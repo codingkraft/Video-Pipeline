@@ -21,13 +21,14 @@ export class PerplexityTester {
     /**
      * Test the complete Perplexity workflow:
      * 1. Navigate to chat URL or create new
-     * 2. Change LLM to Claude Sonnet 4.5 FIRST
-     * 3. Attach files (preserving original filenames)
-     * 4. Wait for files to upload completely
-     * 5. Enter prompt
-     * 6. Submit
-     * 7. Wait for and extract response
-     * 8. Save response to file
+     * 2. Select Search mode (Strict check)
+     * 3. Change LLM to Claude Sonnet 4.5 FIRST (Strict check)
+     * 4. Attach files (preserving original filenames)
+     * 5. Wait for files to upload completely
+     * 6. Enter prompt
+     * 7. Submit
+     * 8. Wait for and extract response
+     * 9. Save response to file
      */
     public async testWorkflow(config: PerplexityTestConfig): Promise<{ success: boolean; message: string; details?: any }> {
         try {
@@ -51,11 +52,10 @@ export class PerplexityTester {
                 steps.push('✓ Opened Perplexity home');
             }
 
-            // Step 2: Select Search mode (before changing LLM)
+            // Step 2: Select Search mode
             try {
                 steps.push('⏳ Selecting Search mode...');
 
-                // Look for mode selector buttons
                 const modeButtonSelectors = [
                     'button[aria-label*="Focus"]',
                     'button[aria-label*="Mode"]',
@@ -83,7 +83,6 @@ export class PerplexityTester {
                 }
 
                 if (modeMenuOpened) {
-                    // Try to find and click Search mode
                     const searchSelectors = [
                         'button:has-text("Search")',
                         '[role="menuitem"]:has-text("Search")',
@@ -106,15 +105,15 @@ export class PerplexityTester {
                     }
 
                     if (!searchSelected) {
-                        steps.push('⚠ Could not find Search mode option (may already be selected)');
+                        throw new Error('Could not find Search mode option');
                     }
                 } else {
-                    steps.push('⚠ Could not open mode selector (may already be in Search mode)');
+                    throw new Error('Could not open mode selector');
                 }
 
                 await this.browser.randomDelay(500, 1000);
             } catch (error) {
-                steps.push(`⚠ Mode selection error: ${(error as Error).message}`);
+                throw new Error(`Mode selection failed: ${(error as Error).message}`);
             }
 
             // Step 3: Change LLM to Claude Sonnet 4.5
@@ -171,18 +170,18 @@ export class PerplexityTester {
                     }
 
                     if (!claudeSelected) {
-                        steps.push('⚠ Could not find Claude Sonnet 4.5 option');
+                        throw new Error('Could not find Claude Sonnet 4.5 option');
                     }
                 } else {
-                    steps.push('⚠ Could not open model selector');
+                    throw new Error('Could not open model selector');
                 }
 
                 await this.browser.randomDelay(1000, 2000);
             } catch (error) {
-                steps.push(`⚠ LLM change error: ${(error as Error).message}`);
+                throw new Error(`LLM selection failed: ${(error as Error).message}`);
             }
 
-            // Step 3: Attach files with ORIGINAL filenames
+            // Step 4: Attach files with ORIGINAL filenames
             if (config.files && config.files.length > 0) {
                 try {
                     steps.push(`⏳ Uploading ${config.files.length} file(s) with original names...`);
@@ -210,19 +209,20 @@ export class PerplexityTester {
                             }, { timeout: 30000 });
                             steps.push('✓ Files uploaded successfully');
                         } catch (e) {
-                            steps.push('✓ Upload wait completed');
+                            console.warn('Upload wait timeout, checking if files attached...');
+                            // We don't throw hero, just warn, as sometimes indicators are tricky
                         }
 
                         await this.browser.randomDelay(2000, 3000);
                     } else {
-                        steps.push('⚠ Could not find file upload input');
+                        throw new Error('Could not find file upload input');
                     }
                 } catch (error) {
-                    steps.push(`⚠ File attachment error: ${(error as Error).message}`);
+                    throw new Error(`File attachment failed: ${(error as Error).message}`);
                 }
             }
 
-            // Step 4: Enter prompt (AFTER files uploaded and LLM selected)
+            // Step 5: Enter prompt
             try {
                 steps.push('⏳ Entering prompt...');
                 const textareaSelectors = [
@@ -254,25 +254,25 @@ export class PerplexityTester {
                 }
 
                 if (!promptEntered) {
-                    steps.push('⚠ Could not find prompt input');
+                    throw new Error('Could not find prompt input');
                 }
 
                 await this.browser.randomDelay(1000, 1500);
             } catch (error) {
-                steps.push(`⚠ Prompt entry error: ${(error as Error).message}`);
+                throw new Error(`Prompt entry failed: ${(error as Error).message}`);
             }
 
-            // Step 5: Submit
+            // Step 6: Submit
             try {
                 steps.push('⏳ Submitting query...');
                 await page.keyboard.press('Enter');
                 steps.push('✓ Submitted query');
                 await this.browser.randomDelay(3000, 5000);
             } catch (error) {
-                steps.push(`⚠ Submit error: ${(error as Error).message}`);
+                throw new Error(`Submit failed: ${(error as Error).message}`);
             }
 
-            // Step 6: Wait for response
+            // Step 7: Wait for response
             steps.push('⏳ Waiting for Perplexity response (up to 60s)...');
             let responseText = '';
 
@@ -290,7 +290,7 @@ export class PerplexityTester {
                         await page.waitForSelector(selector, { timeout: 60000 });
                         await this.browser.randomDelay(5000, 7000);
 
-                        responseText = await page.evaluate((sel: string) => {
+                        responseText = await page.evaluate((sel) => {
                             const element = document.querySelector(sel);
                             return element ? element.textContent || '' : '';
                         }, selector);
@@ -314,7 +314,7 @@ export class PerplexityTester {
                 steps.push(`⚠ Response extraction error: ${(error as Error).message}`);
             }
 
-            // Step 7: Save response
+            // Step 8: Save response
             const responseFilePath = path.join(outputDir, `${jobId}_perplexity_response.txt`);
             fs.writeFileSync(responseFilePath, responseText, 'utf-8');
             steps.push(`✓ Response saved to: ${responseFilePath}`);

@@ -13,8 +13,23 @@ const io = new SocketIOServer(httpServer);
 const PORT = 3000;
 
 // Configure multer for file uploads
+// Configure multer with disk storage to preserve filenames
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(process.cwd(), 'temp_uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Use original filename so Perplexity sees the correct context
+        cb(null, file.originalname);
+    }
+});
+
 const upload = multer({
-    dest: path.join(process.cwd(), 'temp_uploads'),
+    storage: storage,
     limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
 });
 
