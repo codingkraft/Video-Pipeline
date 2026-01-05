@@ -203,7 +203,8 @@ export class PerplexityTester {
                     }
 
                     if (fileInput) {
-                        await fileInput.uploadFile(...config.files);
+                        const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
+                        await inputElement.uploadFile(...config.files);
                         steps.push(`✓ Attached ${config.files.length} file(s)`);
 
                         steps.push('⏳ Waiting for files to upload...');
