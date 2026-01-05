@@ -3,6 +3,67 @@ const socket = io();
 
 let selectedDocuments = [];
 let allFolders = []; // Store multiple folders
+let selectedLocalFolder = null; // The absolute path of the selected local folder
+
+// Select local folder using native Windows dialog
+async function selectLocalFolder() {
+    const btn = document.getElementById('selectFolderBtn');
+    const originalText = btn.textContent;
+    btn.textContent = '⏳ Opening...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/browse-folder');
+        const data = await response.json();
+
+        if (data.path) {
+            selectedLocalFolder = data.path;
+            document.getElementById('folderPath').textContent = data.path;
+            document.getElementById('outputPathPreview').textContent = data.path + '\\output\\';
+
+            // Save to settings
+            document.getElementById('sourceFolder').value = data.path;
+            saveSettings();
+
+            // Load files from the folder
+            await loadFilesFromFolder(data.path);
+        } else if (data.cancelled) {
+            console.log('Folder selection cancelled');
+        }
+    } catch (error) {
+        console.error('Browse error:', error);
+        alert('Failed to open folder picker: ' + error.message);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Load and display files from a local folder
+async function loadFilesFromFolder(folderPath) {
+    const docList = document.getElementById('documentList');
+    docList.innerHTML = '<p style="color: var(--text-muted);">Loading files...</p>';
+
+    try {
+        const response = await fetch('/api/list-folder?path=' + encodeURIComponent(folderPath));
+        const data = await response.json();
+
+        if (data.files && data.files.length > 0) {
+            docList.innerHTML = '';
+            data.files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'document-item';
+                item.innerHTML = `<span>📄 ${file}</span>`;
+                docList.appendChild(item);
+            });
+        } else {
+            docList.innerHTML = '<p style="color: var(--text-muted);">No supported files found in this folder.</p>';
+        }
+    } catch (error) {
+        console.error('Error loading files:', error);
+        docList.innerHTML = '<p style="color: var(--danger);">Error loading files: ' + error.message + '</p>';
+    }
+}
 
 // Handle folder selection from file input
 function handleFolderSelect() {

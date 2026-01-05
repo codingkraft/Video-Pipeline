@@ -39,21 +39,22 @@
                 </div>
             </section>
 
-            <!-- Step 1: Select Folder -->
+            <!-- Step 1: Select Document Folder -->
             <section class="card">
                 <h2>📁 Step 1: Select Document Folder</h2>
-                <div class="input-group">
-                    <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;"
-                        onchange="handleFolderSelect()">
-                    <button onclick="document.getElementById('folderInput').click()" class="btn btn-primary">
-                        📂 Add Folder
+                <div class="input-group" style="flex-wrap: wrap; gap: 0.5rem;">
+                    <button onclick="selectLocalFolder()" class="btn btn-primary" id="selectFolderBtn"
+                        style="font-size: 1.1rem; padding: 0.75rem 1.5rem;">
+                        📂 Select Local Folder
                     </button>
-                    <button onclick="clearFolders()" class="btn btn-secondary">
-                        🗑️ Clear All
-                    </button>
-                    <span id="folderName" class="folder-name">No folders selected</span>
+                    <span id="folderPath" class="folder-name"
+                        style="flex: 1; min-width: 200px; padding: 0.5rem; background: var(--bg); border-radius: 0.25rem;">No
+                        folder selected</span>
                 </div>
-                <div id="documentList" class="document-list"></div>
+                <small class="hint" style="display: block; margin-top: 0.5rem;">Output will be saved to: <strong
+                        id="outputPathPreview">[Selected Folder]/output/</strong></small>
+
+                <div id="documentList" class="document-list" style="margin-top: 1rem;"></div>
             </section>
 
             <!-- Step 2: Configure Settings -->
