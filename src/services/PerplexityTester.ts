@@ -249,10 +249,24 @@ export class PerplexityTester {
                             await element.click();
                             await this.browser.randomDelay(500, 1000);
 
-                            // Human typing for contenteditable div
-                            await this.browser.humanType(page, selector, config.prompt);
+                            // Paste the prompt directly instead of typing
+                            await page.evaluate((sel, text) => {
+                                const el = document.querySelector(sel) as HTMLElement;
+                                if (el) {
+                                    el.focus();
+                                    // For contenteditable, setting innerText is often cleanest
+                                    if (el.getAttribute('contenteditable') === 'true') {
+                                        el.innerText = text;
+                                    } else {
+                                        (el as HTMLInputElement).value = text;
+                                    }
+                                    // Trigger input event to ensure frameworks react
+                                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }, selector, config.prompt);
 
-                            steps.push(`✓ Entered prompt: "${config.prompt.substring(0, 50)}..."`);
+                            steps.push(`✓ Pasted prompt: "${config.prompt.substring(0, 50)}..."`);
                             promptEntered = true;
                             break;
 
