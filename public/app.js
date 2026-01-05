@@ -119,6 +119,7 @@ async function loadSettings() {
             document.getElementById('notebookLmStyleSettings').value = settings.notebookLmStyleSettings || 'Modern, engaging, educational style';
             document.getElementById('stylePrompt').value = settings.stylePrompt || 'Professional with smooth transitions';
             document.getElementById('outputDir').value = settings.outputDir || '';
+            document.getElementById('sourceFolder').value = settings.sourceFolder || '';
             console.log('Settings loaded from file');
         }
     } catch (error) {
@@ -135,6 +136,7 @@ function saveSettings() {
         notebookLmStyleSettings: document.getElementById('notebookLmStyleSettings').value,
         stylePrompt: document.getElementById('stylePrompt').value,
         outputDir: document.getElementById('outputDir').value,
+        sourceFolder: document.getElementById('sourceFolder').value,
     };
     fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if (d.success) { const msg = document.getElementById('saveMessage'); if (msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
 
@@ -158,7 +160,8 @@ function setupAutoSave() {
         'notebookLmChatSettings',
         'notebookLmStyleSettings',
         'stylePrompt',
-        'outputDir'
+        'outputDir',
+        'sourceFolder'
     ];
 
     inputIds.forEach(id => {
@@ -463,12 +466,12 @@ async function testPerplexity() {
         });
 
         const outputDir = document.getElementById('outputDir').value;
+        const sourceFolder = document.getElementById('sourceFolder').value;
 
         formData.append('chatUrl', perplexityChatUrl);
         formData.append('prompt', promptText);
-        if (outputDir) {
-            formData.append('outputDir', outputDir);
-        }
+        if (outputDir) formData.append('outputDir', outputDir);
+        if (sourceFolder) formData.append('sourceFolder', sourceFolder);
 
         const response = await fetch('/api/test-perplexity', {
             method: 'POST',
@@ -519,3 +522,29 @@ checkStatus();
 verifySessions(); // Auto-verify on load
 setupAutoSave(); // Enable auto-save on input blur
 
+
+// Browse folder using native picker
+async function browseFolder() {
+    const btn = document.querySelector('button[onclick="browseFolder()"]');
+    const originalText = btn.textContent;
+    btn.textContent = 'Scanning...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/browse-folder');
+        const data = await response.json();
+
+        if (data.path) {
+            const input = document.getElementById('sourceFolder');
+            input.value = data.path;
+            // Trigger auto-save
+            saveSettings();
+        }
+    } catch (error) {
+        console.error('Browse error:', error);
+        alert('Failed to open folder picker: ' + error.message);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}

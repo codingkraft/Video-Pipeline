@@ -9,7 +9,8 @@ export interface PerplexityTestConfig {
     chatUrl?: string;
     files: string[];
     prompt: string;
-    outputDir?: string; // Optional: directory to save output (defaults to source folder)
+    outputDir?: string;
+    sourceFolder?: string; // NEW: The absolute path of the source folder
 }
 
 export class PerplexityTester {
@@ -32,16 +33,29 @@ export class PerplexityTester {
             const steps: string[] = [];
             const jobId = `job_${Date.now()}`;
 
+            // Resolve file paths if sourceFolder is provided
+            let filesToUpload = config.files;
+            if (config.sourceFolder && config.files.length > 0) {
+                // If we have a source folder, ensure files are absolute paths
+                filesToUpload = config.files.map(f => {
+                    return path.isAbsolute(f) ? f : path.join(config.sourceFolder!, f);
+                });
+            }
+
             // Determine output directory:
             // 1. Use explicit outputDir if provided
-            // 2. Otherwise, use the folder of the first input file
-            // 3. Fall back to project output folder
+            // 2. Use sourceFolder if provided (this is the Local Mode)
+            // 3. Fall back to first file's directory
+            // 4. Fall back to project output folder
             let outputDir: string;
             if (config.outputDir) {
                 outputDir = path.join(config.outputDir, 'output', jobId);
-            } else if (config.files && config.files.length > 0) {
+            } else if (config.sourceFolder) {
+                // Local Mode: Save in sourceFolder/output/job...
+                outputDir = path.join(config.sourceFolder, 'output', jobId);
+            } else if (filesToUpload && filesToUpload.length > 0) {
                 // Save output inside the source folder's 'output' subfolder
-                const sourceFolder = path.dirname(config.files[0]);
+                const sourceFolder = path.dirname(filesToUpload[0]);
                 outputDir = path.join(sourceFolder, 'output', jobId);
             } else {
                 outputDir = path.join(process.cwd(), 'output', jobId);
@@ -170,16 +184,16 @@ export class PerplexityTester {
 
             // Step 4: Attach files
             // HTML: <input data-testid="file-upload-input" type="file" ...>
-            if (config.files && config.files.length > 0) {
+            if (filesToUpload && filesToUpload.length > 0) {
                 try {
-                    steps.push(`⏳ Uploading ${config.files.length} file(s)...`);
+                    steps.push(`⏳ Uploading ${filesToUpload.length} file(s)...`);
 
                     const fileInput = await page.$('input[data-testid="file-upload-input"]');
 
                     if (fileInput) {
                         const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
-                        await inputElement.uploadFile(...config.files);
-                        steps.push(`✓ Attached ${config.files.length} file(s)`);
+                        await inputElement.uploadFile(...filesToUpload);
+                        steps.push(`✓ Attached ${filesToUpload.length} file(s)`);
 
                         // Wait for upload to complete
                         steps.push('⏳ Waiting for files to upload...');

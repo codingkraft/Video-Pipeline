@@ -93,8 +93,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="outputDir">Output Directory (Optional)</label>
-                    <input type="text" id="outputDir" placeholder="Leave empty for default (./output/)">
+                    <label for="sourceFolder">Local Source Folder Path (Absolute)</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="sourceFolder" placeholder="e.g. F:\MyWork\Docs" style="flex: 1;">
+                        <button type="button" onclick="browseFolder()" class="btn btn-secondary"
+                            style="white-space: nowrap; padding: 0.5rem 1rem;">📂 Browse</button>
+                    </div>
+                    <small class="hint">If set, files will be read from here and output saved to 'output'
+                        subfolder.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="outputDir">Output Directory Override (Optional)</label>
+                    <input type="text" id="outputDir" placeholder="Leave empty to use source folder's output">
                 </div>
 
                 <button onclick="saveSettings()" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">

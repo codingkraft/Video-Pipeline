@@ -265,15 +265,40 @@ app.get('/api/verify-sessions', async (req: Request, res: Response) => {
     }
 });
 
+// API: Open Folder Picker (Windows only)
+app.get('/api/browse-folder', async (req: Request, res: Response) => {
+    try {
+        const { exec } = require('child_process');
+        // PowerShell script to open FolderBrowserDialog
+        const psScript = `
+            Add-Type -AssemblyName System.Windows.Forms
+            $f = New-Object System.Windows.Forms.FolderBrowserDialog
+            $f.ShowNewFolderButton = $true
+            if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }
+        `;
+
+        exec(`powershell -command "${psScript.replace(/\n/g, ' ')}"`, (error: any, stdout: string, stderr: string) => {
+            if (error) {
+                console.error('Picker error:', error);
+                return res.status(500).json({ error: 'Failed to open picker' });
+            }
+            const path = stdout.trim();
+            res.json({ path: path || null });
+        });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
 // API: Test Perplexity workflow
 app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request, res: Response) => {
     try {
         const { PerplexityTester } = await import('./services/PerplexityTester');
 
         const files = req.files as Express.Multer.File[];
-        const { chatUrl, prompt, outputDir } = req.body;
+        const { chatUrl, prompt, outputDir, sourceFolder } = req.body;
 
-        console.log(`Received test request with ${files ? files.length : 0} files`);
+        console.log(`Received test request with ${files ? files.length : 0} files. SourceFolder: ${sourceFolder}`);
 
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
@@ -281,11 +306,31 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
 
         const tester = new PerplexityTester();
 
+        // Resolve files:
+        // 1. If files uploaded, use them (temp paths)
+        // 2. If sourceFolder provided, list files from there
+        let targetFiles: string[] = [];
+
+        if (files && files.length > 0) {
+            targetFiles = files.map(f => f.path);
+        } else if (sourceFolder) {
+            // Local Mode: Read files from source folder
+            if (fs.existsSync(sourceFolder)) {
+                targetFiles = fs.readdirSync(sourceFolder)
+                    .filter(f => /\.(pdf|txt|md|docx?)$/i.test(f))
+                    .map(f => path.join(sourceFolder, f));
+                console.log(`Found ${targetFiles.length} files in source folder`);
+            } else {
+                return res.status(400).json({ error: `Source folder not found: ${sourceFolder}` });
+            }
+        }
+
         const result = await tester.testWorkflow({
             chatUrl: chatUrl || undefined,
-            files: files ? files.map(f => f.path) : [],
+            files: targetFiles,
             prompt,
-            outputDir: outputDir || undefined
+            outputDir: outputDir || undefined,
+            sourceFolder: sourceFolder || undefined
         });
 
         // Cleanup uploaded files
