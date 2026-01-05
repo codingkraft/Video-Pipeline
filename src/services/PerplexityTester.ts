@@ -195,42 +195,57 @@ export class PerplexityTester {
                 }
             }
 
-            // Step 5: Enter prompt - set text directly via JavaScript
-            // HTML: <div contenteditable="true" id="ask-input" data-lexical-editor="true">
+            // Step 5: Enter prompt
+            // Method 3: Clipboard Paste (Most reliable for rich text editors)
+            // 1. Copy to clipboard using Puppeteer
+            // 2. Focus input
+            // 3. Paste (Ctrl+V)
             try {
                 steps.push('⏳ Entering prompt...');
 
-                // Set text directly via JavaScript - much faster than typing
-                // Lexical editor requires special handling
-                // Set text using execCommand which works reliably with Lexical/contenteditable
-                // Set text using execCommand which works reliably with Lexical/contenteditable
-                const promptSet = await page.evaluate(async (promptText) => {
-                    const inputArea = document.querySelector('#ask-input') as HTMLElement;
-                    if (!inputArea) return false;
+                // Focus and clear first
+                await page.click('#ask-input');
+                await this.browser.randomDelay(200, 400);
 
-                    inputArea.focus();
-                    document.execCommand('selectAll', false);
-                    document.execCommand('delete', false);
+                await page.keyboard.down('Control');
+                await page.keyboard.press('KeyA');
+                await page.keyboard.up('Control');
+                await page.keyboard.press('Backspace');
 
-                    // Split content by newlines and insert line by line
-                    // This creates the proper paragraph structure
-                    const lines = promptText.split('\n');
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i]) {
-                            document.execCommand('insertText', false, lines[i]);
-                        }
-                        if (i < lines.length - 1) {
-                            // Insert a linebreak for newlines
-                            document.execCommand('insertParagraph', false, '');
-                        }
-                    }
-                    return true;
+                await this.browser.randomDelay(200, 400);
+
+                // Copy text to clipboard (using explicit browser permissions if needed, but usually works in Puppeteer)
+                await page.evaluate((text) => {
+                    const input = document.createElement('textarea');
+                    input.value = text;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(input);
                 }, config.prompt);
 
-                if (promptSet) {
-                    steps.push(`✓ Set prompt: "${config.prompt.substring(0, 50)}..."`);
+                // Paste
+                await page.keyboard.down('Control');
+                await page.keyboard.press('KeyV');
+                await page.keyboard.up('Control');
+
+                steps.push(`✓ Pasted prompt via Clipboard`);
+
+                await this.browser.randomDelay(2000, 3000);
+
+                // VERIFY text is present before continuing
+                const hasText = await page.evaluate(() => {
+                    const el = document.querySelector('#ask-input');
+                    return el && el.textContent && el.textContent.length > 5;
+                });
+
+                if (!hasText) {
+                    steps.push('⚠ Text verification failed - trying fallback typing...');
+                    // Fallback to simple typing if paste failed
+                    await page.click('#ask-input');
+                    await page.keyboard.type(config.prompt);
                 } else {
-                    throw new Error('Could not set prompt - #ask-input not found');
+                    steps.push('✓ Verified prompt text is present');
                 }
 
                 // Important: Wait for UI to process the text and enable the submit button
