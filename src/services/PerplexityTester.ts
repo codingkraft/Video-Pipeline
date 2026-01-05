@@ -84,25 +84,48 @@ export class PerplexityTester {
             }
 
             // Step 3: Change LLM to Claude Sonnet 4.5
-            // HTML: <button aria-label="Gemini 3 Pro" ...>
+            // HTML: <button aria-label="Gemini 3 Pro" ...> with <svg><use xlink:href="#pplx-icon-cpu">
             try {
                 steps.push('⏳ Opening model selector...');
 
-                // Click the model button (aria-label contains current model name)
-                const modelButton = await page.$('button[aria-label*="Pro"], button[aria-label*="Claude"], button[aria-label*="GPT"], button[aria-label*="Sonar"], button[aria-label*="Gemini"]');
+                // Use JavaScript to find the LAST button containing the CPU icon
+                // There are multiple CPU icons - the last one is the model selector
+                const modelButtonClicked = await page.evaluate(() => {
+                    // Find all buttons with CPU icon
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const cpuButtons: HTMLButtonElement[] = [];
 
-                if (modelButton) {
-                    const currentModel = await page.evaluate(el => el.getAttribute('aria-label'), modelButton);
-                    steps.push(`✓ Found model button: ${currentModel}`);
+                    for (const btn of buttons) {
+                        // Check if button contains the CPU icon
+                        const useElement = btn.querySelector('svg use');
+                        if (useElement) {
+                            const href = useElement.getAttribute('xlink:href') || useElement.getAttribute('href');
+                            if (href && href.includes('pplx-icon-cpu')) {
+                                cpuButtons.push(btn);
+                            }
+                        }
+                    }
 
-                    await modelButton.click();
+                    // Use the LAST CPU button (model selector near input)
+                    if (cpuButtons.length > 0) {
+                        const modelBtn = cpuButtons[cpuButtons.length - 1];
+                        const label = modelBtn.getAttribute('aria-label');
+                        modelBtn.click();
+                        return label || 'Model button (last CPU icon)';
+                    }
+                    return null;
+                });
+
+                if (modelButtonClicked) {
+                    steps.push(`✓ Clicked model button: ${modelButtonClicked}`);
                     await this.browser.randomDelay(1500, 2000);
 
                     // Wait for dropdown to appear and find Claude option
                     // Look for text containing "Claude" in the dropdown
                     try {
-                        // Use XPath for text matching which is more reliable
-                        const claudeXpath = "//button[contains(text(), 'Claude')] | //div[contains(text(), 'Claude 3.5 Sonnet')]";
+                        // Use XPath for specific text matching
+                        // We must match "Sonnet" to avoid "Opus"
+                        const claudeXpath = "//div[contains(text(), 'Claude 3.5 Sonnet')] | //button[contains(text(), 'Sonnet')]";
                         await page.waitForXPath(claudeXpath, { timeout: 3000 });
 
                         const [claudeOption] = await page.$x(claudeXpath);
@@ -111,14 +134,16 @@ export class PerplexityTester {
                             await this.browser.randomDelay(1000, 1500);
                             steps.push('✓ Selected Claude Sonnet');
                         } else {
-                            throw new Error('Claude option not clickable');
+                            throw new Error('Claude Sonnet option not clickable');
                         }
                     } catch (e) {
                         // Fallback: Try clicking by evaluating text
                         const clicked = await page.evaluate(() => {
                             const elements = Array.from(document.querySelectorAll('button, div[role="menuitem"], div[role="option"]'));
                             for (const el of elements) {
-                                if (el.textContent?.includes('Claude')) {
+                                // Explicitly check for "Sonnet"
+                                const text = el.textContent || '';
+                                if (text.includes('Claude') && text.includes('Sonnet')) {
                                     (el as HTMLElement).click();
                                     return true;
                                 }
@@ -170,30 +195,42 @@ export class PerplexityTester {
                 }
             }
 
-            // Step 5: Enter prompt
+            // Step 5: Enter prompt - set text directly via JavaScript
             // HTML: <div contenteditable="true" id="ask-input" data-lexical-editor="true">
             try {
                 steps.push('⏳ Entering prompt...');
 
-                // Click to focus the input area
-                const inputArea = await page.$('#ask-input');
-                if (inputArea) {
-                    await inputArea.click();
-                    await this.browser.randomDelay(300, 500);
+                // Set text directly via JavaScript - much faster than typing
+                // Lexical editor requires special handling
+                const promptSet = await page.evaluate((promptText) => {
+                    const inputArea = document.querySelector('#ask-input') as HTMLElement;
+                    if (!inputArea) return false;
 
-                    // For Lexical editor, we need to use keyboard to type
-                    // First clear any existing content
-                    await page.keyboard.down('Control');
-                    await page.keyboard.press('KeyA');
-                    await page.keyboard.up('Control');
-                    await page.keyboard.press('Backspace');
+                    // Focus the element
+                    inputArea.focus();
 
-                    // Type the prompt directly
-                    await page.keyboard.type(config.prompt);
+                    // Clear existing content
+                    inputArea.innerHTML = '';
 
-                    steps.push(`✓ Entered prompt: "${config.prompt.substring(0, 50)}..."`);
+                    // For Lexical editor, we need to create proper paragraph structure
+                    const p = document.createElement('p');
+                    p.setAttribute('dir', 'auto');
+                    const span = document.createElement('span');
+                    span.setAttribute('data-lexical-text', 'true');
+                    span.textContent = promptText;
+                    p.appendChild(span);
+                    inputArea.appendChild(p);
+
+                    // Trigger input event to notify Lexical of changes
+                    inputArea.dispatchEvent(new Event('input', { bubbles: true }));
+
+                    return true;
+                }, config.prompt);
+
+                if (promptSet) {
+                    steps.push(`✓ Set prompt: "${config.prompt.substring(0, 50)}..."`);
                 } else {
-                    throw new Error('Prompt input #ask-input not found');
+                    throw new Error('Could not set prompt - #ask-input not found');
                 }
 
                 await this.browser.randomDelay(1000, 1500);
@@ -201,27 +238,42 @@ export class PerplexityTester {
                 throw new Error(`Prompt entry failed: ${(error as Error).message}`);
             }
 
-            // Step 6: Submit
+            // Step 6: Submit - ONLY use button click, never Enter key
             try {
                 steps.push('⏳ Submitting query...');
 
-                // Click submit button or press Enter
-                const submitButton = await page.$('button[aria-label="Submit"]');
-                if (submitButton) {
-                    // Check if button is disabled
-                    const isDisabled = await page.evaluate(el => el.hasAttribute('disabled'), submitButton);
-                    if (isDisabled) {
-                        // Wait a moment then try Enter key
-                        await this.browser.randomDelay(500, 1000);
-                        await page.keyboard.press('Enter');
-                        steps.push('✓ Submitted via Enter key');
-                    } else {
-                        await submitButton.click();
-                        steps.push('✓ Submitted via button');
+                // Wait a moment for the UI to update after prompt entry
+                await this.browser.randomDelay(500, 1000);
+
+                // Click submit button (must wait for it to be enabled)
+                const submitted = await page.evaluate(() => {
+                    const submitBtn = document.querySelector('button[aria-label="Submit"]') as HTMLButtonElement;
+                    if (submitBtn && !submitBtn.disabled) {
+                        submitBtn.click();
+                        return true;
                     }
+                    return false;
+                });
+
+                if (submitted) {
+                    steps.push('✓ Submitted via button');
                 } else {
-                    await page.keyboard.press('Enter');
-                    steps.push('✓ Submitted via Enter key');
+                    // Wait and retry - button might need time to enable
+                    await this.browser.randomDelay(1000, 1500);
+                    const retrySubmit = await page.evaluate(() => {
+                        const submitBtn = document.querySelector('button[aria-label="Submit"]') as HTMLButtonElement;
+                        if (submitBtn) {
+                            submitBtn.click();
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (retrySubmit) {
+                        steps.push('✓ Submitted via button (after retry)');
+                    } else {
+                        throw new Error('Submit button not found or still disabled');
+                    }
                 }
 
                 await this.browser.randomDelay(3000, 5000);
