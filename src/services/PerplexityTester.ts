@@ -234,18 +234,31 @@ export class PerplexityTester {
                 await this.browser.randomDelay(2000, 3000);
 
                 // VERIFY text is present before continuing
-                const hasText = await page.evaluate(() => {
+                let hasText = await page.evaluate(() => {
                     const el = document.querySelector('#ask-input');
-                    return el && el.textContent && el.textContent.length > 5;
+                    return el && el.textContent && el.textContent.trim().length > 0;
                 });
 
                 if (!hasText) {
-                    steps.push('⚠ Text verification failed - trying fallback typing...');
-                    // Fallback to simple typing if paste failed
+                    steps.push('⚠ Text verification failed - retrying paste...');
+                    // Retry paste once
                     await page.click('#ask-input');
-                    await page.keyboard.type(config.prompt);
-                } else {
+                    await page.keyboard.down('Control');
+                    await page.keyboard.press('KeyV');
+                    await page.keyboard.up('Control');
+
+                    await this.browser.randomDelay(1000, 2000);
+
+                    hasText = await page.evaluate(() => {
+                        const el = document.querySelector('#ask-input');
+                        return el && el.textContent && el.textContent.trim().length > 0;
+                    });
+                }
+
+                if (hasText) {
                     steps.push('✓ Verified prompt text is present');
+                } else {
+                    throw new Error('Failed to set prompt text after retry');
                 }
 
                 // Important: Wait for UI to process the text and enable the submit button
