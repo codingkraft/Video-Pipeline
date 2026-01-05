@@ -51,7 +51,73 @@ export class PerplexityTester {
                 steps.push('✓ Opened Perplexity home');
             }
 
-            // Step 2: Change LLM to Claude Sonnet 4.5 FIRST
+            // Step 2: Select Search mode (before changing LLM)
+            try {
+                steps.push('⏳ Selecting Search mode...');
+
+                // Look for mode selector buttons
+                const modeButtonSelectors = [
+                    'button[aria-label*="Focus"]',
+                    'button[aria-label*="Mode"]',
+                    'button:has-text("Focus")',
+                    'button:has-text("Deep")',
+                    'button:has-text("Search")',
+                    '[data-testid*="focus"]',
+                    '[data-testid*="mode"]'
+                ];
+
+                let modeMenuOpened = false;
+                for (const selector of modeButtonSelectors) {
+                    try {
+                        const button = await page.$(selector);
+                        if (button) {
+                            await button.click();
+                            await this.browser.randomDelay(500, 1000);
+                            modeMenuOpened = true;
+                            steps.push('✓ Opened mode selector');
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+
+                if (modeMenuOpened) {
+                    // Try to find and click Search mode
+                    const searchSelectors = [
+                        'button:has-text("Search")',
+                        '[role="menuitem"]:has-text("Search")',
+                        '[role="option"]:has-text("Search")',
+                        'div:has-text("Search")'
+                    ];
+
+                    let searchSelected = false;
+                    for (const selector of searchSelectors) {
+                        try {
+                            await page.waitForSelector(selector, { timeout: 2000 });
+                            await page.click(selector);
+                            await this.browser.randomDelay(500, 1000);
+                            searchSelected = true;
+                            steps.push('✓ Selected Search mode');
+                            break;
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+
+                    if (!searchSelected) {
+                        steps.push('⚠ Could not find Search mode option (may already be selected)');
+                    }
+                } else {
+                    steps.push('⚠ Could not open mode selector (may already be in Search mode)');
+                }
+
+                await this.browser.randomDelay(500, 1000);
+            } catch (error) {
+                steps.push(`⚠ Mode selection error: ${(error as Error).message}`);
+            }
+
+            // Step 3: Change LLM to Claude Sonnet 4.5
             try {
                 steps.push('⏳ Changing LLM to Claude Sonnet 4.5...');
 
