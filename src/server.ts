@@ -271,7 +271,7 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
         const { PerplexityTester } = await import('./services/PerplexityTester');
 
         const files = req.files as Express.Multer.File[];
-        const { chatUrl, prompt } = req.body;
+        const { chatUrl, prompt, outputDir } = req.body;
 
         console.log(`Received test request with ${files ? files.length : 0} files`);
 
@@ -284,7 +284,8 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
         const result = await tester.testWorkflow({
             chatUrl: chatUrl || undefined,
             files: files ? files.map(f => f.path) : [],
-            prompt
+            prompt,
+            outputDir: outputDir || undefined
         });
 
         // Cleanup uploaded files

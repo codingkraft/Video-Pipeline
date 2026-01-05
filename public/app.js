@@ -136,7 +136,7 @@ function saveSettings() {
         stylePrompt: document.getElementById('stylePrompt').value,
         outputDir: document.getElementById('outputDir').value,
     };
-    fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if(d.success) { const msg = document.getElementById('saveMessage'); if(msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
+    fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if (d.success) { const msg = document.getElementById('saveMessage'); if (msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
 
     // Show confirmation message
     const saveMessage = document.getElementById('saveMessage');
@@ -462,8 +462,13 @@ async function testPerplexity() {
             formData.append('files', doc.file);
         });
 
+        const outputDir = document.getElementById('outputDir').value;
+
         formData.append('chatUrl', perplexityChatUrl);
         formData.append('prompt', promptText);
+        if (outputDir) {
+            formData.append('outputDir', outputDir);
+        }
 
         const response = await fetch('/api/test-perplexity', {
             method: 'POST',
