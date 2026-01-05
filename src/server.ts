@@ -265,20 +265,20 @@ app.get('/api/verify-sessions', async (req: Request, res: Response) => {
     }
 });
 
-// API: Open Folder Picker (Windows only - uses PowerShell with STA mode)
+// API: Open Folder Picker (Windows - MODERN dialog with Quick Access)
 app.get('/api/browse-folder', async (req: Request, res: Response) => {
     try {
         const { exec } = require('child_process');
 
-        // PowerShell with -STA flag is required for Windows Forms dialogs
-        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Select Source Folder'; $f.ShowNewFolderButton = $true; $f.RootFolder = [System.Environment+SpecialFolder]::Desktop; if ($f.ShowDialog() -eq 'OK') { Write-Output $f.SelectedPath } }"`;
+        // Use OpenFileDialog which shows the MODERN Windows Explorer UI with Quick Access
+        // This is a workaround - user navigates to folder, types folder name, clicks Open
+        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Navigate to folder and click Open'; $d.CheckFileExists = $false; $d.CheckPathExists = $true; $d.FileName = 'Select This Folder'; $d.Filter = 'Folders|*.folder'; $d.ValidateNames = $false; if ($d.ShowDialog() -eq 'OK') { [System.IO.Path]::GetDirectoryName($d.FileName) } }"`;
 
-        console.log('Opening folder picker...');
+        console.log('Opening modern folder picker...');
 
         exec(cmd, { timeout: 120000 }, (error: any, stdout: string, stderr: string) => {
             if (error) {
                 console.error('Picker stderr:', stderr);
-                // User cancelled or error
                 return res.json({ path: null, cancelled: true });
             }
             const selectedPath = stdout.trim();
