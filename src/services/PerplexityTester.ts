@@ -389,6 +389,13 @@ export class PerplexityTester {
             steps.push(`✓ Response saved to: ${responseFilePath}`);
 
             const screenshotPath = path.join(outputDir, `${jobId}_perplexity_screenshot.png`);
+
+            // Scroll to bottom before screenshot
+            await page.evaluate(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            });
+            await this.browser.randomDelay(1000, 2000); // Wait for any lazy load
+
             await page.screenshot({ path: screenshotPath, fullPage: true });
             steps.push(`✓ Screenshot saved: ${screenshotPath}`);
 
