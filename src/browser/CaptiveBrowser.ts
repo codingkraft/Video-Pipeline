@@ -47,13 +47,13 @@ export class CaptiveBrowser {
         this.browser = await puppeteerExtra.launch({
             headless: this.config.headless,
             userDataDir: this.config.userDataDir,
-            defaultViewport: this.config.defaultViewport,
+            defaultViewport: null, // Use full screen viewport
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
                 '--disable-infobars',
-                `--window-size=${this.config.defaultViewport.width},${this.config.defaultViewport.height}`,
+                '--start-maximized', // Start maximized to fit screen
             ],
         });
 

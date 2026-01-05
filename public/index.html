@@ -96,6 +96,14 @@
                     <label for="outputDir">Output Directory (Optional)</label>
                     <input type="text" id="outputDir" placeholder="Leave empty for default (./output/)">
                 </div>
+
+                <button onclick="saveSettings()" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    💾 Save Settings
+                </button>
+                <p id="saveMessage"
+                    style="text-align: center; margin-top: 0.5rem; color: var(--success); display: none;">
+                    ✓ Settings saved!
+                </p>
             </section>
 
             <!-- Step 3: Generate -->

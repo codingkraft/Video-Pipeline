@@ -130,6 +130,39 @@ function saveSettings() {
         outputDir: document.getElementById('outputDir').value,
     };
     localStorage.setItem('videoCreatorSettings', JSON.stringify(settings));
+
+    // Show confirmation message
+    const saveMessage = document.getElementById('saveMessage');
+    if (saveMessage) {
+        saveMessage.style.display = 'block';
+        setTimeout(() => {
+            saveMessage.style.display = 'none';
+        }, 2000);
+    }
+
+    console.log('Settings saved:', settings);
+}
+
+// Auto-save settings when inputs change
+function setupAutoSave() {
+    const inputIds = [
+        'perplexityChatUrl',
+        'promptText',
+        'notebookLmChatSettings',
+        'notebookLmStyleSettings',
+        'stylePrompt',
+        'outputDir'
+    ];
+
+    inputIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            // Save on blur (when user leaves the field)
+            element.addEventListener('blur', () => {
+                saveSettings();
+            });
+        }
+    });
 }
 
 // Generate video
@@ -434,10 +467,15 @@ async function testPerplexity() {
 
         if (data.success) {
             testMessage.innerHTML = `
-                <strong>✅ Test Completed!</strong><br>
+                <strong>✅ Test Completed!</strong><br><br>
+                <strong>📄 Response File:</strong><br>
+                <code style="background: var(--bg); padding: 0.5rem; border-radius: 0.25rem; display: block; margin: 0.5rem 0; word-break: break-all;">
+                    ${data.details.responseFilePath}
+                </code>
+                <strong>Response Length:</strong> ${data.details.responseLength} characters<br><br>
+                <strong>Steps:</strong><br>
                 ${data.details.steps.join('<br>')}
                 <br><br>
-                <strong>Current URL:</strong> ${data.details.currentUrl}<br>
                 <strong>Screenshot:</strong> ${data.details.screenshotPath}
             `;
             testMessage.style.color = 'var(--success)';
@@ -467,3 +505,4 @@ socket.on('login-status', (data) => {
 loadSettings();
 checkStatus();
 verifySessions(); // Auto-verify on load
+setupAutoSave(); // Enable auto-save on input blur
