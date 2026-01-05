@@ -57,6 +57,3 @@ desktop.ini
 
 # Uploaded documents (temporary)
 uploads/
-
-# User settings (keep private)
-config/settings.json
