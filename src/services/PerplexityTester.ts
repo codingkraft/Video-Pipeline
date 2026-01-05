@@ -203,20 +203,28 @@ export class PerplexityTester {
                 // Set text directly via JavaScript - much faster than typing
                 // Lexical editor requires special handling
                 // Set text using execCommand which works reliably with Lexical/contenteditable
-                const promptSet = await page.evaluate((promptText) => {
+                // Set text using execCommand which works reliably with Lexical/contenteditable
+                const promptSet = await page.evaluate(async (promptText) => {
                     const inputArea = document.querySelector('#ask-input') as HTMLElement;
                     if (!inputArea) return false;
 
-                    // Focus and clear
                     inputArea.focus();
-
-                    // Select all and delete to clear cleanly
                     document.execCommand('selectAll', false);
                     document.execCommand('delete', false);
 
-                    // Use insertText command - this simulates a user paste/type
-                    // and triggers all necessary internal events for Lexical
-                    return document.execCommand('insertText', false, promptText);
+                    // Split content by newlines and insert line by line
+                    // This creates the proper paragraph structure
+                    const lines = promptText.split('\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i]) {
+                            document.execCommand('insertText', false, lines[i]);
+                        }
+                        if (i < lines.length - 1) {
+                            // Insert a linebreak for newlines
+                            document.execCommand('insertParagraph', false, '');
+                        }
+                    }
+                    return true;
                 }, config.prompt);
 
                 if (promptSet) {
@@ -225,7 +233,9 @@ export class PerplexityTester {
                     throw new Error('Could not set prompt - #ask-input not found');
                 }
 
-                await this.browser.randomDelay(1000, 1500);
+                // Important: Wait for UI to process the text and enable the submit button
+                await this.browser.randomDelay(2000, 3000);
+
             } catch (error) {
                 throw new Error(`Prompt entry failed: ${(error as Error).message}`);
             }
@@ -234,38 +244,26 @@ export class PerplexityTester {
             try {
                 steps.push('⏳ Submitting query...');
 
-                // Wait a moment for the UI to update after prompt entry
-                await this.browser.randomDelay(500, 1000);
-
-                // Click submit button (must wait for it to be enabled)
-                const submitted = await page.evaluate(() => {
-                    const submitBtn = document.querySelector('button[aria-label="Submit"]') as HTMLButtonElement;
-                    if (submitBtn && !submitBtn.disabled) {
-                        submitBtn.click();
-                        return true;
-                    }
-                    return false;
-                });
-
-                if (submitted) {
-                    steps.push('✓ Submitted via button');
-                } else {
-                    // Wait and retry - button might need time to enable
-                    await this.browser.randomDelay(1000, 1500);
-                    const retrySubmit = await page.evaluate(() => {
+                // Wait for button to become enabled (up to 5 seconds)
+                let submitted = false;
+                for (let i = 0; i < 5; i++) {
+                    submitted = await page.evaluate(() => {
                         const submitBtn = document.querySelector('button[aria-label="Submit"]') as HTMLButtonElement;
-                        if (submitBtn) {
+                        if (submitBtn && !submitBtn.disabled) {
                             submitBtn.click();
                             return true;
                         }
                         return false;
                     });
 
-                    if (retrySubmit) {
-                        steps.push('✓ Submitted via button (after retry)');
-                    } else {
-                        throw new Error('Submit button not found or still disabled');
-                    }
+                    if (submitted) break;
+                    await this.browser.randomDelay(1000, 1500);
+                }
+
+                if (submitted) {
+                    steps.push('✓ Submitted via button');
+                } else {
+                    throw new Error('Submit button stuck disabled or not found');
                 }
 
                 await this.browser.randomDelay(3000, 5000);
