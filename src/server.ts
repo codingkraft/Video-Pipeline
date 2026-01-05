@@ -271,18 +271,20 @@ app.get('/api/browse-folder', async (req: Request, res: Response) => {
         const { exec } = require('child_process');
 
         // Use OpenFileDialog which shows the MODERN Windows Explorer UI with Quick Access
-        // This is a workaround - user navigates to folder, types folder name, clicks Open
-        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Navigate to folder and click Open'; $d.CheckFileExists = $false; $d.CheckPathExists = $true; $d.FileName = 'Select This Folder'; $d.Filter = 'Folders|*.folder'; $d.ValidateNames = $false; if ($d.ShowDialog() -eq 'OK') { [System.IO.Path]::GetDirectoryName($d.FileName) } }"`;
+        // User navigates to folder, sees "Select This Folder" in filename, clicks Open
+        // We extract the directory path from the selected "file"
+        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Navigate to folder - then click Open'; $d.CheckFileExists = $false; $d.CheckPathExists = $true; $d.FileName = 'Select This Folder'; $d.Filter = 'Folders|*.*'; $d.ValidateNames = $false; $d.InitialDirectory = [Environment]::GetFolderPath('Desktop'); if ($d.ShowDialog() -eq 'OK') { Split-Path -Parent $d.FileName } }"`;
 
         console.log('Opening modern folder picker...');
 
         exec(cmd, { timeout: 120000 }, (error: any, stdout: string, stderr: string) => {
             if (error) {
+                console.error('Picker error:', error.message);
                 console.error('Picker stderr:', stderr);
                 return res.json({ path: null, cancelled: true });
             }
             const selectedPath = stdout.trim();
-            console.log('Selected folder:', selectedPath);
+            console.log('Selected folder:', selectedPath || '(empty - user cancelled?)');
             res.json({ path: selectedPath || null });
         });
     } catch (e) {
@@ -339,7 +341,7 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
             // Local Mode: Read files from source folder
             if (fs.existsSync(sourceFolder)) {
                 targetFiles = fs.readdirSync(sourceFolder)
-                    .filter(f => /\.(pdf|txt|md|docx?)$/i.test(f))
+                    .filter(f => /\.(pdf|txt|md|docx?|jpe?g|png|gif|webp|bmp)$/i.test(f))
                     .map(f => path.join(sourceFolder, f));
                 console.log(`Found ${targetFiles.length} files in source folder`);
             } else {
