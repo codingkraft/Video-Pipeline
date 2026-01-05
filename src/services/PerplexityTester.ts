@@ -331,13 +331,18 @@ export class PerplexityTester {
 
                 while (Date.now() - startTime < maxWait) {
                     const { text: currentText, proseCount } = await page.evaluate(() => {
-                        // Get all prose elements (answers) and pick the LAST one
-                        const proses = document.querySelectorAll('[class*="prose"]');
-                        if (proses.length === 0) return { text: '', proseCount: 0 };
-                        const lastProse = proses[proses.length - 1];
+                        // Use data-state="active" to find conversation turns
+                        const activeDivs = document.querySelectorAll('div[data-state="active"]');
+                        if (activeDivs.length === 0) return { text: '', proseCount: 0 };
+
+                        // Get the LAST active div (most recent turn)
+                        const lastActive = activeDivs[activeDivs.length - 1];
+
+                        // Find the prose content within this last active div
+                        const prose = lastActive.querySelector('[class*="prose"]');
                         return {
-                            text: lastProse.textContent || '',
-                            proseCount: proses.length
+                            text: prose ? (prose.textContent || '') : '',
+                            proseCount: document.querySelectorAll('[class*="prose"]').length
                         };
                     });
 
@@ -348,8 +353,8 @@ export class PerplexityTester {
                         lastLength = currentText.length;
                     } else if (currentText.length > 0 && currentText.length === lastLength) {
                         stableCount++;
-                        // If text hasn't changed for 600 checks (approx 10 mins), assume done
-                        if (stableCount >= 600) {
+                        // If text hasn't changed for 5 checks (approx 5 seconds), assume done
+                        if (stableCount >= 5) {
                             responseText = currentText;
                             break;
                         }
