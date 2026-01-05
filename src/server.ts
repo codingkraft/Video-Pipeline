@@ -291,6 +291,67 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
     }
 });
 
+// API: Save settings to file
+app.post('/api/save-settings', (req: Request, res: Response) => {
+    try {
+        const settings = req.body;
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+
+        // Create config directory if it doesn't exist
+        const configDir = path.join(process.cwd(), 'config');
+        if (!fs.existsSync(configDir)) {
+            fs.mkdirSync(configDir, { recursive: true });
+        }
+
+        // Save settings to file
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+
+        res.json({
+            success: true,
+            message: 'Settings saved successfully',
+            path: settingsPath
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to save settings: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Load settings from file
+app.get('/api/load-settings', (req: Request, res: Response) => {
+    try {
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+
+        if (fs.existsSync(settingsPath)) {
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            res.json({
+                success: true,
+                settings
+            });
+        } else {
+            // Return default settings
+            res.json({
+                success: true,
+                settings: {
+                    perplexityChatUrl: '',
+                    promptText: '',
+                    notebookLmChatSettings: 'Focus on key concepts and provide clear explanations',
+                    notebookLmStyleSettings: 'Modern, engaging, educational style',
+                    stylePrompt: 'Professional with smooth transitions',
+                    outputDir: ''
+                }
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to load settings: ' + (error as Error).message
+        });
+    }
+});
+
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('Client connected');

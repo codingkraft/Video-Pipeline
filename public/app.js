@@ -105,17 +105,24 @@ function updateSelectedDocuments() {
     generateBtn.disabled = selectedDocuments.length === 0;
 }
 
-// Load saved settings from localStorage
-function loadSettings() {
-    const saved = localStorage.getItem('videoCreatorSettings');
-    if (saved) {
-        const settings = JSON.parse(saved);
-        document.getElementById('perplexityChatUrl').value = settings.perplexityChatUrl || '';
-        document.getElementById('promptText').value = settings.promptText || '';
-        document.getElementById('notebookLmChatSettings').value = settings.notebookLmChatSettings || 'Focus on key concepts and provide clear explanations';
-        document.getElementById('notebookLmStyleSettings').value = settings.notebookLmStyleSettings || 'Modern, engaging, educational style';
-        document.getElementById('stylePrompt').value = settings.stylePrompt || 'Professional with smooth transitions';
-        document.getElementById('outputDir').value = settings.outputDir || '';
+// Load saved settings from server (file-based)
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/load-settings');
+        const data = await response.json();
+
+        if (data.success && data.settings) {
+            const settings = data.settings;
+            document.getElementById('perplexityChatUrl').value = settings.perplexityChatUrl || '';
+            document.getElementById('promptText').value = settings.promptText || '';
+            document.getElementById('notebookLmChatSettings').value = settings.notebookLmChatSettings || 'Focus on key concepts and provide clear explanations';
+            document.getElementById('notebookLmStyleSettings').value = settings.notebookLmStyleSettings || 'Modern, engaging, educational style';
+            document.getElementById('stylePrompt').value = settings.stylePrompt || 'Professional with smooth transitions';
+            document.getElementById('outputDir').value = settings.outputDir || '';
+            console.log('Settings loaded from file');
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
     }
 }
 
