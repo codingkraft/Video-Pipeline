@@ -324,23 +324,32 @@ export class PerplexityTester {
 
                 // 2. Poll for text stability (wait until text stops changing)
                 let lastLength = 0;
+                let lastProseCount = 0;
                 let stableCount = 0;
-                const maxWait = 120000; // 2 minutes
+                const maxWait = 600000; // 10 minutes
                 const startTime = Date.now();
 
                 while (Date.now() - startTime < maxWait) {
-                    const currentText = await page.evaluate(() => {
+                    const { text: currentText, proseCount } = await page.evaluate(() => {
                         // Get all prose elements (answers) and pick the LAST one
                         const proses = document.querySelectorAll('[class*="prose"]');
-                        if (proses.length === 0) return '';
+                        if (proses.length === 0) return { text: '', proseCount: 0 };
                         const lastProse = proses[proses.length - 1];
-                        return lastProse.textContent || '';
+                        return {
+                            text: lastProse.textContent || '',
+                            proseCount: proses.length
+                        };
                     });
 
-                    if (currentText.length > 0 && currentText.length === lastLength) {
+                    // If prose count increased, reset stability (new content being added)
+                    if (proseCount > lastProseCount) {
+                        stableCount = 0;
+                        lastProseCount = proseCount;
+                        lastLength = currentText.length;
+                    } else if (currentText.length > 0 && currentText.length === lastLength) {
                         stableCount++;
-                        // If text hasn't changed for 5 checks (approx 5 seconds), assume done
-                        if (stableCount >= 5) {
+                        // If text hasn't changed for 600 checks (approx 10 mins), assume done
+                        if (stableCount >= 600) {
                             responseText = currentText;
                             break;
                         }
@@ -349,13 +358,13 @@ export class PerplexityTester {
                         lastLength = currentText.length;
                     }
 
-                    // Check if "Stop generating" button is gone (optional optimization)
+                    // Check if "Stop generating" button is gone
                     const isGenerating = await page.evaluate(() => {
-                        return !!document.querySelector('button[aria-label="Stop generating"]');
+                        return !!document.querySelector('button[aria-label="Stop generating response"]');
                     });
 
                     if (!isGenerating && stableCount >= 3) {
-                        // If no stop button and stable for 3s, probably done
+                        // If no stop button and stable for 3s, done
                         responseText = currentText;
                         break;
                     }
@@ -363,17 +372,12 @@ export class PerplexityTester {
                     await this.browser.randomDelay(1000, 1000);
                 }
 
-                if (responseText && responseText.length > 50) {
-                    steps.push(`✓ Response captured (${responseText.length} chars)`);
-                } else {
-                    steps.push('⚠ Response timeout or empty');
-                    // Try one last grab of the LAST prose element
-                    responseText = await page.evaluate(() => {
-                        const proses = document.querySelectorAll('[class*="prose"]');
-                        if (proses.length === 0) return document.body.innerText;
-                        return proses[proses.length - 1].textContent || '';
-                    });
+                // Check if we timed out without getting a response
+                if (!responseText || responseText.length < 50) {
+                    throw new Error('Response timeout: Perplexity did not generate a response within 10 minutes');
                 }
+
+                steps.push(`✓ Response captured (${responseText.length} chars)`);
             } catch (error) {
                 steps.push(`⚠ Response extraction: ${(error as Error).message}`);
                 responseText = await page.evaluate(() => document.body.innerText);
