@@ -125,7 +125,7 @@ export class PerplexityTester {
                     try {
                         // Use XPath for specific text matching
                         // We must match "Sonnet" to avoid "Opus"
-                        const claudeXpath = "//div[contains(text(), 'Claude 3.5 Sonnet')] | //button[contains(text(), 'Sonnet')]";
+                        const claudeXpath = "//div[contains(text(), 'Claude Sonnet 4.5')] | //button[contains(text(), 'Sonnet')]";
                         await page.waitForXPath(claudeXpath, { timeout: 3000 });
 
                         const [claudeOption] = await page.$x(claudeXpath);
@@ -202,29 +202,21 @@ export class PerplexityTester {
 
                 // Set text directly via JavaScript - much faster than typing
                 // Lexical editor requires special handling
+                // Set text using execCommand which works reliably with Lexical/contenteditable
                 const promptSet = await page.evaluate((promptText) => {
                     const inputArea = document.querySelector('#ask-input') as HTMLElement;
                     if (!inputArea) return false;
 
-                    // Focus the element
+                    // Focus and clear
                     inputArea.focus();
 
-                    // Clear existing content
-                    inputArea.innerHTML = '';
+                    // Select all and delete to clear cleanly
+                    document.execCommand('selectAll', false);
+                    document.execCommand('delete', false);
 
-                    // For Lexical editor, we need to create proper paragraph structure
-                    const p = document.createElement('p');
-                    p.setAttribute('dir', 'auto');
-                    const span = document.createElement('span');
-                    span.setAttribute('data-lexical-text', 'true');
-                    span.textContent = promptText;
-                    p.appendChild(span);
-                    inputArea.appendChild(p);
-
-                    // Trigger input event to notify Lexical of changes
-                    inputArea.dispatchEvent(new Event('input', { bubbles: true }));
-
-                    return true;
+                    // Use insertText command - this simulates a user paste/type
+                    // and triggers all necessary internal events for Lexical
+                    return document.execCommand('insertText', false, promptText);
                 }, config.prompt);
 
                 if (promptSet) {
