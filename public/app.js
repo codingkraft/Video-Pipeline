@@ -136,7 +136,7 @@ function saveSettings() {
         stylePrompt: document.getElementById('stylePrompt').value,
         outputDir: document.getElementById('outputDir').value,
     };
-    localStorage.setItem('videoCreatorSettings', JSON.stringify(settings));
+    fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if(d.success) { const msg = document.getElementById('saveMessage'); if(msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
 
     // Show confirmation message
     const saveMessage = document.getElementById('saveMessage');
@@ -513,3 +513,4 @@ loadSettings();
 checkStatus();
 verifySessions(); // Auto-verify on load
 setupAutoSave(); // Enable auto-save on input blur
+
