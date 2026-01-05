@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Creator - Automated Pipeline</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 Video Creator</h1>
+            <p class="subtitle">Automated video generation from documents</p>
+        </header>
+
+        <main>
+            <!-- Login Setup -->
+            <section class="card">
+                <h2>🔐 Login Setup</h2>
+                <p style="margin-bottom: 1rem; color: var(--text-muted);">
+                    First time? Click "Setup Login" to log into all services. Your sessions will be saved.
+                </p>
+                <div class="input-group">
+                    <button onclick="setupLogin()" class="btn btn-primary" id="loginBtn">
+                        🔐 Setup Login
+                    </button>
+                    <button onclick="verifySessions()" class="btn btn-secondary" id="verifyBtn">
+                        ✓ Verify Sessions
+                    </button>
+                    <button onclick="testPerplexity()" class="btn btn-success" id="testPerplexityBtn">
+                        🧪 Test Perplexity
+                    </button>
+                    <span id="sessionStatus" class="session-status">Not verified</span>
+                </div>
+                <div id="testResults" style="margin-top: 1rem; display: none;">
+                    <p style="color: var(--text-muted); font-size: 0.9rem;" id="testMessage"></p>
+                </div>
+            </section>
+
+            <!-- Step 1: Select Folder -->
+            <section class="card">
+                <h2>📁 Step 1: Select Document Folder</h2>
+                <div class="input-group">
+                    <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;"
+                        onchange="handleFolderSelect()">
+                    <button onclick="document.getElementById('folderInput').click()" class="btn btn-primary">
+                        📂 Add Folder
+                    </button>
+                    <button onclick="clearFolders()" class="btn btn-secondary">
+                        🗑️ Clear All
+                    </button>
+                    <span id="folderName" class="folder-name">No folders selected</span>
+                </div>
+                <div id="documentList" class="document-list"></div>
+            </section>
+
+            <!-- Step 2: Configure Settings -->
+            <section class="card">
+                <h2>⚙️ Step 2: Configure Video Settings</h2>
+
+                <div class="form-group">
+                    <label for="perplexityChatUrl">Perplexity Chat URL (Optional)</label>
+                    <input type="text" id="perplexityChatUrl" placeholder="https://www.perplexity.ai/search/...">
+                    <small class="hint">If you have an existing Perplexity chat with the prompt, paste the URL
+                        here</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="promptText">Or Enter Prompt Text Directly</label>
+                    <textarea id="promptText" rows="4"
+                        placeholder="Enter your video generation prompt here..."></textarea>
+                    <small class="hint">This will be used if no Perplexity URL is provided</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="notebookLmChatSettings">NotebookLM Chat Settings</label>
+                    <textarea id="notebookLmChatSettings" rows="3"
+                        placeholder="Focus on key concepts and provide clear explanations...">Focus on key concepts and provide clear explanations</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="notebookLmStyleSettings">NotebookLM Style Settings</label>
+                    <input type="text" id="notebookLmStyleSettings" placeholder="Modern, engaging, educational style"
+                        value="Modern, engaging, educational style">
+                </div>
+
+                <div class="form-group">
+                    <label for="stylePrompt">Gemini Video Style Prompt</label>
+                    <input type="text" id="stylePrompt" placeholder="Professional with smooth transitions"
+                        value="Professional with smooth transitions">
+                </div>
+
+                <div class="form-group">
+                    <label for="outputDir">Output Directory (Optional)</label>
+                    <input type="text" id="outputDir" placeholder="Leave empty for default (./output/)">
+                </div>
+            </section>
+
+            <!-- Step 3: Generate -->
+            <section class="card">
+                <h2>🚀 Step 3: Generate Video</h2>
+                <button onclick="generateVideo()" id="generateBtn" class="btn btn-success btn-large" disabled>
+                    Generate Video
+                </button>
+                <p class="hint">Select documents first to enable generation</p>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="card progress-section" id="progressSection" style="display: none;">
+                <h2>📊 Progress</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div id="progressLog" class="progress-log"></div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="card" id="resultsSection" style="display: none;">
+                <h2>✅ Results</h2>
+                <div id="resultsContent"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Status: <span id="status" class="status-idle">Idle</span></p>
+        </footer>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
