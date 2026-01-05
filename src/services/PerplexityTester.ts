@@ -141,40 +141,38 @@ export class PerplexityTester {
                 }
 
                 if (modelMenuOpened) {
-                    // Look for Claude option in the dropdown
-                    const claudeSelectors = [
-                        'button:has-text("Claude 3.5 Sonnet")',
-                        'div:has-text("Claude 3.5 Sonnet")',
-                        'button:has-text("Sonnet 3.5")',
-                        '[role="menuitem"]:has-text("Claude")',
-                        'div:has-text("Claude")'
-                    ];
+                    // Search for text content directly instead of specific roles
+                    try {
+                        // Wait for the text "Claude 3.5 Sonnet" to be visible anywhere
+                        // This avoids guessing the container tag (div, button, span, etc.)
+                        const claudeTextSelector = 'text/Claude 3.5 Sonnet';
 
-                    let claudeSelected = false;
-                    for (const selector of claudeSelectors) {
+                        // Puppeteer's text selector '::-p-text(Claude 3.5 Sonnet)' is robust
+                        const element = await page.waitForSelector('div ::-p-text(Claude 3.5 Sonnet)', { timeout: 3000 });
+
+                        if (element) {
+                            await element.click();
+                            await this.browser.randomDelay(1000, 1500);
+                            steps.push('✓ Selected Claude Sonnet 4.5');
+                        } else {
+                            throw new Error('Timeout waiting for Claude text');
+                        }
+                    } catch (e) {
+                        // Fallback: Try "Sonnet"
                         try {
-                            const element = await page.waitForSelector(selector, { timeout: 2000 });
+                            const element = await page.waitForSelector('div ::-p-text(Sonnet)', { timeout: 2000 });
                             if (element) {
                                 await element.click();
                                 await this.browser.randomDelay(1000, 1500);
-                                claudeSelected = true;
-                                steps.push('✓ Selected Claude Sonnet 4.5');
-                                break;
+                                steps.push('✓ Selected Claude (Sonnet fallback)');
+                            } else {
+                                throw e;
                             }
-                        } catch (e) {
-                            continue;
+                        } catch (finalError) {
+                            // Log visible text to help debug
+                            const visibleText = await page.evaluate(() => document.body.innerText.substring(0, 1000));
+                            throw new Error(`Could not find Claude option. Visible text start: ${visibleText}`);
                         }
-                    }
-
-                    if (!claudeSelected) {
-                        // Debug available options
-                        const options = await page.evaluate(() => {
-                            return Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], .group\\/item'))
-                                .map(el => el.textContent?.trim())
-                                .filter(t => t && t.length > 0)
-                                .join(', ');
-                        });
-                        throw new Error(`Could not find Claude option. Menu items: ${options}`);
                     }
                 } else {
                     throw new Error('Could not open model selector');
