@@ -3,7 +3,7 @@ const socket = io();
 
 let selectedDocuments = [];
 let allFolders = []; // Store multiple folders
-let selectedLocalFolder = null; // The absolute path of the selected local folder
+let selectedLocalFolders = []; // Array of absolute paths of selected local folders
 
 // Select local folder using native Windows dialog
 async function selectLocalFolder() {
@@ -17,12 +17,16 @@ async function selectLocalFolder() {
         const data = await response.json();
 
         if (data.path) {
-            selectedLocalFolder = data.path;
-            document.getElementById('folderPath').textContent = data.path;
-            document.getElementById('outputPathPreview').textContent = data.path + '\\output\\';
+            // Add to array if not already present
+            if (!selectedLocalFolders.includes(data.path)) {
+                selectedLocalFolders.push(data.path);
+            }
 
-            // Save to settings
-            document.getElementById('sourceFolder').value = data.path;
+            // Update display
+            updateLocalFolderDisplay();
+
+            // Save first folder to settings (for backwards compatibility)
+            document.getElementById('sourceFolder').value = selectedLocalFolders.join(';');
             saveSettings();
 
             // Load files from the folder
@@ -37,6 +41,32 @@ async function selectLocalFolder() {
         btn.textContent = originalText;
         btn.disabled = false;
     }
+}
+
+// Update folder display for multiple folders
+function updateLocalFolderDisplay() {
+    const folderPathEl = document.getElementById('folderPath');
+    const outputPreviewEl = document.getElementById('outputPathPreview');
+
+    if (selectedLocalFolders.length === 0) {
+        folderPathEl.textContent = 'No folder selected';
+        outputPreviewEl.textContent = '[Selected Folder]/output/';
+    } else if (selectedLocalFolders.length === 1) {
+        folderPathEl.textContent = selectedLocalFolders[0];
+        outputPreviewEl.textContent = selectedLocalFolders[0] + '\\output\\';
+    } else {
+        folderPathEl.innerHTML = selectedLocalFolders.map(f => `📁 ${f}`).join('<br>');
+        outputPreviewEl.textContent = 'Each folder will have its own output subfolder';
+    }
+}
+
+// Clear all selected local folders
+function clearLocalFolders() {
+    selectedLocalFolders = [];
+    updateLocalFolderDisplay();
+    document.getElementById('documentList').innerHTML = '';
+    document.getElementById('sourceFolder').value = '';
+    saveSettings();
 }
 
 // Load and display files from a local folder
@@ -501,8 +531,11 @@ async function testPerplexity() {
     const testResults = document.getElementById('testResults');
     const testMessage = document.getElementById('testMessage');
 
-    if (selectedDocuments.length === 0) {
-        alert('Please select at least one document/image first');
+    const sourceFolder = document.getElementById('sourceFolder').value;
+
+    // Accept either uploaded documents OR a local source folder
+    if (selectedDocuments.length === 0 && !sourceFolder && selectedLocalFolders.length === 0) {
+        alert('Please select at least one folder using "Select Local Folder"');
         return;
     }
 

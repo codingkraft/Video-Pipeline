@@ -45,11 +45,15 @@
                 <div class="input-group" style="flex-wrap: wrap; gap: 0.5rem;">
                     <button onclick="selectLocalFolder()" class="btn btn-primary" id="selectFolderBtn"
                         style="font-size: 1.1rem; padding: 0.75rem 1.5rem;">
-                        📂 Select Local Folder
+                        📂 Add Folder
                     </button>
-                    <span id="folderPath" class="folder-name"
-                        style="flex: 1; min-width: 200px; padding: 0.5rem; background: var(--bg); border-radius: 0.25rem;">No
-                        folder selected</span>
+                    <button onclick="clearLocalFolders()" class="btn btn-secondary">
+                        🗑️ Clear All
+                    </button>
+                    <div id="folderPath" class="folder-name"
+                        style="flex: 1; min-width: 200px; padding: 0.5rem; background: var(--bg); border-radius: 0.25rem;">
+                        No
+                        folder selected</div>
                 </div>
                 <small class="hint" style="display: block; margin-top: 0.5rem;">Output will be saved to: <strong
                         id="outputPathPreview">[Selected Folder]/output/</strong></small>
