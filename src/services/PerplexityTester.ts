@@ -9,6 +9,7 @@ export interface PerplexityTestConfig {
     chatUrl?: string;
     files: string[];
     prompt: string;
+    outputDir?: string; // Optional: directory to save output (defaults to source folder)
 }
 
 export class PerplexityTester {
@@ -30,11 +31,26 @@ export class PerplexityTester {
 
             const steps: string[] = [];
             const jobId = `job_${Date.now()}`;
-            const outputDir = path.join(process.cwd(), 'output', jobId);
+
+            // Determine output directory:
+            // 1. Use explicit outputDir if provided
+            // 2. Otherwise, use the folder of the first input file
+            // 3. Fall back to project output folder
+            let outputDir: string;
+            if (config.outputDir) {
+                outputDir = path.join(config.outputDir, 'output', jobId);
+            } else if (config.files && config.files.length > 0) {
+                // Save output inside the source folder's 'output' subfolder
+                const sourceFolder = path.dirname(config.files[0]);
+                outputDir = path.join(sourceFolder, 'output', jobId);
+            } else {
+                outputDir = path.join(process.cwd(), 'output', jobId);
+            }
 
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
+            steps.push(`✓ Output will be saved to: ${outputDir}`);
 
             // Step 1: Navigate
             if (config.chatUrl) {
@@ -100,7 +116,7 @@ export class PerplexityTester {
                     } catch (e) {
                         // Fallback: Try clicking by evaluating text
                         const clicked = await page.evaluate(() => {
-                            const elements = document.querySelectorAll('button, div[role="menuitem"], div[role="option"]');
+                            const elements = Array.from(document.querySelectorAll('button, div[role="menuitem"], div[role="option"]'));
                             for (const el of elements) {
                                 if (el.textContent?.includes('Claude')) {
                                     (el as HTMLElement).click();
