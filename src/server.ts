@@ -273,6 +273,8 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
         const files = req.files as Express.Multer.File[];
         const { chatUrl, prompt } = req.body;
 
+        console.log(`Received test request with ${files ? files.length : 0} files`);
+
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
