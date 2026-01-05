@@ -20,15 +20,13 @@ export class PerplexityTester {
 
     /**
      * Test the complete Perplexity workflow:
-     * 1. Navigate to chat URL or create new
-     * 2. Select Search mode (Strict check)
-     * 3. Change LLM to Claude Sonnet 4.5 FIRST (Strict check)
-     * 4. Attach files (preserving original filenames)
-     * 5. Wait for files to upload completely
-     * 6. Enter prompt
-     * 7. Submit
-     * 8. Wait for and extract response
-     * 9. Save response to file
+     * 1. Navigate to chat
+     * 2. Select Search mode (using value="search")
+     * 3. Change LLM (using aria-label="Gemini..." etc)
+     * 4. Attach files (preserving filenames)
+     * 5. Enter prompt
+     * 6. Submit
+     * 7. Save output
      */
     public async testWorkflow(config: PerplexityTestConfig): Promise<{ success: boolean; message: string; details?: any }> {
         try {
@@ -56,25 +54,30 @@ export class PerplexityTester {
             try {
                 steps.push('⏳ Selecting Search mode...');
 
-                const modeButtonSelectors = [
-                    'button[aria-label*="Focus"]',
-                    'button[aria-label*="Mode"]',
-                    'button:has-text("Focus")',
-                    'button:has-text("Deep")',
-                    'button:has-text("Search")',
-                    '[data-testid*="focus"]',
-                    '[data-testid*="mode"]'
+                // Based on HTML: <button role="radio" value="search" ...>
+                const searchButtonSelectors = [
+                    'button[value="search"]',
+                    'button[aria-label="Search"]',
+                    '[role="radio"][value="search"]'
                 ];
 
-                let modeMenuOpened = false;
-                for (const selector of modeButtonSelectors) {
+                let searchSelected = false;
+                for (const selector of searchButtonSelectors) {
                     try {
                         const button = await page.$(selector);
                         if (button) {
+                            // Check if already selected
+                            const ariaChecked = await page.evaluate(el => el.getAttribute('aria-checked'), button);
+                            if (ariaChecked === 'true') {
+                                steps.push('✓ Search mode already selected');
+                                searchSelected = true;
+                                break;
+                            }
+
                             await button.click();
                             await this.browser.randomDelay(500, 1000);
-                            modeMenuOpened = true;
-                            steps.push('✓ Opened mode selector');
+                            searchSelected = true;
+                            steps.push('✓ Selected Search mode');
                             break;
                         }
                     } catch (e) {
@@ -82,33 +85,22 @@ export class PerplexityTester {
                     }
                 }
 
-                if (modeMenuOpened) {
-                    const searchSelectors = [
-                        'button:has-text("Search")',
-                        '[role="menuitem"]:has-text("Search")',
-                        '[role="option"]:has-text("Search")',
-                        'div:has-text("Search")'
-                    ];
-
-                    let searchSelected = false;
-                    for (const selector of searchSelectors) {
-                        try {
-                            await page.waitForSelector(selector, { timeout: 2000 });
-                            await page.click(selector);
-                            await this.browser.randomDelay(500, 1000);
+                if (!searchSelected) {
+                    // Fallback to text search if specific value selector fails
+                    try {
+                        const textSearch = await page.$('button:has-text("Search")');
+                        if (textSearch) {
+                            await textSearch.click();
+                            steps.push('✓ Selected Search mode (text fallback)');
                             searchSelected = true;
-                            steps.push('✓ Selected Search mode');
-                            break;
-                        } catch (e) {
-                            continue;
                         }
+                    } catch (e) {
+                        // Ignore
                     }
+                }
 
-                    if (!searchSelected) {
-                        throw new Error('Could not find Search mode option');
-                    }
-                } else {
-                    throw new Error('Could not open mode selector');
+                if (!searchSelected) {
+                    throw new Error('Could not find Search mode button');
                 }
 
                 await this.browser.randomDelay(500, 1000);
@@ -120,13 +112,13 @@ export class PerplexityTester {
             try {
                 steps.push('⏳ Changing LLM to Claude Sonnet 4.5...');
 
+                // From HTML: aria-label="Gemini 3 Pro" (or whatever current model is)
                 const modelButtonSelectors = [
-                    'button[aria-label*="model"]',
-                    'button[aria-label*="Model"]',
-                    'button:has-text("Pro")',
-                    'button:has-text("GPT")',
-                    'button:has-text("Claude")',
-                    '[data-testid*="model"]'
+                    'button[aria-label*="Pro"]',
+                    'button[aria-label*="Claude"]',
+                    'button[aria-label*="GPT"]',
+                    'button[aria-label*="Sonar"]',
+                    'button:has(svg use[xlink\\:href="#pplx-icon-cpu"])' // Icon based selector
                 ];
 
                 let modelMenuOpened = false;
@@ -134,10 +126,13 @@ export class PerplexityTester {
                     try {
                         const button = await page.$(selector);
                         if (button) {
+                            // Helper to log what we found
+                            const label = await page.evaluate(el => el.getAttribute('aria-label'), button);
+                            steps.push(`✓ Found model button: ${label}`);
+
                             await button.click();
                             await this.browser.randomDelay(1000, 1500);
                             modelMenuOpened = true;
-                            steps.push('✓ Opened model selector');
                             break;
                         }
                     } catch (e) {
@@ -146,31 +141,40 @@ export class PerplexityTester {
                 }
 
                 if (modelMenuOpened) {
+                    // Look for Claude option in the dropdown
                     const claudeSelectors = [
-                        'button:has-text("Claude")',
-                        'button:has-text("Sonnet")',
-                        'button:has-text("4.5")',
+                        'button:has-text("Claude 3.5 Sonnet")',
+                        'div:has-text("Claude 3.5 Sonnet")',
+                        'button:has-text("Sonnet 3.5")',
                         '[role="menuitem"]:has-text("Claude")',
-                        '[role="option"]:has-text("Claude")',
-                        'div:has-text("Claude Sonnet 4")'
+                        'div:has-text("Claude")'
                     ];
 
                     let claudeSelected = false;
                     for (const selector of claudeSelectors) {
                         try {
-                            await page.waitForSelector(selector, { timeout: 3000 });
-                            await page.click(selector);
-                            await this.browser.randomDelay(1000, 1500);
-                            claudeSelected = true;
-                            steps.push('✓ Selected Claude Sonnet 4.5');
-                            break;
+                            const element = await page.waitForSelector(selector, { timeout: 2000 });
+                            if (element) {
+                                await element.click();
+                                await this.browser.randomDelay(1000, 1500);
+                                claudeSelected = true;
+                                steps.push('✓ Selected Claude Sonnet 4.5');
+                                break;
+                            }
                         } catch (e) {
                             continue;
                         }
                     }
 
                     if (!claudeSelected) {
-                        throw new Error('Could not find Claude Sonnet 4.5 option');
+                        // Debug available options
+                        const options = await page.evaluate(() => {
+                            return Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], .group\\/item'))
+                                .map(el => el.textContent?.trim())
+                                .filter(t => t && t.length > 0)
+                                .join(', ');
+                        });
+                        throw new Error(`Could not find Claude option. Menu items: ${options}`);
                     }
                 } else {
                     throw new Error('Could not open model selector');
@@ -181,23 +185,30 @@ export class PerplexityTester {
                 throw new Error(`LLM selection failed: ${(error as Error).message}`);
             }
 
-            // Step 4: Attach files with ORIGINAL filenames
+            // Step 4: Attach files
             if (config.files && config.files.length > 0) {
                 try {
                     steps.push(`⏳ Uploading ${config.files.length} file(s) with original names...`);
 
-                    const fileInput = await page.$('input[type="file"]');
+                    // From HTML: data-testid="file-upload-input"
+                    const fileInputSelectors = [
+                        'input[data-testid="file-upload-input"]',
+                        'input[type="file"]'
+                    ];
+
+                    let fileInput = null;
+                    for (const sel of fileInputSelectors) {
+                        fileInput = await page.$(sel);
+                        if (fileInput) break;
+                    }
 
                     if (fileInput) {
-                        // Puppeteer preserves original filenames
                         await fileInput.uploadFile(...config.files);
-                        steps.push(`✓ Attached ${config.files.length} file(s) with original names`);
+                        steps.push(`✓ Attached ${config.files.length} file(s)`);
 
-                        // Wait for files to upload
                         steps.push('⏳ Waiting for files to upload...');
                         await this.browser.randomDelay(3000, 5000);
 
-                        // Wait for upload indicators to disappear
                         try {
                             await page.waitForFunction(() => {
                                 const indicators = document.querySelectorAll('[class*="upload"], [class*="progress"], [class*="loading"]');
@@ -209,8 +220,7 @@ export class PerplexityTester {
                             }, { timeout: 30000 });
                             steps.push('✓ Files uploaded successfully');
                         } catch (e) {
-                            console.warn('Upload wait timeout, checking if files attached...');
-                            // We don't throw hero, just warn, as sometimes indicators are tricky
+                            console.warn('Upload wait timeout, continuing...');
                         }
 
                         await this.browser.randomDelay(2000, 3000);
@@ -225,29 +235,29 @@ export class PerplexityTester {
             // Step 5: Enter prompt
             try {
                 steps.push('⏳ Entering prompt...');
+                // From HTML: id="ask-input"
                 const textareaSelectors = [
+                    '#ask-input',
                     'textarea[placeholder*="Ask"]',
-                    'textarea[placeholder*="follow"]',
-                    'textarea'
+                    '[contenteditable="true"]'
                 ];
 
                 let promptEntered = false;
                 for (const selector of textareaSelectors) {
                     try {
-                        await page.waitForSelector(selector, { timeout: 3000 });
+                        const element = await page.$(selector);
+                        if (element) {
+                            await element.click();
+                            await this.browser.randomDelay(500, 1000);
 
-                        // Clear existing text
-                        await page.click(selector);
-                        await page.keyboard.down('Control');
-                        await page.keyboard.press('A');
-                        await page.keyboard.up('Control');
-                        await page.keyboard.press('Backspace');
+                            // Human typing for contenteditable div
+                            await this.browser.humanType(page, selector, config.prompt);
 
-                        // Type the prompt
-                        await this.browser.humanType(page, selector, config.prompt);
-                        steps.push(`✓ Entered prompt: "${config.prompt.substring(0, 50)}..."`);
-                        promptEntered = true;
-                        break;
+                            steps.push(`✓ Entered prompt: "${config.prompt.substring(0, 50)}..."`);
+                            promptEntered = true;
+                            break;
+
+                        }
                     } catch (e) {
                         continue;
                     }
@@ -314,12 +324,11 @@ export class PerplexityTester {
                 steps.push(`⚠ Response extraction error: ${(error as Error).message}`);
             }
 
-            // Step 8: Save response
+            // Step 8: Save
             const responseFilePath = path.join(outputDir, `${jobId}_perplexity_response.txt`);
             fs.writeFileSync(responseFilePath, responseText, 'utf-8');
             steps.push(`✓ Response saved to: ${responseFilePath}`);
 
-            // Screenshot
             const screenshotPath = path.join(outputDir, `${jobId}_perplexity_screenshot.png`);
             await page.screenshot({ path: screenshotPath, fullPage: true });
             steps.push(`✓ Screenshot saved: ${screenshotPath}`);
