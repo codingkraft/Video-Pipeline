@@ -265,27 +265,38 @@ app.get('/api/verify-sessions', async (req: Request, res: Response) => {
     }
 });
 
-// API: Open Folder Picker (Windows only)
+// API: Open Folder Picker (Windows only - uses VBScript)
 app.get('/api/browse-folder', async (req: Request, res: Response) => {
     try {
         const { exec } = require('child_process');
-        // PowerShell script to open FolderBrowserDialog
-        const psScript = `
-            Add-Type -AssemblyName System.Windows.Forms
-            $f = New-Object System.Windows.Forms.FolderBrowserDialog
-            $f.ShowNewFolderButton = $true
-            if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }
-        `;
+        const os = require('os');
 
-        exec(`powershell -command "${psScript.replace(/\n/g, ' ')}"`, (error: any, stdout: string, stderr: string) => {
+        // VBScript is more reliable for folder dialogs on Windows
+        const vbsScript = `
+Set objShell = CreateObject("Shell.Application")
+Set objFolder = objShell.BrowseForFolder(0, "Select Source Folder", 0, 0)
+If Not objFolder Is Nothing Then
+    WScript.Echo objFolder.Self.Path
+End If
+`;
+        // Write VBS to temp file
+        const tmpFile = path.join(os.tmpdir(), 'browse_' + Date.now() + '.vbs');
+        fs.writeFileSync(tmpFile, vbsScript);
+
+        exec(`cscript //nologo "${tmpFile}"`, (error: any, stdout: string, stderr: string) => {
+            // Clean up temp file
+            try { fs.unlinkSync(tmpFile); } catch (e) { }
+
             if (error) {
                 console.error('Picker error:', error);
-                return res.status(500).json({ error: 'Failed to open picker' });
+                return res.json({ path: null, error: 'User cancelled or picker failed' });
             }
-            const path = stdout.trim();
-            res.json({ path: path || null });
+            const selectedPath = stdout.trim();
+            console.log('Selected folder:', selectedPath);
+            res.json({ path: selectedPath || null });
         });
     } catch (e) {
+        console.error('Browse folder error:', e);
         res.status(500).json({ error: (e as Error).message });
     }
 });
