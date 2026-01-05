@@ -300,27 +300,62 @@ export class PerplexityTester {
             }
 
             // Step 7: Wait for response
-            steps.push('⏳ Waiting for Perplexity response (up to 60s)...');
+            steps.push('⏳ Waiting for Perplexity response (max 2 mins)...');
             let responseText = '';
 
             try {
-                // Wait for answer content to appear
-                await page.waitForSelector('[class*="prose"], [class*="answer"], article', { timeout: 60000 });
-                await this.browser.randomDelay(5000, 7000);
+                // 1. Wait for answer container to appear
+                await page.waitForSelector('[class*="prose"]', { timeout: 60000 });
+                steps.push('✓ Response started streaming...');
 
-                responseText = await page.evaluate(() => {
-                    // Try to get the main answer content
-                    const prose = document.querySelector('[class*="prose"]');
-                    if (prose) return prose.textContent || '';
-                    return document.body.innerText;
-                });
+                // 2. Poll for text stability (wait until text stops changing)
+                let lastLength = 0;
+                let stableCount = 0;
+                const maxWait = 120000; // 2 minutes
+                const startTime = Date.now();
 
-                if (responseText && responseText.length > 50) {
-                    steps.push(`✓ Response received (${responseText.length} characters)`);
-                } else {
-                    steps.push('⚠ Response may be incomplete');
+                while (Date.now() - startTime < maxWait) {
+                    const currentText = await page.evaluate(() => {
+                        const prose = document.querySelector('[class*="prose"]');
+                        return prose ? prose.textContent || '' : '';
+                    });
+
+                    if (currentText.length > 0 && currentText.length === lastLength) {
+                        stableCount++;
+                        // If text hasn't changed for 5 checks (approx 5 seconds), assume done
+                        if (stableCount >= 5) {
+                            responseText = currentText;
+                            break;
+                        }
+                    } else {
+                        stableCount = 0;
+                        lastLength = currentText.length;
+                    }
+
+                    // Check if "Stop generating" button is gone (optional optimization)
+                    const isGenerating = await page.evaluate(() => {
+                        return !!document.querySelector('button[aria-label="Stop generating"]');
+                    });
+
+                    if (!isGenerating && stableCount >= 3) {
+                        // If no stop button and stable for 3s, probably done
+                        responseText = currentText;
+                        break;
+                    }
+
+                    await this.browser.randomDelay(1000, 1000);
                 }
 
+                if (responseText && responseText.length > 50) {
+                    steps.push(`✓ Response captured (${responseText.length} chars)`);
+                } else {
+                    steps.push('⚠ Response timeout or empty');
+                    // Try one last grab
+                    responseText = await page.evaluate(() => {
+                        const prose = document.querySelector('[class*="prose"]');
+                        return prose ? prose.textContent || '' : document.body.innerText;
+                    });
+                }
             } catch (error) {
                 steps.push(`⚠ Response extraction: ${(error as Error).message}`);
                 responseText = await page.evaluate(() => document.body.innerText);
