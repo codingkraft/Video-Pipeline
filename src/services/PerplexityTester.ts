@@ -316,8 +316,11 @@ export class PerplexityTester {
 
                 while (Date.now() - startTime < maxWait) {
                     const currentText = await page.evaluate(() => {
-                        const prose = document.querySelector('[class*="prose"]');
-                        return prose ? prose.textContent || '' : '';
+                        // Get all prose elements (answers) and pick the LAST one
+                        const proses = document.querySelectorAll('[class*="prose"]');
+                        if (proses.length === 0) return '';
+                        const lastProse = proses[proses.length - 1];
+                        return lastProse.textContent || '';
                     });
 
                     if (currentText.length > 0 && currentText.length === lastLength) {
@@ -350,10 +353,11 @@ export class PerplexityTester {
                     steps.push(`✓ Response captured (${responseText.length} chars)`);
                 } else {
                     steps.push('⚠ Response timeout or empty');
-                    // Try one last grab
+                    // Try one last grab of the LAST prose element
                     responseText = await page.evaluate(() => {
-                        const prose = document.querySelector('[class*="prose"]');
-                        return prose ? prose.textContent || '' : document.body.innerText;
+                        const proses = document.querySelectorAll('[class*="prose"]');
+                        if (proses.length === 0) return document.body.innerText;
+                        return proses[proses.length - 1].textContent || '';
                     });
                 }
             } catch (error) {
