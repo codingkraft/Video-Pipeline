@@ -355,14 +355,8 @@ export class PerplexityTester {
                         lastLength = currentText.length;
                     } else if (currentText.length > 0 && currentText.length === lastLength) {
                         stableCount++;
-
-                        // Safety fallback: Only break if text is stable for a VERY long time (e.g. 60s)
-                        // This handles cases where "Stop generating" button might be stuck or missing
-                        if (stableCount >= 60) {
-                            console.log('Text stable for 60s, assuming complete despite UI state.');
-                            responseText = currentText;
-                            break;
-                        }
+                        // We rely entirely on "Stop generating" button absence for completion.
+                        // The global maxWait (10 min) handles effectively stuck processes.
                     } else {
                         stableCount = 0;
                         lastLength = currentText.length;
