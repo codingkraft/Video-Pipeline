@@ -109,15 +109,18 @@ async function loadFilesFromFolder(folderPath) {
 
                 // Build dropdown options based on completed steps
                 let dropdownOptions = '<option value="start-fresh">🔄 Start Fresh (from Perplexity)</option>';
+                let lastOption = 'start-fresh'; // Track the last option added
 
                 // If Perplexity is done, show option to skip to NotebookLM
                 if (progressData.summary.completedSteps.includes('perplexity')) {
-                    dropdownOptions += '<option value="skip-to-notebooklm" selected>📓 Skip to NotebookLM</option>';
+                    dropdownOptions += '<option value="skip-to-notebooklm">📓 Skip to NotebookLM</option>';
+                    lastOption = 'skip-to-notebooklm';
                 }
 
                 // If notebook is created, show option to continue from there
                 if (progressData.summary.completedSteps.includes('notebooklm_notebook_created')) {
                     dropdownOptions += '<option value="continue-from-notebook">📂 Open Existing Notebook</option>';
+                    lastOption = 'continue-from-notebook';
                 }
 
                 const dropdownHtml = `
@@ -140,6 +143,14 @@ async function loadFilesFromFolder(folderPath) {
                     </div>
                 `;
                 docList.appendChild(progressDiv);
+
+                // Set the last option as selected after rendering
+                setTimeout(() => {
+                    const dropdown = document.getElementById('pipelineStartPoint');
+                    if (dropdown) {
+                        dropdown.value = lastOption;
+                    }
+                }, 50);
 
                 // Store progress for later use
                 window.currentFolderProgress = progressData;

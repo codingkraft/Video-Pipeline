@@ -333,32 +333,81 @@ export class NotebookLMTester {
      */
     private async uploadSources(page: Page, files: string[], steps: string[]): Promise<void> {
         try {
-            // Look for upload/add source button first
-            const uploadButtonSelectors = [
-                'button[aria-label*="Upload"]',
-                'button[aria-label*="Add source"]',
-                'button[aria-label*="Add"]',
-                '[data-testid="add-source"]',
-                'button:has-text("Add source")',
-                'button:has-text("Upload")'
-            ];
+            // First, check if the "Add sources" modal is already open and close it
+            const modalOpen = await page.$('.mat-mdc-dialog-container, mat-dialog-container');
+            if (modalOpen) {
+                steps.push(`⚠ Add sources modal is already open, closing it first...`);
 
-            // Click add source button if present
-            for (const selector of uploadButtonSelectors) {
-                try {
-                    const btn = await page.$(selector);
-                    if (btn) {
-                        await btn.click();
-                        steps.push(`✓ Clicked add source button`);
-                        await this.browser.randomDelay(1000, 2000);
-                        break;
-                    }
-                } catch {
-                    continue;
+                // Try to click the close button within the modal
+                const closeButton = await modalOpen.$('button[aria-label="Close"], button.close-button');
+                if (closeButton) {
+                    await closeButton.click();
+                    await this.browser.randomDelay(500, 800);
+                    steps.push(`✓ Closed existing modal`);
+                } else {
+                    // Fallback: click outside the modal
+                    await page.click('body');
+                    await this.browser.randomDelay(500, 800);
+                    steps.push(`✓ Closed modal by clicking outside`);
                 }
             }
 
-            // Find file input
+            // Check if sources already exist and delete them to avoid duplicates
+            const existingSources = await page.$$('.source-item-more-button');
+
+            if (existingSources.length > 0) {
+                steps.push(`⚠ Found ${existingSources.length} existing sources, deleting to avoid duplicates...`);
+
+                // Delete each source by clicking its menu button, then delete button
+                for (let i = 0; i < existingSources.length; i++) {
+                    try {
+                        // Find all menu buttons again (DOM updates after each deletion)
+                        const menuButtons = await page.$$('.source-item-more-button');
+                        if (menuButtons.length === 0) break;
+
+                        // Click the first menu button (more_vert icon)
+                        await menuButtons[0].click();
+                        await this.browser.randomDelay(500, 800);
+
+                        // Click the "Remove source" button from the menu
+                        const deleteButton = await page.$('button.more-menu-delete-source-button, button[jslog*="202052"]');
+                        if (deleteButton) {
+                            await deleteButton.click();
+                            await this.browser.randomDelay(500, 800);
+
+                            // Confirmation dialog appears - click the "Delete" button to confirm
+                            const confirmButton = await page.$('button[type="submit"].submit, button.submit');
+                            if (confirmButton) {
+                                await confirmButton.click();
+                                await this.browser.randomDelay(800, 1200);
+                                steps.push(`✓ Deleted source ${i + 1}/${existingSources.length}`);
+                            } else {
+                                steps.push(`⚠ Could not find confirmation button for source ${i + 1}`);
+                            }
+                        } else {
+                            steps.push(`⚠ Could not find delete button for source ${i + 1}`);
+                            // Press Escape to close menu
+                            await page.keyboard.press('Escape');
+                            await this.browser.randomDelay(300, 500);
+                        }
+                    } catch (e) {
+                        steps.push(`⚠ Error deleting source ${i + 1}: ${(e as Error).message}`);
+                    }
+                }
+
+                steps.push(`✓ Finished deleting existing sources`);
+                await this.browser.randomDelay(1000, 2000);
+            }
+
+            //open the add sources modal
+            const addSourcesButton = await page.$('button[aria-label*="Add source"]');
+            if (addSourcesButton) {
+                await addSourcesButton.click();
+                await this.browser.randomDelay(1000, 2000);
+            }
+
+            // Find the hidden file input and upload files directly
+            // Don't click the upload button as it opens a native file dialog that we can't close programmatically
             const fileInput = await page.$('input[type="file"]');
             if (fileInput) {
                 const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
@@ -377,9 +426,9 @@ export class NotebookLMTester {
 
                 while (Date.now() - startTime < maxWait) {
                     const isProcessing = await page.evaluate(() => {
-                        // Look for loading/processing indicators
+                        // Look for NotebookLM loading/processing indicators
                         const loadingIndicators = document.querySelectorAll(
-                            '[class*="loading"], [class*="progress"], [class*="processing"], [role="progressbar"]'
+                            'mat-progress-spinner.loading-spinner, .loading-spinner-container'
                         );
                         return loadingIndicators.length > 0;
                     });
@@ -397,6 +446,15 @@ export class NotebookLMTester {
                 }
 
                 steps.push(`✓ Files processed`);
+
+                // Close the upload modal by clicking outside of it
+                try {
+                    await page.click('body');
+                    await this.browser.randomDelay(1000, 2000);
+                    steps.push(`✓ Closed upload modal`);
+                } catch (e) {
+                    steps.push(`⚠ Could not close modal: ${(e as Error).message}`);
+                }
 
             } else {
                 steps.push('⚠ File input not found');
