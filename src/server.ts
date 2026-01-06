@@ -521,11 +521,25 @@ app.post('/api/test-notebooklm', async (req: Request, res: Response) => {
 
         console.log(`Starting NotebookLM test for folder: ${sourceFolder}`);
 
+        // Load visual style from global settings
+        let visualStyle: string | undefined;
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+        if (fs.existsSync(settingsPath)) {
+            try {
+                const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+                visualStyle = settings.notebookLmStyleSettings;
+            } catch (e) {
+                console.warn('Could not read settings for visual style:', e);
+            }
+        }
+
         const tester = new NotebookLMTester();
         const result = await tester.testWorkflow({
             sourceFolder,
             headless: headless === true || headless === 'true',
-            existingNotebookUrl: existingNotebookUrl || undefined
+            existingNotebookUrl: existingNotebookUrl || undefined,
+            visualStyle  // From global settings
+            // steeringPrompt will be loaded from per-folder progress.json automatically
         });
 
         res.json(result);

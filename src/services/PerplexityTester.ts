@@ -401,9 +401,10 @@ export class PerplexityTester {
             const sourceFolder = config.sourceFolder || (filesToUpload && filesToUpload.length > 0 ? path.dirname(filesToUpload[0]) : null);
             if (sourceFolder) {
                 ProgressTracker.markStepComplete(sourceFolder, 'perplexity', {
-                    outputFile: 'perplexity_response.txt'
+                    outputFile: 'perplexity_response.txt',
+                    steeringPrompt: cleanedResponse  // Save for NotebookLM to use
                 });
-                steps.push('✓ Progress saved');
+                steps.push('✓ Progress saved (including steering prompt)');
             }
 
             const screenshotPath = path.join(outputDir, 'perplexity_screenshot.png');

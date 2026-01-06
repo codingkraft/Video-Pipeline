@@ -119,7 +119,12 @@ async function loadFilesFromFolder(folderPath) {
 
                 // If notebook is created, show option to continue from there
                 if (progressData.summary.completedSteps.includes('notebooklm_notebook_created')) {
-                    dropdownOptions += '<option value="continue-from-notebook">📂 Open Existing Notebook</option>';
+                    // Check if sources are also uploaded
+                    if (progressData.summary.completedSteps.includes('notebooklm_sources_uploaded')) {
+                        dropdownOptions += '<option value="continue-from-notebook">📂 Continue (Sources Uploaded)</option>';
+                    } else {
+                        dropdownOptions += '<option value="continue-from-notebook">📂 Open Existing Notebook</option>';
+                    }
                     lastOption = 'continue-from-notebook';
                 }
 

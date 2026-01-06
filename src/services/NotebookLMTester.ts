@@ -11,6 +11,8 @@ export interface NotebookLMTestConfig {
     files?: string[];
     headless?: boolean;
     existingNotebookUrl?: string; // If resuming from an existing notebook
+    steeringPrompt?: string;      // Prompt from Perplexity
+    visualStyle?: string;         // Visual style description
 }
 
 export interface NotebookLMTestResult {
@@ -51,6 +53,30 @@ export class NotebookLMTester {
 
             steps.push(`✓ Navigated to: ${targetUrl}`);
 
+            // Load steering prompt from per-folder progress if not provided
+            // This allows resuming from any step while preserving Perplexity-generated data
+            // Note: visualStyle comes from global settings, not per-folder progress
+            if (!config.steeringPrompt) {
+                const progress = ProgressTracker.getProgress(config.sourceFolder);
+                if (progress?.steps.perplexity?.steeringPrompt) {
+                    config.steeringPrompt = progress.steps.perplexity.steeringPrompt;
+                    steps.push(`✓ Loaded steering prompt from progress`);
+                } else {
+                    // Fallback: Read from perplexity_response.txt file directly
+                    const perplexityResponsePath = path.join(config.sourceFolder, 'output', 'perplexity_response.txt');
+                    if (fs.existsSync(perplexityResponsePath)) {
+                        try {
+                            config.steeringPrompt = fs.readFileSync(perplexityResponsePath, 'utf-8');
+                            steps.push(`✓ Loaded steering prompt from perplexity_response.txt`);
+                        } catch (e) {
+                            steps.push(`⚠ Could not read perplexity_response.txt: ${(e as Error).message}`);
+                        }
+                    } else {
+                        steps.push(`⚠ No steering prompt found (run Perplexity first)`);
+                    }
+                }
+            }
+
             // Resolve files to upload
             let filesToUpload = config.files || [];
             if (filesToUpload.length === 0 && config.sourceFolder) {
@@ -90,17 +116,24 @@ export class NotebookLMTester {
 
             // Step 2: Upload sources
             if (filesToUpload.length > 0) {
-                steps.push(`⏳ Uploading ${filesToUpload.length} source files...`);
-                await this.uploadSources(page, filesToUpload, steps);
+                // Check if sources are already uploaded
+                if (config.sourceFolder && ProgressTracker.isStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded')) {
+                    steps.push(`✓ Sources already uploaded (skipping upload)`);
+                } else {
+                    steps.push(`⏳ Uploading ${filesToUpload.length} source files...`);
+                    await this.uploadSources(page, filesToUpload, steps);
 
-                ProgressTracker.markStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded', {
-                    sourceCount: filesToUpload.length
-                });
+                    if (config.sourceFolder) {
+                        ProgressTracker.markStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded', {
+                            sourceCount: filesToUpload.length
+                        });
+                    }
+                }
             }
 
             // Step 3: Navigate to video creation
             steps.push('⏳ Navigating to video creation...');
-            await this.navigateToVideoCreation(page, steps);
+            await this.navigateToVideoCreation(page, steps, config);
 
             ProgressTracker.markStepComplete(config.sourceFolder, 'notebooklm_video_started');
 
@@ -505,20 +538,12 @@ export class NotebookLMTester {
     /**
      * Navigate to the video/audio creation section.
      */
-    private async navigateToVideoCreation(page: Page, steps: string[]): Promise<void> {
+    private async navigateToVideoCreation(page: Page, steps: string[], config?: NotebookLMTestConfig): Promise<void> {
         try {
             // Look for Audio Overview or Studio tab
             const videoButtonSelectors = [
-                'button[aria-label*="Audio"]',
-                'button[aria-label*="Studio"]',
-                'button[aria-label*="Generate"]',
-                '[data-testid="audio-overview"]',
-                'button:has-text("Audio Overview")',
-                'button:has-text("Studio")',
-                'button:has-text("Generate")',
-                // Tab-based navigation
-                '[role="tab"]:has-text("Studio")',
-                '[role="tab"]:has-text("Audio")'
+                'button[aria-label="Customize Video Overview"]', // User identified correct button
+                'button[aria-label*="Customize Video"]',
             ];
 
             let clicked = false;
@@ -536,29 +561,139 @@ export class NotebookLMTester {
                 }
             }
 
-            if (!clicked) {
-                // Try via evaluate
-                clicked = await page.evaluate(() => {
-                    const buttons = Array.from(document.querySelectorAll('button, [role="tab"]'));
-                    const audioBtn = buttons.find(b => {
-                        const text = b.textContent?.toLowerCase() || '';
-                        const label = b.getAttribute('aria-label')?.toLowerCase() || '';
-                        return text.includes('audio') || text.includes('studio') ||
-                            label.includes('audio') || label.includes('studio');
-                    });
-                    if (audioBtn) {
-                        (audioBtn as HTMLElement).click();
-                        return true;
-                    }
-                    return false;
-                });
-            }
 
             if (clicked) {
-                await this.browser.randomDelay(2000, 3000);
-                steps.push('✓ Navigated to audio/video section');
+                steps.push('✓ Clicked "Customize Video Overview" button');
+
+                // Wait for the modal to appear
+                try {
+                    const modalSelector = 'mat-dialog-container';
+                    await page.waitForSelector(modalSelector, { timeout: 5000 });
+                    steps.push('✓ Opened "Customize Video Overview" modal');
+                    await this.browser.randomDelay(1000, 2000);
+
+                    // 1. Click on Explainer
+                    const explainerClicked = await page.evaluate(() => {
+                        const radios = Array.from(document.querySelectorAll('mat-radio-button'));
+                        const explainer = radios.find(r => r.textContent?.includes('Explainer'));
+                        if (explainer) {
+                            const explainerInput = explainer.querySelector('input');
+                            if (explainerInput) {
+                                explainerInput.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                    if (explainerClicked) {
+                        steps.push('✓ Selected "Explainer" format');
+                        await this.browser.randomDelay(500, 1000);
+                    } else {
+                        steps.push('⚠ Could not find "Explainer" option');
+                    }
+
+                    // 2. Click on Custom Visual Style
+                    const customStyleClicked = await page.evaluate(() => {
+                        const radios = Array.from(document.querySelectorAll('mat-radio-button'));
+                        const custom = radios.find(r => r.textContent?.includes('Custom'));
+                        if (custom) {
+                            const customInput = custom.querySelector('input');
+                            if (customInput) {
+                                customInput.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                    if (customStyleClicked) {
+                        steps.push('✓ Selected "Custom" visual style');
+                        await this.browser.randomDelay(500, 1000);
+
+                        // 3. Put the visual style from settings in the custom visual style input
+                        if (config?.visualStyle) {
+                            // Look for the input that appears for Custom style
+                            await new Promise(r => setTimeout(r, 500)); // Wait for input to appear
+                            const inputFound = await page.evaluate((styleText) => {
+                                const textareas = Array.from(document.querySelectorAll('mat-dialog-container textarea'));
+                                // @ts-ignore - Valid JS at runtime, textarea has placeholder
+                                const styleInput = textareas.find(t => t.placeholder && t.placeholder.includes('Try a story-like style'));
+
+                                if (styleInput) {
+                                    // @ts-ignore - Valid JS at runtime
+                                    styleInput.value = styleText;
+                                    styleInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                    styleInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                    return true;
+                                }
+                                return false;
+                            }, config.visualStyle);
+
+                            if (inputFound) {
+                                steps.push('✓ Entered custom visual style');
+                            } else {
+                                steps.push('⚠ Could not find input for custom visual style');
+                            }
+                        }
+                    } else {
+                        steps.push('⚠ Could not find "Custom" visual style option');
+                    }
+
+                    // 4. Put the steering prompt created by perplexity in what should the AI focus on
+                    if (config?.steeringPrompt) {
+                        const promptEntered = await page.evaluate((promptText) => {
+                            const textareas = Array.from(document.querySelectorAll('mat-dialog-container textarea'));
+                            // @ts-ignore - Valid JS at runtime, textarea has placeholder
+                            const focusInput = textareas.find(t => (t.placeholder && t.placeholder.includes('Things to try')));
+
+                            if (focusInput) {
+                                // @ts-ignore - Valid JS at runtime
+                                focusInput.value = promptText;
+                                focusInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                focusInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                return true;
+                            }
+                            return false;
+                        }, config.steeringPrompt);
+
+                        if (promptEntered) {
+                            steps.push('✓ Entered steering prompt');
+                        } else {
+                            steps.push('⚠ Could not find "What should AI focus on" input');
+                        }
+                    }
+
+                    await this.browser.randomDelay(1000, 2000);
+
+                    // Click the "Generate" button inside the modal
+                    const generateClicked = await page.evaluate(() => {
+                        const buttons = Array.from(document.querySelectorAll('mat-dialog-container button'));
+                        const generateBtn = buttons.find(b => b.textContent?.includes('Generate'));
+                        if (generateBtn) {
+                            (generateBtn as HTMLElement).click();
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (generateClicked) {
+                        steps.push('✓ Clicked "Generate" button');
+                        await this.browser.randomDelay(2000, 3000);
+
+                        // Mark step as complete explicitly since multiple things happen here
+                        // Actually, progress tracking handles 'notebooklm_video_started' separately? 
+                        // We'll let the caller handle progress tracking updates if needed, 
+                        // but for now just logging it is enough.
+                    } else {
+                        steps.push('⚠ Could not find "Generate" button in modal');
+                    }
+                } catch (e) {
+                    steps.push(`⚠ Modal did not appear or error interacting: ${(e as Error).message}`);
+                }
+
             } else {
-                steps.push('⚠ Audio/Studio button not found - may need manual navigation');
+                steps.push('⚠ Audio/Studio/Customize button not found - may need manual navigation');
             }
 
         } catch (error) {
