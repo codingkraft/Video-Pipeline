@@ -209,9 +209,9 @@ async function loadSettings() {
             document.getElementById('notebookLmChatSettings').value = settings.notebookLmChatSettings || 'Focus on key concepts and provide clear explanations';
             document.getElementById('notebookLmStyleSettings').value = settings.notebookLmStyleSettings || 'Modern, engaging, educational style';
             document.getElementById('stylePrompt').value = settings.stylePrompt || 'Professional with smooth transitions';
-            document.getElementById('outputDir').value = settings.outputDir || '';
             document.getElementById('sourceFolder').value = settings.sourceFolder || '';
             document.getElementById('headlessMode').checked = settings.headlessMode === true;
+            document.getElementById('deleteConversation').checked = settings.deleteConversation === true;
             console.log('Settings loaded from file');
         }
     } catch (error) {
@@ -230,6 +230,7 @@ function saveSettings() {
         outputDir: document.getElementById('outputDir').value,
         sourceFolder: document.getElementById('sourceFolder').value,
         headlessMode: document.getElementById('headlessMode').checked,
+        deleteConversation: document.getElementById('deleteConversation').checked,
     };
     fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if (d.success) { const msg = document.getElementById('saveMessage'); if (msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
 
@@ -255,7 +256,8 @@ function setupAutoSave() {
         'stylePrompt',
         'outputDir',
         'sourceFolder',
-        'headlessMode'
+        'headlessMode',
+        'deleteConversation'
     ];
 
     inputIds.forEach(id => {
@@ -572,12 +574,14 @@ async function testPerplexity() {
         const sourceFolder = document.getElementById('sourceFolder').value;
 
         const headless = document.getElementById('headlessMode').checked;
+        const deleteConversation = document.getElementById('deleteConversation').checked;
 
         formData.append('chatUrl', perplexityChatUrl);
         formData.append('prompt', promptText);
         if (outputDir) formData.append('outputDir', outputDir);
         if (sourceFolder) formData.append('sourceFolder', sourceFolder);
         formData.append('headless', headless);
+        formData.append('deleteConversation', deleteConversation);
 
         const response = await fetch('/api/test-perplexity', {
             method: 'POST',

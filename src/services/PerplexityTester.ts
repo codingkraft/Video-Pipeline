@@ -12,6 +12,7 @@ export interface PerplexityTestConfig {
     outputDir?: string;
     sourceFolder?: string;
     headless?: boolean;
+    shouldDeleteConversation?: boolean;
 }
 
 export class PerplexityTester {
@@ -405,56 +406,60 @@ export class PerplexityTester {
             await page.screenshot({ path: screenshotPath, fullPage: true });
             steps.push(`✓ Screenshot saved: ${screenshotPath}`);
 
-            // Step 9: Cleanup (Delete response)
-            try {
-                steps.push('⏳ Cleaning up (deleting response)...');
+            // Step 9: Cleanup (Delete response) if requested
+            if (config.shouldDeleteConversation) {
+                try {
+                    steps.push('⏳ Cleaning up (deleting conversation)...');
 
-                // Find "More actions" button SPECIFICALLY within the last active response
-                const dotsClicked = await page.evaluate(() => {
-                    // Re-find the exact same container we got the text from
-                    const activeDivs = document.querySelectorAll('div[data-state="active"]');
-                    if (activeDivs.length === 0) return false;
+                    // Find "More actions" button SPECIFICALLY within the last active response
+                    const dotsClicked = await page.evaluate(() => {
+                        // Re-find the exact same container we got the text from
+                        const activeDivs = document.querySelectorAll('div[data-state="active"]');
+                        if (activeDivs.length === 0) return false;
 
-                    console.log(`Found ${activeDivs.length} active conversation turns. Targeting the last one.`);
-                    const lastActive = activeDivs[activeDivs.length - 1];
+                        console.log(`Found ${activeDivs.length} active conversation turns. Targeting the last one.`);
+                        const lastActive = activeDivs[activeDivs.length - 1];
 
-                    // Look for the dots button INSIDE this specific container
-                    const button = lastActive.querySelector('button[aria-label="More actions"]');
+                        // Look for the dots button INSIDE this specific container
+                        const button = lastActive.querySelector('button[aria-label="More actions"]');
 
-                    if (button) {
-                        (button as HTMLElement).click();
-                        return true;
-                    }
-                    return false;
-                });
-
-                if (dotsClicked) {
-                    await this.browser.randomDelay(800, 1200);
-
-                    // Click "Delete" in the popup menu
-                    const deleteClicked = await page.evaluate(() => {
-                        const menuItems = Array.from(document.querySelectorAll('div[role="menuitem"]'));
-                        // Find item with "Delete" text
-                        const deleteItem = menuItems.find(item => item.textContent?.trim() === 'Delete' || item.textContent?.includes('Delete'));
-
-                        if (deleteItem) {
-                            (deleteItem as HTMLElement).click();
+                        if (button) {
+                            (button as HTMLElement).click();
                             return true;
                         }
                         return false;
                     });
 
-                    if (deleteClicked) {
-                        steps.push('✓ Response deleted from history');
-                        await this.browser.randomDelay(1000, 2000);
+                    if (dotsClicked) {
+                        await this.browser.randomDelay(800, 1200);
+
+                        // Click "Delete" in the popup menu
+                        const deleteClicked = await page.evaluate(() => {
+                            const menuItems = Array.from(document.querySelectorAll('div[role="menuitem"]'));
+                            // Find item with "Delete" text
+                            const deleteItem = menuItems.find(item => item.textContent?.trim() === 'Delete' || item.textContent?.includes('Delete'));
+
+                            if (deleteItem) {
+                                (deleteItem as HTMLElement).click();
+                                return true;
+                            }
+                            return false;
+                        });
+
+                        if (deleteClicked) {
+                            steps.push('✓ Response deleted from history');
+                            await this.browser.randomDelay(1000, 2000);
+                        } else {
+                            steps.push('⚠ "Delete" option not found in menu');
+                        }
                     } else {
-                        steps.push('⚠ "Delete" option not found in menu');
+                        steps.push('⚠ "More actions" button not found in the current response');
                     }
-                } else {
-                    steps.push('⚠ "More actions" button not found in the current response');
+                } catch (cleanupError) {
+                    steps.push(`⚠ Cleanup failed: ${(cleanupError as Error).message}`);
                 }
-            } catch (cleanupError) {
-                steps.push(`⚠ Cleanup failed: ${(cleanupError as Error).message}`);
+            } else {
+                steps.push('ℹ Conversation preserved (deletion not requested)');
             }
 
             return {

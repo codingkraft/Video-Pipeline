@@ -320,9 +320,9 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
         const { PerplexityTester } = await import('./services/PerplexityTester');
 
         const files = req.files as Express.Multer.File[];
-        const { chatUrl, prompt, outputDir, sourceFolder, headless } = req.body;
+        const { chatUrl, prompt, outputDir, sourceFolder, headless, deleteConversation } = req.body;
 
-        console.log(`Received test request with ${files ? files.length : 0} files. SourceFolder: ${sourceFolder}. Headless: ${headless}`);
+        console.log(`Received test request with ${files ? files.length : 0} files. Headless: ${headless}, DeleteConv: ${deleteConversation}`);
 
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
@@ -355,7 +355,8 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
             prompt,
             outputDir: outputDir || undefined,
             sourceFolder: sourceFolder || undefined,
-            headless: headless === 'true' || headless === true
+            headless: headless === 'true' || headless === true,
+            shouldDeleteConversation: deleteConversation === 'true' || deleteConversation === true
         });
 
         // Cleanup uploaded files
