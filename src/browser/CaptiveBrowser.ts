@@ -57,17 +57,26 @@ export class CaptiveBrowser {
 
         console.log(`Launching browser with profile: ${this.config.userDataDir}`);
 
+        const startMinimized = this.config.headless; // "headless" config now triggers minimized mode
+
+        const args = [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-infobars',
+        ];
+
+        if (startMinimized) {
+            args.push('--start-minimized');
+        } else {
+            args.push('--start-maximized');
+        }
+
         this.browser = await puppeteerExtra.launch({
-            headless: this.config.headless,
+            headless: false, // Always visible (false), just minimized if requested
             userDataDir: this.config.userDataDir,
             defaultViewport: null, // Use full screen viewport
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-infobars',
-                '--start-maximized', // Start maximized to fit screen
-            ],
+            args: args,
         });
 
         console.log('Browser launched successfully');
