@@ -415,6 +415,7 @@ export class PerplexityTester {
                     const activeDivs = document.querySelectorAll('div[data-state="active"]');
                     if (activeDivs.length === 0) return false;
 
+                    console.log(`Found ${activeDivs.length} active conversation turns. Targeting the last one.`);
                     const lastActive = activeDivs[activeDivs.length - 1];
 
                     // Look for the dots button INSIDE this specific container
