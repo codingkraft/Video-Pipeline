@@ -419,8 +419,28 @@ export class PerplexityTester {
                         // Click "Delete" in the popup menu
                         const deleteClicked = await page.evaluate(() => {
                             const menuItems = Array.from(document.querySelectorAll('div[role="menuitem"]'));
-                            // Find item with "Delete" text
-                            const deleteItem = menuItems.find(item => item.textContent?.trim() === 'Delete' || item.textContent?.includes('Delete'));
+
+                            // Debug: Log items found
+                            const itemTexts = menuItems.map(i => i.textContent?.trim());
+                            console.log('Menu items found:', itemTexts);
+
+                            // Strategy 1: Find item with "Delete" text (case-insensitive)
+                            let deleteItem = menuItems.find(item => {
+                                const text = item.textContent?.trim().toLowerCase();
+                                return text === 'delete';
+                            });
+
+                            // Strategy 2: Find item with Trash icon (fallback)
+                            if (!deleteItem) {
+                                deleteItem = menuItems.find(item => {
+                                    const svgUse = item.querySelector('svg use');
+                                    if (svgUse) {
+                                        const href = svgUse.getAttribute('xlink:href') || svgUse.getAttribute('href');
+                                        return href && (href.includes('pplx-icon-trash') || href.includes('trash'));
+                                    }
+                                    return false;
+                                });
+                            }
 
                             if (deleteItem) {
                                 (deleteItem as HTMLElement).click();
