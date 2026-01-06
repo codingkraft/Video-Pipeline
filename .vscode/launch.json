@@ -13,11 +13,21 @@
                 "${workspaceFolder}/src/server.ts"
             ],
             "cwd": "${workspaceFolder}",
+            "sourceMaps": true,
+            "smartStep": true,
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "skipFiles": [
                 "<node_internals>/**"
-            ]
+            ],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "env": {
+                "TS_NODE_FILES": "true",
+                "TS_NODE_TRANSPILE_ONLY": "false"
+            }
         },
         {
             "name": "Debug Current Active File",
@@ -31,11 +41,21 @@
                 "${file}"
             ],
             "cwd": "${workspaceFolder}",
+            "sourceMaps": true,
+            "smartStep": true,
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "skipFiles": [
                 "<node_internals>/**"
-            ]
+            ],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "env": {
+                "TS_NODE_FILES": "true",
+                "TS_NODE_TRANSPILE_ONLY": "false"
+            }
         }
     ]
 }
