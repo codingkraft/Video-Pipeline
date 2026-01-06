@@ -10,7 +10,8 @@ export interface PerplexityTestConfig {
     files: string[];
     prompt: string;
     outputDir?: string;
-    sourceFolder?: string; // NEW: The absolute path of the source folder
+    sourceFolder?: string;
+    headless?: boolean;
 }
 
 export class PerplexityTester {
@@ -25,7 +26,7 @@ export class PerplexityTester {
      */
     public async testWorkflow(config: PerplexityTestConfig): Promise<{ success: boolean; message: string; details?: any }> {
         try {
-            await this.browser.initialize();
+            await this.browser.initialize({ headless: config.headless });
 
             const page = await this.browser.getPage('perplexity-test', config.chatUrl || PERPLEXITY_URL);
             await this.browser.randomDelay(2000, 3000);

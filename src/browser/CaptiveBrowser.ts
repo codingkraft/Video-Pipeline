@@ -36,7 +36,20 @@ export class CaptiveBrowser {
         return CaptiveBrowser.instance;
     }
 
-    public async initialize(): Promise<void> {
+    public async initialize(config?: Partial<BrowserConfig>): Promise<void> {
+        // Update config if provided
+        if (config) {
+            const restartRequired = config.headless !== undefined && config.headless !== this.config.headless;
+            this.config = { ...this.config, ...config };
+
+            if (this.browser && restartRequired) {
+                console.log('Headless mode changed, restarting browser...');
+                await this.browser.close();
+                this.browser = null;
+                this.pages.clear();
+            }
+        }
+
         if (this.browser) {
             console.log('Browser already initialized');
             return;
