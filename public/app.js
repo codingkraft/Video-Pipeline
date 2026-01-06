@@ -80,6 +80,16 @@ async function loadFilesFromFolder(folderPath) {
 
         if (data.files && data.files.length > 0) {
             docList.innerHTML = '';
+
+            // Show warning if perplexity output already exists
+            if (data.warning) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'warning-banner';
+                warningDiv.style.cssText = 'background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; color: #ffc107; font-size: 0.9em;';
+                warningDiv.innerHTML = `⚠ ${data.warning}. Running again will overwrite existing output.`;
+                docList.appendChild(warningDiv);
+            }
+
             data.files.forEach(file => {
                 const item = document.createElement('div');
                 item.className = 'document-item';

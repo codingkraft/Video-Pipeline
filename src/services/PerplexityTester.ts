@@ -50,18 +50,25 @@ export class PerplexityTester {
             // 2. Use sourceFolder if provided (this is the Local Mode)
             // 3. Fall back to first file's directory
             // 4. Fall back to project output folder
+            // NOTE: No job-specific subfolder - files will overwrite on each run
             let outputDir: string;
             if (config.outputDir) {
-                outputDir = path.join(config.outputDir, 'output', jobId);
+                outputDir = path.join(config.outputDir, 'output');
             } else if (config.sourceFolder) {
-                // Local Mode: Save in sourceFolder/output/job...
-                outputDir = path.join(config.sourceFolder, 'output', jobId);
+                // Local Mode: Save in sourceFolder/output/
+                outputDir = path.join(config.sourceFolder, 'output');
             } else if (filesToUpload && filesToUpload.length > 0) {
                 // Save output inside the source folder's 'output' subfolder
                 const sourceFolder = path.dirname(filesToUpload[0]);
-                outputDir = path.join(sourceFolder, 'output', jobId);
+                outputDir = path.join(sourceFolder, 'output');
             } else {
-                outputDir = path.join(process.cwd(), 'output', jobId);
+                outputDir = path.join(process.cwd(), 'output');
+            }
+
+            // Check if output files already exist and warn
+            const existingResponse = path.join(outputDir, 'perplexity_response.txt');
+            if (fs.existsSync(existingResponse)) {
+                steps.push('⚠ Existing output files will be overwritten');
             }
 
             if (!fs.existsSync(outputDir)) {
@@ -105,32 +112,22 @@ export class PerplexityTester {
                 try {
                     steps.push(`⏳ Selecting model: ${config.model}...`);
 
-                    // 1. Find and click the model trigger
+                    // 1. Find and click the model trigger (button with CPU icon)
                     const triggerClicked = await page.evaluate(() => {
-                        // Look for button that usually triggers model menu
-                        // Currently Perplexity has a button showing "Best", "Sonar", etc.
-                        const potentialNames = ['Best', 'Sonar', 'Pro', 'GPT', 'Claude', 'Gemini'];
+                        // Find all buttons containing the CPU icon
                         const buttons = Array.from(document.querySelectorAll('button'));
-
-                        // Find button that contains one of the model names
-                        const targetBtn = buttons.find(b => {
-                            const txt = b.textContent?.trim();
-                            if (!txt) return false;
-                            if (txt.length > 25) return false; // Avoid selecting large blocks
-
-                            // Check if text matches known model keywords
-                            if (potentialNames.some(name => txt.includes(name))) return true;
-
-                            // FALLBACK: Check for CPU icon (pplx-icon-cpu)
+                        const cpuButtons = buttons.filter(b => {
                             const useElement = b.querySelector('svg use');
                             if (useElement) {
                                 const href = useElement.getAttribute('xlink:href') || useElement.getAttribute('href');
-                                if (href && href.includes('pplx-icon-cpu')) return true;
+                                return href && href.includes('pplx-icon-cpu');
                             }
                             return false;
                         });
 
-                        if (targetBtn) {
+                        // Use the LAST button with CPU icon on the page
+                        if (cpuButtons.length > 0) {
+                            const targetBtn = cpuButtons[cpuButtons.length - 1];
                             targetBtn.click();
                             return true;
                         }
@@ -180,6 +177,10 @@ export class PerplexityTester {
 
                     if (fileInput) {
                         const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
+
+                        // Clear file input value before uploading (fixes repeat run issues)
+                        await page.evaluate((el) => { (el as HTMLInputElement).value = ''; }, fileInput);
+
                         await inputElement.uploadFile(...filesToUpload);
                         steps.push(`✓ Attached ${filesToUpload.length} file(s)`);
 
@@ -225,6 +226,10 @@ export class PerplexityTester {
                     document.execCommand('copy');
                     document.body.removeChild(input);
                 }, config.prompt);
+
+                // Focus again before pasting
+                await page.click('#ask-input');
+                await this.browser.randomDelay(200, 400);
 
                 // Paste
                 await page.keyboard.down('Control');
@@ -374,11 +379,24 @@ export class PerplexityTester {
             }
 
             // Step 8: Save
-            const responseFilePath = path.join(outputDir, `${jobId}_perplexity_response.txt`);
-            fs.writeFileSync(responseFilePath, responseText, 'utf-8');
+            // Clean up extra blank lines (textContent can include many newlines from nested HTML)
+            const cleanedResponse = responseText
+                .split('\n')
+                .map(line => line.trim())
+                .filter((line, index, arr) => {
+                    // Keep non-empty lines, and only keep one blank line between sections
+                    if (line !== '') return true;
+                    // Check if previous line was also empty - if so, filter this one out
+                    return index === 0 || arr[index - 1] !== '';
+                })
+                .join('\n')
+                .trim();
+
+            const responseFilePath = path.join(outputDir, 'perplexity_response.txt');
+            fs.writeFileSync(responseFilePath, cleanedResponse, 'utf-8');
             steps.push(`✓ Response saved to: ${responseFilePath}`);
 
-            const screenshotPath = path.join(outputDir, `${jobId}_perplexity_screenshot.png`);
+            const screenshotPath = path.join(outputDir, 'perplexity_screenshot.png');
 
             // Scroll to bottom before screenshot
             await page.evaluate(() => {
@@ -395,63 +413,46 @@ export class PerplexityTester {
                     steps.push('⏳ Cleaning up (deleting conversation)...');
 
                     // Find "More actions" button SPECIFICALLY within the last active response
-                    const dotsClicked = await page.evaluate(() => {
-                        // Re-find the exact same container we got the text from
-                        const activeDivs = document.querySelectorAll('div[data-state="active"]');
-                        if (activeDivs.length === 0) return false;
+                    // Get all active divs and find the button in the last one
+                    const activeDivs = await page.$$('div[data-state="active"]');
+                    let btnElement = null;
 
-                        console.log(`Found ${activeDivs.length} active conversation turns. Targeting the last one.`);
-                        const lastActive = activeDivs[activeDivs.length - 1];
+                    if (activeDivs.length > 0) {
+                        const lastActiveDiv = activeDivs[activeDivs.length - 1];
+                        btnElement = await lastActiveDiv.$('button[aria-label="More actions"]');
+                    }
 
-                        // Look for the dots button INSIDE this specific container
-                        const button = lastActive.querySelector('button[aria-label="More actions"]');
-
-                        if (button) {
-                            (button as HTMLElement).click();
-                            return true;
-                        }
-                        return false;
-                    });
-
-                    if (dotsClicked) {
+                    if (btnElement) {
+                        // Use Puppeteer's native click which properly triggers event handlers
+                        await btnElement.click();
                         await this.browser.randomDelay(800, 1200);
 
-                        // Click "Delete" in the popup menu
+                        // Click "Delete" in the popup menu using native click
+                        const deleteSelector = 'div[role="menuitem"]';
+                        await page.waitForSelector(deleteSelector, { timeout: 3000 });
+
+                        // Find and click the Delete menu item
                         const deleteClicked = await page.evaluate(() => {
                             const menuItems = Array.from(document.querySelectorAll('div[role="menuitem"]'));
-
-                            // Debug: Log items found
-                            const itemTexts = menuItems.map(i => i.textContent?.trim());
-                            console.log('Menu items found:', itemTexts);
-
-                            // Strategy 1: Find item with "Delete" text (case-insensitive)
-                            let deleteItem = menuItems.find(item => {
+                            const deleteItem = menuItems.find(item => {
                                 const text = item.textContent?.trim().toLowerCase();
-                                return text === 'delete';
+                                return text === 'delete' || text?.includes('delete');
                             });
-
-                            // Strategy 2: Find item with Trash icon (fallback)
-                            if (!deleteItem) {
-                                deleteItem = menuItems.find(item => {
-                                    const svgUse = item.querySelector('svg use');
-                                    if (svgUse) {
-                                        const href = svgUse.getAttribute('xlink:href') || svgUse.getAttribute('href');
-                                        return href && (href.includes('pplx-icon-trash') || href.includes('trash'));
-                                    }
-                                    return false;
-                                });
-                            }
-
                             if (deleteItem) {
-                                (deleteItem as HTMLElement).click();
-                                return true;
+                                // Return the index so we can click it natively
+                                return menuItems.indexOf(deleteItem);
                             }
-                            return false;
+                            return -1;
                         });
 
-                        if (deleteClicked) {
-                            steps.push('✓ Response deleted from history');
-                            await this.browser.randomDelay(1000, 2000);
+                        if (deleteClicked >= 0) {
+                            // Click using Puppeteer's native click
+                            const deleteItems = await page.$$('div[role="menuitem"]');
+                            if (deleteItems[deleteClicked]) {
+                                await deleteItems[deleteClicked].click();
+                                steps.push('✓ Response deleted from history');
+                                await this.browser.randomDelay(1000, 2000);
+                            }
                         } else {
                             steps.push('⚠ "Delete" option not found in menu');
                         }

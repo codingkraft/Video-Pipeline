@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch UI Server (src/server.ts)",
+            "name": "Launch UI Server",
             "type": "node",
             "request": "launch",
             "runtimeArgs": [
@@ -11,34 +11,6 @@
             ],
             "args": [
                 "${workspaceFolder}/src/server.ts"
-            ],
-            "cwd": "${workspaceFolder}",
-            "sourceMaps": true,
-            "smartStep": true,
-            "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/**",
-                "!**/node_modules/**"
-            ],
-            "env": {
-                "TS_NODE_FILES": "true",
-                "TS_NODE_TRANSPILE_ONLY": "false"
-            }
-        },
-        {
-            "name": "Debug Current Active File",
-            "type": "node",
-            "request": "launch",
-            "runtimeArgs": [
-                "-r",
-                "ts-node/register"
-            ],
-            "args": [
-                "${file}"
             ],
             "cwd": "${workspaceFolder}",
             "sourceMaps": true,

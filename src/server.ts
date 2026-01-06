@@ -308,7 +308,16 @@ app.get('/api/list-folder', (req: Request, res: Response) => {
     try {
         const files = fs.readdirSync(folderPath)
             .filter(f => /\.(pdf|txt|md|docx?|jpe?g|png|gif|webp|bmp)$/i.test(f));
-        res.json({ files });
+
+        // Check if perplexity output already exists
+        const outputDir = path.join(folderPath, 'output');
+        const perplexityOutputExists = fs.existsSync(path.join(outputDir, 'perplexity_response.txt'));
+
+        res.json({
+            files,
+            perplexityOutputExists,
+            warning: perplexityOutputExists ? 'Perplexity prompt already generated for this folder' : null
+        });
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
     }
