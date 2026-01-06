@@ -13,6 +13,7 @@ export interface PerplexityTestConfig {
     sourceFolder?: string;
     headless?: boolean;
     shouldDeleteConversation?: boolean;
+    model?: string; // NEW: The model to use (e.g. "GPT-5.2")
 }
 
 export class PerplexityTester {
@@ -99,90 +100,75 @@ export class PerplexityTester {
                 steps.push(`⚠ Mode selection: ${(error as Error).message}`);
             }
 
-            // Step 3: Change LLM to Claude Sonnet 4.5
-            // HTML: <button aria-label="Gemini 3 Pro" ...> with <svg><use xlink:href="#pplx-icon-cpu">
-            try {
-                steps.push('⏳ Opening model selector...');
+            // Step 2.5: Select Model (if configured and not default)
+            if (config.model && config.model !== 'Best') {
+                try {
+                    steps.push(`⏳ Selecting model: ${config.model}...`);
 
-                // Use JavaScript to find the LAST button containing the CPU icon
-                // There are multiple CPU icons - the last one is the model selector
-                const modelButtonClicked = await page.evaluate(() => {
-                    // Find all buttons with CPU icon
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const cpuButtons: HTMLButtonElement[] = [];
+                    // 1. Find and click the model trigger
+                    const triggerClicked = await page.evaluate(() => {
+                        // Look for button that usually triggers model menu
+                        // Currently Perplexity has a button showing "Best", "Sonar", etc.
+                        const potentialNames = ['Best', 'Sonar', 'Pro', 'GPT', 'Claude', 'Gemini'];
+                        const buttons = Array.from(document.querySelectorAll('button'));
 
-                    for (const btn of buttons) {
-                        // Check if button contains the CPU icon
-                        const useElement = btn.querySelector('svg use');
-                        if (useElement) {
-                            const href = useElement.getAttribute('xlink:href') || useElement.getAttribute('href');
-                            if (href && href.includes('pplx-icon-cpu')) {
-                                cpuButtons.push(btn);
-                            }
-                        }
-                    }
+                        // Find button that contains one of the model names
+                        const targetBtn = buttons.find(b => {
+                            const txt = b.textContent?.trim();
+                            if (!txt) return false;
+                            if (txt.length > 25) return false; // Avoid selecting large blocks
 
-                    // Use the LAST CPU button (model selector near input)
-                    if (cpuButtons.length > 0) {
-                        const modelBtn = cpuButtons[cpuButtons.length - 1];
-                        const label = modelBtn.getAttribute('aria-label');
-                        modelBtn.click();
-                        return label || 'Model button (last CPU icon)';
-                    }
-                    return null;
-                });
+                            // Check if text matches known model keywords
+                            if (potentialNames.some(name => txt.includes(name))) return true;
 
-                if (modelButtonClicked) {
-                    steps.push(`✓ Clicked model button: ${modelButtonClicked}`);
-                    await this.browser.randomDelay(1500, 2000);
-
-                    // Wait for dropdown to appear and find Claude option
-                    // Look for text containing "Claude" in the dropdown
-                    try {
-                        // Use XPath for specific text matching
-                        // We must match "Sonnet" to avoid "Opus"
-                        const claudeXpath = "//div[contains(text(), 'Claude Sonnet 4.5')] | //button[contains(text(), 'Sonnet')]";
-                        await page.waitForXPath(claudeXpath, { timeout: 3000 });
-
-                        const [claudeOption] = await page.$x(claudeXpath);
-                        if (claudeOption) {
-                            await (claudeOption as any).click();
-                            await this.browser.randomDelay(1000, 1500);
-                            steps.push('✓ Selected Claude Sonnet');
-                        } else {
-                            throw new Error('Claude Sonnet option not clickable');
-                        }
-                    } catch (e) {
-                        // Fallback: Try clicking by evaluating text
-                        const clicked = await page.evaluate(() => {
-                            const elements = Array.from(document.querySelectorAll('button, div[role="menuitem"], div[role="option"]'));
-                            for (const el of elements) {
-                                // Explicitly check for "Sonnet"
-                                const text = el.textContent || '';
-                                if (text.includes('Claude') && text.includes('Sonnet')) {
-                                    (el as HTMLElement).click();
-                                    return true;
-                                }
+                            // FALLBACK: Check for CPU icon (pplx-icon-cpu)
+                            const useElement = b.querySelector('svg use');
+                            if (useElement) {
+                                const href = useElement.getAttribute('xlink:href') || useElement.getAttribute('href');
+                                if (href && href.includes('pplx-icon-cpu')) return true;
                             }
                             return false;
                         });
 
-                        if (clicked) {
-                            steps.push('✓ Selected Claude (fallback)');
-                        } else {
-                            // Click somewhere else to close dropdown
-                            await page.keyboard.press('Escape');
-                            steps.push('⚠ Claude not found, keeping current model');
+                        if (targetBtn) {
+                            targetBtn.click();
+                            return true;
                         }
-                    }
-                } else {
-                    steps.push('⚠ Model selector button not found');
-                }
+                        return false;
+                    });
 
-                await this.browser.randomDelay(1000, 2000);
-            } catch (error) {
-                steps.push(`⚠ LLM selection: ${(error as Error).message}`);
+                    if (triggerClicked) {
+                        await this.browser.randomDelay(1000, 1500);
+
+                        // 2. Select the specific model from the menu
+                        const modelSelected = await page.evaluate((modelName) => {
+                            const items = Array.from(document.querySelectorAll('div[role="menuitem"]'));
+                            const targetItem = items.find(item => item.textContent?.includes(modelName));
+
+                            if (targetItem) {
+                                (targetItem as HTMLElement).click();
+                                return true;
+                            }
+                            return false;
+                        }, config.model);
+
+                        if (modelSelected) {
+                            steps.push(`✓ Model selected: ${config.model}`);
+                        } else {
+                            steps.push(`⚠ Could not find model "${config.model}" in menu`);
+                            // Try to close menu by clicking body (soft fail)
+                            await page.evaluate(() => document.body.click());
+                        }
+                    } else {
+                        steps.push('⚠ Could not find model selector button');
+                    }
+                    await this.browser.randomDelay(1000, 1500);
+                } catch (err) {
+                    steps.push(`⚠ Model selection failed: ${(err as Error).message}`);
+                }
             }
+
+            // (Old hardcoded Step 3 removed - replaced by Step 2.5 generic model selection)
 
             // Step 4: Attach files
             // HTML: <input data-testid="file-upload-input" type="file" ...>

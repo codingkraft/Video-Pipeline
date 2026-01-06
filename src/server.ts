@@ -320,15 +320,18 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
         const { PerplexityTester } = await import('./services/PerplexityTester');
 
         const files = req.files as Express.Multer.File[];
-        const { chatUrl, prompt, outputDir, sourceFolder, headless, deleteConversation } = req.body;
+        const { chatUrl, prompt, outputDir, sourceFolder, headless, deleteConversation, model } = req.body;
 
-        console.log(`Received test request with ${files ? files.length : 0} files. Headless: ${headless}, DeleteConv: ${deleteConversation}`);
+        console.log(`Received test request. Files: ${files ? files.length : 0}. Model: ${model || 'Default'}`);
 
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
 
         const tester = new PerplexityTester();
+
+        // ... (file resolution logic is unchanged, keeping this concise in thought, but I must replace correctly) ...
+        // Since I can't skip lines in replacement, I'll target the surrounding block.
 
         // Resolve files:
         // 1. If files uploaded, use them (temp paths)
@@ -356,7 +359,8 @@ app.post('/api/test-perplexity', upload.array('files', 10), async (req: Request,
             outputDir: outputDir || undefined,
             sourceFolder: sourceFolder || undefined,
             headless: headless === 'true' || headless === true,
-            shouldDeleteConversation: deleteConversation === 'true' || deleteConversation === true
+            shouldDeleteConversation: deleteConversation === 'true' || deleteConversation === true,
+            model: model || undefined
         });
 
         // Cleanup uploaded files

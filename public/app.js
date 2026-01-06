@@ -212,6 +212,7 @@ async function loadSettings() {
             document.getElementById('sourceFolder').value = settings.sourceFolder || '';
             document.getElementById('headlessMode').checked = settings.headlessMode === true;
             document.getElementById('deleteConversation').checked = settings.deleteConversation === true;
+            document.getElementById('perplexityModel').value = settings.perplexityModel || 'Best';
             console.log('Settings loaded from file');
         }
     } catch (error) {
@@ -231,6 +232,7 @@ function saveSettings() {
         sourceFolder: document.getElementById('sourceFolder').value,
         headlessMode: document.getElementById('headlessMode').checked,
         deleteConversation: document.getElementById('deleteConversation').checked,
+        perplexityModel: document.getElementById('perplexityModel').value,
     };
     fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if (d.success) { const msg = document.getElementById('saveMessage'); if (msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
 
@@ -257,7 +259,8 @@ function setupAutoSave() {
         'outputDir',
         'sourceFolder',
         'headlessMode',
-        'deleteConversation'
+        'deleteConversation',
+        'perplexityModel'
     ];
 
     inputIds.forEach(id => {
@@ -575,6 +578,7 @@ async function testPerplexity() {
 
         const headless = document.getElementById('headlessMode').checked;
         const deleteConversation = document.getElementById('deleteConversation').checked;
+        const model = document.getElementById('perplexityModel').value;
 
         formData.append('chatUrl', perplexityChatUrl);
         formData.append('prompt', promptText);
@@ -582,6 +586,7 @@ async function testPerplexity() {
         if (sourceFolder) formData.append('sourceFolder', sourceFolder);
         formData.append('headless', headless);
         formData.append('deleteConversation', deleteConversation);
+        if (model) formData.append('model', model);
 
         const response = await fetch('/api/test-perplexity', {
             method: 'POST',
