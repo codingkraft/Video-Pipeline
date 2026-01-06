@@ -399,66 +399,101 @@ export class NotebookLMTester {
                 await this.browser.randomDelay(1000, 2000);
             }
 
-            //open the add sources modal
+            // Open the add sources modal
             const addSourcesButton = await page.$('button[aria-label*="Add source"]');
             if (addSourcesButton) {
                 await addSourcesButton.click();
+                steps.push(`✓ Clicked Add sources button`);
+                await this.browser.randomDelay(1000, 2000);
+
+                // Wait for modal to appear
+                await page.waitForSelector('.mat-mdc-dialog-container, mat-dialog-container', { timeout: 5000 });
+                steps.push(`✓ Add sources modal opened`);
+            } else {
+                steps.push(`⚠ Could not find Add sources button`);
+                throw new Error('Add sources button not found');
+            }
+
+            // We need to trigger the file input to be added to DOM first
+            // Click upload button, but use setInput method to set files without native dialog
+            const uploadButton = await page.$('button[xapscottyuploadertrigger]');
+            if (!uploadButton) {
+                steps.push(`⚠ Could not find Upload files button`);
+                throw new Error('Upload files button not found');
+            }
+
+            // Use page.evaluate to set up a listener before clicking
+            // This will capture the file input as soon as it's added
+            await page.evaluate(() => {
+                // Override the click on file input to prevent native dialog
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node instanceof HTMLInputElement && node.type === 'file') {
+                                // Prevent the native dialog from opening by removing click behavior
+                                node.style.display = 'block';
+                                node.style.opacity = '1';
+                                (window as any).__fileInput = node;
+                            }
+                        });
+                    });
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+                (window as any).__inputObserver = observer;
+            });
+
+            // Use waitForFileChooser to intercept the file dialog
+            // This prevents the native dialog from appearing
+            const [fileChooser] = await Promise.all([
+                page.waitForFileChooser(),
+                uploadButton.click()
+            ]);
+            steps.push(`✓ Clicked Upload files button`);
+
+            steps.push(`✓ Intercepted file chooser`);
+
+            // Accept the files without showing native dialog
+            await fileChooser.accept(files);
+            steps.push(`✓ Uploaded ${files.length} files`);
+
+            // Wait for upload to process
+            await this.browser.randomDelay(3000, 5000);
+
+            // Wait for processing indicators to disappear
+            let processingCount = 0;
+            const maxWait = 120000; // 2 minutes
+            const startTime = Date.now();
+
+            while (Date.now() - startTime < maxWait) {
+                const isProcessing = await page.evaluate(() => {
+                    // Look for NotebookLM loading/processing indicators
+                    const loadingIndicators = document.querySelectorAll(
+                        'mat-progress-spinner.loading-spinner, .loading-spinner-container'
+                    );
+                    return loadingIndicators.length > 0;
+                });
+
+                if (!isProcessing) {
+                    break;
+                }
+
+                processingCount++;
+                if (processingCount % 10 === 0) {
+                    steps.push(`⏳ Still processing files...`);
+                }
+
                 await this.browser.randomDelay(1000, 2000);
             }
 
-            // Find the hidden file input and upload files directly
-            // Don't click the upload button as it opens a native file dialog that we can't close programmatically
-            const fileInput = await page.$('input[type="file"]');
-            if (fileInput) {
-                const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
+            steps.push(`✓ Files processed`);
 
-                // Upload all files at once
-                await inputElement.uploadFile(...files);
-                steps.push(`✓ Uploaded ${files.length} files`);
-
-                // Wait for upload to process
-                await this.browser.randomDelay(3000, 5000);
-
-                // Wait for processing indicators to disappear
-                let processingCount = 0;
-                const maxWait = 120000; // 2 minutes
-                const startTime = Date.now();
-
-                while (Date.now() - startTime < maxWait) {
-                    const isProcessing = await page.evaluate(() => {
-                        // Look for NotebookLM loading/processing indicators
-                        const loadingIndicators = document.querySelectorAll(
-                            'mat-progress-spinner.loading-spinner, .loading-spinner-container'
-                        );
-                        return loadingIndicators.length > 0;
-                    });
-
-                    if (!isProcessing) {
-                        break;
-                    }
-
-                    processingCount++;
-                    if (processingCount % 10 === 0) {
-                        steps.push(`⏳ Still processing files...`);
-                    }
-
-                    await this.browser.randomDelay(1000, 2000);
-                }
-
-                steps.push(`✓ Files processed`);
-
-                // Close the upload modal by clicking outside of it
-                try {
-                    await page.click('body');
-                    await this.browser.randomDelay(1000, 2000);
-                    steps.push(`✓ Closed upload modal`);
-                } catch (e) {
-                    steps.push(`⚠ Could not close modal: ${(e as Error).message}`);
-                }
-
-            } else {
-                steps.push('⚠ File input not found');
-                throw new Error('Could not find file upload input');
+            // Close the Add sources modal by clicking outside
+            try {
+                await page.click('body');
+                await this.browser.randomDelay(1000, 2000);
+                steps.push(`✓ Closed Add sources modal`);
+            } catch (e) {
+                steps.push(`⚠ Could not close modal: ${(e as Error).message}`);
             }
 
         } catch (error) {
