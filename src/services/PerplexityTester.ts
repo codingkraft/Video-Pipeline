@@ -409,14 +409,22 @@ export class PerplexityTester {
             try {
                 steps.push('⏳ Cleaning up (deleting response)...');
 
-                // Find all "More actions" buttons and click the LAST one
+                // Find "More actions" button SPECIFICALLY within the last active response
                 const dotsClicked = await page.evaluate(() => {
-                    const buttons = Array.from(document.querySelectorAll('button[aria-label="More actions"]'));
-                    if (buttons.length === 0) return false;
+                    // Re-find the exact same container we got the text from
+                    const activeDivs = document.querySelectorAll('div[data-state="active"]');
+                    if (activeDivs.length === 0) return false;
 
-                    const lastBtn = buttons[buttons.length - 1] as HTMLElement;
-                    lastBtn.click();
-                    return true;
+                    const lastActive = activeDivs[activeDivs.length - 1];
+
+                    // Look for the dots button INSIDE this specific container
+                    const button = lastActive.querySelector('button[aria-label="More actions"]');
+
+                    if (button) {
+                        (button as HTMLElement).click();
+                        return true;
+                    }
+                    return false;
                 });
 
                 if (dotsClicked) {
@@ -442,7 +450,7 @@ export class PerplexityTester {
                         steps.push('⚠ "Delete" option not found in menu');
                     }
                 } else {
-                    steps.push('⚠ "More actions" button not found');
+                    steps.push('⚠ "More actions" button not found in the current response');
                 }
             } catch (cleanupError) {
                 steps.push(`⚠ Cleanup failed: ${(cleanupError as Error).message}`);
