@@ -454,6 +454,90 @@ app.get('/api/load-settings', (req: Request, res: Response) => {
     }
 });
 
+// API: Get folder progress
+app.get('/api/folder-progress', (req: Request, res: Response) => {
+    try {
+        const { ProgressTracker } = require('./services/ProgressTracker');
+        const folderPath = req.query.path as string;
+
+        if (!folderPath) {
+            return res.status(400).json({ error: 'Path is required' });
+        }
+
+        const progress = ProgressTracker.getProgress(folderPath);
+        const summary = ProgressTracker.getCompletionSummary(folderPath);
+
+        res.json({
+            success: true,
+            progress,
+            summary
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get progress: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Reset progress from a specific step
+app.post('/api/reset-progress', (req: Request, res: Response) => {
+    try {
+        const { ProgressTracker } = require('./services/ProgressTracker');
+        const { folderPath, fromStep } = req.body;
+
+        if (!folderPath || !fromStep) {
+            return res.status(400).json({ error: 'folderPath and fromStep are required' });
+        }
+
+        const progress = ProgressTracker.resetFromStep(folderPath, fromStep);
+
+        res.json({
+            success: true,
+            progress,
+            message: `Progress reset from step: ${fromStep}`
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reset progress: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Test NotebookLM workflow
+app.post('/api/test-notebooklm', async (req: Request, res: Response) => {
+    try {
+        const { NotebookLMTester } = await import('./services/NotebookLMTester');
+        const { sourceFolder, headless, existingNotebookUrl } = req.body;
+
+        if (!sourceFolder) {
+            return res.status(400).json({ error: 'sourceFolder is required' });
+        }
+
+        if (!fs.existsSync(sourceFolder)) {
+            return res.status(400).json({ error: `Source folder not found: ${sourceFolder}` });
+        }
+
+        console.log(`Starting NotebookLM test for folder: ${sourceFolder}`);
+
+        const tester = new NotebookLMTester();
+        const result = await tester.testWorkflow({
+            sourceFolder,
+            headless: headless === true || headless === 'true',
+            existingNotebookUrl: existingNotebookUrl || undefined
+        });
+
+        res.json(result);
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'NotebookLM test failed: ' + (error as Error).message
+        });
+    }
+});
+
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('Client connected');

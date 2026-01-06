@@ -1,5 +1,6 @@
 import { Page } from 'puppeteer';
 import { CaptiveBrowser } from '../browser/CaptiveBrowser';
+import { ProgressTracker } from './ProgressTracker';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -395,6 +396,15 @@ export class PerplexityTester {
             const responseFilePath = path.join(outputDir, 'perplexity_response.txt');
             fs.writeFileSync(responseFilePath, cleanedResponse, 'utf-8');
             steps.push(`✓ Response saved to: ${responseFilePath}`);
+
+            // Update progress tracker
+            const sourceFolder = config.sourceFolder || (filesToUpload && filesToUpload.length > 0 ? path.dirname(filesToUpload[0]) : null);
+            if (sourceFolder) {
+                ProgressTracker.markStepComplete(sourceFolder, 'perplexity', {
+                    outputFile: 'perplexity_response.txt'
+                });
+                steps.push('✓ Progress saved');
+            }
 
             const screenshotPath = path.join(outputDir, 'perplexity_screenshot.png');
 

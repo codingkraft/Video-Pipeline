@@ -1,0 +1,210 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
+/**
+ * Pipeline step names in order of execution.
+ * When resetting from a step, all steps after it are also reset.
+ */
+export const PIPELINE_STEPS = [
+    'perplexity',
+    'notebooklm_notebook_created',
+    'notebooklm_sources_uploaded',
+    'notebooklm_video_started'
+] as const;
+
+export type PipelineStepName = typeof PIPELINE_STEPS[number];
+
+export interface StepProgress {
+    completed: boolean;
+    timestamp?: string;
+    outputFile?: string;
+    notebookUrl?: string;
+    sourceCount?: number;
+    error?: string;
+}
+
+export interface FolderProgress {
+    folderPath: string;
+    steps: Partial<Record<PipelineStepName, StepProgress>>;
+    lastUpdated: string;
+}
+
+/**
+ * Utility class for tracking pipeline progress per folder.
+ * Progress is stored in [folder]/output/progress.json
+ */
+export class ProgressTracker {
+    private static PROGRESS_FILE = 'progress.json';
+
+    /**
+     * Get the progress file path for a folder.
+     */
+    public static getProgressFilePath(folderPath: string): string {
+        return path.join(folderPath, 'output', ProgressTracker.PROGRESS_FILE);
+    }
+
+    /**
+     * Load progress for a folder. Returns null if no progress exists.
+     */
+    public static getProgress(folderPath: string): FolderProgress | null {
+        const progressPath = ProgressTracker.getProgressFilePath(folderPath);
+
+        if (!fs.existsSync(progressPath)) {
+            return null;
+        }
+
+        try {
+            const content = fs.readFileSync(progressPath, 'utf-8');
+            return JSON.parse(content) as FolderProgress;
+        } catch (error) {
+            console.error(`Failed to read progress file: ${progressPath}`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Initialize or get existing progress for a folder.
+     */
+    public static initProgress(folderPath: string): FolderProgress {
+        const existing = ProgressTracker.getProgress(folderPath);
+        if (existing) {
+            return existing;
+        }
+
+        const progress: FolderProgress = {
+            folderPath,
+            steps: {},
+            lastUpdated: new Date().toISOString()
+        };
+
+        ProgressTracker.saveProgress(folderPath, progress);
+        return progress;
+    }
+
+    /**
+     * Save progress to file.
+     */
+    public static saveProgress(folderPath: string, progress: FolderProgress): void {
+        const progressPath = ProgressTracker.getProgressFilePath(folderPath);
+        const outputDir = path.dirname(progressPath);
+
+        // Ensure output directory exists
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        progress.lastUpdated = new Date().toISOString();
+        fs.writeFileSync(progressPath, JSON.stringify(progress, null, 2), 'utf-8');
+    }
+
+    /**
+     * Update a specific step's status.
+     */
+    public static updateStep(
+        folderPath: string,
+        stepName: PipelineStepName,
+        data: Partial<StepProgress>
+    ): FolderProgress {
+        const progress = ProgressTracker.initProgress(folderPath);
+
+        progress.steps[stepName] = {
+            ...progress.steps[stepName],
+            ...data,
+            completed: data.completed ?? progress.steps[stepName]?.completed ?? false,
+            timestamp: data.completed ? new Date().toISOString() : progress.steps[stepName]?.timestamp
+        };
+
+        ProgressTracker.saveProgress(folderPath, progress);
+        return progress;
+    }
+
+    /**
+     * Mark a step as complete.
+     */
+    public static markStepComplete(
+        folderPath: string,
+        stepName: PipelineStepName,
+        additionalData?: Partial<StepProgress>
+    ): FolderProgress {
+        return ProgressTracker.updateStep(folderPath, stepName, {
+            ...additionalData,
+            completed: true
+        });
+    }
+
+    /**
+     * Reset from a specific step. Clears this step and all steps after it.
+     * Returns the updated progress.
+     */
+    public static resetFromStep(folderPath: string, stepName: PipelineStepName): FolderProgress {
+        const progress = ProgressTracker.initProgress(folderPath);
+        const stepIndex = PIPELINE_STEPS.indexOf(stepName);
+
+        if (stepIndex === -1) {
+            console.warn(`Unknown step: ${stepName}`);
+            return progress;
+        }
+
+        // Clear this step and all steps after it
+        for (let i = stepIndex; i < PIPELINE_STEPS.length; i++) {
+            const step = PIPELINE_STEPS[i];
+            if (progress.steps[step]) {
+                progress.steps[step] = { completed: false };
+            }
+        }
+
+        ProgressTracker.saveProgress(folderPath, progress);
+        return progress;
+    }
+
+    /**
+     * Check if a step is completed.
+     */
+    public static isStepComplete(folderPath: string, stepName: PipelineStepName): boolean {
+        const progress = ProgressTracker.getProgress(folderPath);
+        return progress?.steps[stepName]?.completed ?? false;
+    }
+
+    /**
+     * Get the next incomplete step, or null if all are complete.
+     */
+    public static getNextIncompleteStep(folderPath: string): PipelineStepName | null {
+        const progress = ProgressTracker.getProgress(folderPath);
+
+        for (const step of PIPELINE_STEPS) {
+            if (!progress?.steps[step]?.completed) {
+                return step;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get summary of completed steps for UI display.
+     */
+    public static getCompletionSummary(folderPath: string): {
+        completedSteps: PipelineStepName[];
+        nextStep: PipelineStepName | null;
+        notebookUrl?: string;
+    } {
+        const progress = ProgressTracker.getProgress(folderPath);
+        const completedSteps: PipelineStepName[] = [];
+        let notebookUrl: string | undefined;
+
+        for (const step of PIPELINE_STEPS) {
+            if (progress?.steps[step]?.completed) {
+                completedSteps.push(step);
+                if (step === 'notebooklm_notebook_created' && progress.steps[step]?.notebookUrl) {
+                    notebookUrl = progress.steps[step]!.notebookUrl;
+                }
+            }
+        }
+
+        return {
+            completedSteps,
+            nextStep: ProgressTracker.getNextIncompleteStep(folderPath),
+            notebookUrl
+        };
+    }
+}

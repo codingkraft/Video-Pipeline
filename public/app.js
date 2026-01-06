@@ -78,8 +78,72 @@ async function loadFilesFromFolder(folderPath) {
         const response = await fetch('/api/list-folder?path=' + encodeURIComponent(folderPath));
         const data = await response.json();
 
+        // Also load progress for this folder
+        const progressResponse = await fetch('/api/folder-progress?path=' + encodeURIComponent(folderPath));
+        const progressData = await progressResponse.json();
+
         if (data.files && data.files.length > 0) {
             docList.innerHTML = '';
+
+            // Show progress status if any steps are complete
+            if (progressData.success && progressData.summary && progressData.summary.completedSteps.length > 0) {
+                const progressDiv = document.createElement('div');
+                progressDiv.className = 'progress-status';
+                progressDiv.style.cssText = 'background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;';
+
+                const stepLabels = {
+                    'perplexity': '✅ Perplexity Prompt',
+                    'notebooklm_notebook_created': '✅ Notebook Created',
+                    'notebooklm_sources_uploaded': '✅ Sources Uploaded',
+                    'notebooklm_video_started': '✅ Video Started'
+                };
+
+                const completedHtml = progressData.summary.completedSteps
+                    .map(step => `<span style="color: #4caf50; margin-right: 12px;">${stepLabels[step] || step}</span>`)
+                    .join('');
+
+                const nextStep = progressData.summary.nextStep;
+                const nextStepText = nextStep ?
+                    `<br><strong style="color: var(--text-muted);">Next: ${nextStep.replace(/_/g, ' ')}</strong>` :
+                    '<br><strong style="color: #4caf50;">All steps complete!</strong>';
+
+                // Build dropdown options based on completed steps
+                let dropdownOptions = '<option value="start-fresh">🔄 Start Fresh (from Perplexity)</option>';
+
+                // If Perplexity is done, show option to skip to NotebookLM
+                if (progressData.summary.completedSteps.includes('perplexity')) {
+                    dropdownOptions += '<option value="skip-to-notebooklm" selected>📓 Skip to NotebookLM</option>';
+                }
+
+                // If notebook is created, show option to continue from there
+                if (progressData.summary.completedSteps.includes('notebooklm_notebook_created')) {
+                    dropdownOptions += '<option value="continue-from-notebook">📂 Open Existing Notebook</option>';
+                }
+
+                const dropdownHtml = `
+                    <div style="margin-top: 10px;">
+                        <label for="pipelineStartPoint" style="display: block; margin-bottom: 4px; font-size: 0.9em; color: var(--text-muted);">
+                            <strong>Start pipeline from:</strong>
+                        </label>
+                        <select id="pipelineStartPoint" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #4caf50; background: var(--bg); color: var(--text); font-size: 0.9em;">
+                            ${dropdownOptions}
+                        </select>
+                    </div>
+                `;
+
+                progressDiv.innerHTML = `
+                    <div style="font-size: 0.9em;">
+                        <strong style="color: var(--text);">Pipeline Progress:</strong><br>
+                        ${completedHtml}
+                        ${nextStepText}
+                        ${dropdownHtml}
+                    </div>
+                `;
+                docList.appendChild(progressDiv);
+
+                // Store progress for later use
+                window.currentFolderProgress = progressData;
+            }
 
             // Show warning if perplexity output already exists
             if (data.warning) {
@@ -566,6 +630,36 @@ async function testPerplexity() {
     const perplexityChatUrl = document.getElementById('perplexityChatUrl').value;
     const promptText = document.getElementById('promptText').value;
 
+    // Check if there's a pipeline start point dropdown
+    const startPointDropdown = document.getElementById('pipelineStartPoint');
+    if (startPointDropdown) {
+        const startPoint = startPointDropdown.value;
+
+        // Route based on selected starting point
+        if (startPoint === 'skip-to-notebooklm') {
+            await skipToNotebookLM();
+            return;
+        } else if (startPoint === 'continue-from-notebook') {
+            await continueFromNotebook();
+            return;
+        } else if (startPoint === 'start-fresh') {
+            // Reset progress and continue with full pipeline
+            const sourceFolder = document.getElementById('sourceFolder').value || selectedLocalFolders[0];
+            if (sourceFolder) {
+                await fetch('/api/reset-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        folderPath: sourceFolder,
+                        fromStep: 'perplexity'
+                    })
+                });
+                window.currentFolderProgress = null;
+            }
+            // Continue with normal flow below
+        }
+    }
+
     if (!promptText) {
         alert('Please enter a prompt text');
         return;
@@ -607,7 +701,7 @@ async function testPerplexity() {
 
         if (data.success) {
             testMessage.innerHTML = `
-                <strong>✅ Test Completed!</strong><br><br>
+                <strong>✅ Perplexity Completed!</strong><br><br>
                 <strong>📄 Response File:</strong><br>
                 <code style="background: var(--bg); padding: 0.5rem; border-radius: 0.25rem; display: block; margin: 0.5rem 0; word-break: break-all;">
                     ${data.details.responseFilePath}
@@ -617,21 +711,91 @@ async function testPerplexity() {
                 ${data.details.steps.join('<br>')}
                 <br><br>
                 <strong>Screenshot:</strong> ${data.details.screenshotPath}
+                <br><br>
+                <strong style="color: #2196f3;">⏳ Auto-continuing to NotebookLM...</strong>
             `;
             testMessage.style.color = 'var(--success)';
+
+            // Auto-continue to NotebookLM
+            testBtn.textContent = '📓 NotebookLM...';
+            await testNotebookLM(sourceFolder || selectedLocalFolders[0]);
+
         } else {
             testMessage.innerHTML = `<strong>❌ Test Failed:</strong> ${data.message}`;
             testMessage.style.color = 'var(--danger)';
         }
 
-        testBtn.textContent = '🧪 Test Perplexity';
+        testBtn.textContent = '🧪 Run Pipeline (Perplexity → NotebookLM)';
         testBtn.disabled = false;
 
     } catch (error) {
         testMessage.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
         testMessage.style.color = 'var(--danger)';
-        testBtn.textContent = '🧪 Test Perplexity';
+        testBtn.textContent = '🧪 Run Pipeline (Perplexity → NotebookLM)';
         testBtn.disabled = false;
+    }
+}
+
+// Test NotebookLM workflow (called after Perplexity or directly)
+async function testNotebookLM(folderPath) {
+    const testResults = document.getElementById('testResults');
+    const testMessage = document.getElementById('testMessage');
+
+    // Get source folder
+    const sourceFolder = folderPath || document.getElementById('sourceFolder').value || selectedLocalFolders[0];
+
+    if (!sourceFolder) {
+        alert('Please select a folder first');
+        return;
+    }
+
+    testResults.style.display = 'block';
+    testMessage.innerHTML += '<br><br><strong style="color: #2196f3;">📓 Starting NotebookLM workflow...</strong>';
+
+    try {
+        const headless = document.getElementById('headlessMode').checked;
+
+        // Check if we have an existing notebook URL from progress
+        let existingNotebookUrl = null;
+        if (window.currentFolderProgress?.progress?.steps?.notebooklm_notebook_created?.notebookUrl) {
+            existingNotebookUrl = window.currentFolderProgress.progress.steps.notebooklm_notebook_created.notebookUrl;
+        }
+
+        const response = await fetch('/api/test-notebooklm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourceFolder,
+                headless,
+                existingNotebookUrl
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            testMessage.innerHTML += `
+                <br><br>
+                <strong>✅ NotebookLM Completed!</strong><br><br>
+                <strong>📓 Notebook URL:</strong><br>
+                <code style="background: var(--bg); padding: 0.5rem; border-radius: 0.25rem; display: block; margin: 0.5rem 0; word-break: break-all;">
+                    ${data.details.notebookUrl || 'Not captured'}
+                </code>
+                <strong>Sources Uploaded:</strong> ${data.details.sourceCount}<br><br>
+                <strong>Steps:</strong><br>
+                ${data.details.steps.join('<br>')}
+            `;
+        } else {
+            testMessage.innerHTML += `<br><br><strong>❌ NotebookLM Failed:</strong> ${data.message}`;
+        }
+
+        // Refresh folder to show updated progress
+        if (sourceFolder) {
+            await loadFilesFromFolder(sourceFolder);
+        }
+
+    } catch (error) {
+        testMessage.innerHTML += `<br><br><strong>❌ NotebookLM Error:</strong> ${error.message}`;
     }
 }
 
@@ -671,5 +835,116 @@ async function browseFolder() {
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
+    }
+}
+
+// Skip Perplexity and go directly to NotebookLM
+async function skipToNotebookLM() {
+    const sourceFolder = document.getElementById('sourceFolder').value || selectedLocalFolders[0];
+
+    if (!sourceFolder) {
+        alert('Please select a folder first');
+        return;
+    }
+
+    // Show test results section
+    const testResults = document.getElementById('testResults');
+    const testMessage = document.getElementById('testMessage');
+    testResults.style.display = 'block';
+    testMessage.innerHTML = '<strong style="color: #2196f3;">📓 Skipping Perplexity, starting NotebookLM...</strong>';
+
+    // Call NotebookLM directly
+    await testNotebookLM(sourceFolder);
+}
+
+// Continue from existing notebook (don't create new one)
+async function continueFromNotebook() {
+    const sourceFolder = document.getElementById('sourceFolder').value || selectedLocalFolders[0];
+
+    if (!sourceFolder) {
+        alert('Please select a folder first');
+        return;
+    }
+
+    // Get the existing notebook URL from progress
+    const notebookUrl = window.currentFolderProgress?.progress?.steps?.notebooklm_notebook_created?.notebookUrl;
+
+    if (!notebookUrl) {
+        alert('No saved notebook URL found. Please create a new notebook.');
+        return;
+    }
+
+    // Show test results section
+    const testResults = document.getElementById('testResults');
+    const testMessage = document.getElementById('testMessage');
+    testResults.style.display = 'block';
+    testMessage.innerHTML = `<strong style="color: #2196f3;">📂 Opening existing notebook...</strong><br>
+        <code style="font-size: 0.85em;">${notebookUrl}</code>`;
+
+    try {
+        const headless = document.getElementById('headlessMode').checked;
+
+        const response = await fetch('/api/test-notebooklm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourceFolder,
+                headless,
+                existingNotebookUrl: notebookUrl
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            testMessage.innerHTML += `<br><br><strong>✅ NotebookLM Completed!</strong><br>
+                <strong>Steps:</strong><br>${data.details.steps.join('<br>')}`;
+        } else {
+            testMessage.innerHTML += `<br><br><strong>❌ Failed:</strong> ${data.message}`;
+        }
+
+        // Refresh folder to show updated progress
+        await loadFilesFromFolder(sourceFolder);
+
+    } catch (error) {
+        testMessage.innerHTML += `<br><br><strong>❌ Error:</strong> ${error.message}`;
+    }
+}
+
+// Reset progress and run full pipeline from scratch
+async function resetAndRunFull() {
+    const sourceFolder = document.getElementById('sourceFolder').value || selectedLocalFolders[0];
+
+    if (!sourceFolder) {
+        alert('Please select a folder first');
+        return;
+    }
+
+    if (!confirm('This will reset all progress and start from Perplexity. Continue?')) {
+        return;
+    }
+
+    try {
+        // Reset progress from the first step
+        await fetch('/api/reset-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                folderPath: sourceFolder,
+                fromStep: 'perplexity'
+            })
+        });
+
+        // Clear stored progress
+        window.currentFolderProgress = null;
+
+        // Refresh folder display
+        await loadFilesFromFolder(sourceFolder);
+
+        // Run full pipeline
+        testPerplexity();
+
+    } catch (error) {
+        alert('Failed to reset progress: ' + error.message);
     }
 }
