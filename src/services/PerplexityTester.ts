@@ -405,6 +405,49 @@ export class PerplexityTester {
             await page.screenshot({ path: screenshotPath, fullPage: true });
             steps.push(`✓ Screenshot saved: ${screenshotPath}`);
 
+            // Step 9: Cleanup (Delete response)
+            try {
+                steps.push('⏳ Cleaning up (deleting response)...');
+
+                // Find all "More actions" buttons and click the LAST one
+                const dotsClicked = await page.evaluate(() => {
+                    const buttons = Array.from(document.querySelectorAll('button[aria-label="More actions"]'));
+                    if (buttons.length === 0) return false;
+
+                    const lastBtn = buttons[buttons.length - 1] as HTMLElement;
+                    lastBtn.click();
+                    return true;
+                });
+
+                if (dotsClicked) {
+                    await this.browser.randomDelay(800, 1200);
+
+                    // Click "Delete" in the popup menu
+                    const deleteClicked = await page.evaluate(() => {
+                        const menuItems = Array.from(document.querySelectorAll('div[role="menuitem"]'));
+                        // Find item with "Delete" text
+                        const deleteItem = menuItems.find(item => item.textContent?.trim() === 'Delete' || item.textContent?.includes('Delete'));
+
+                        if (deleteItem) {
+                            (deleteItem as HTMLElement).click();
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (deleteClicked) {
+                        steps.push('✓ Response deleted from history');
+                        await this.browser.randomDelay(1000, 2000);
+                    } else {
+                        steps.push('⚠ "Delete" option not found in menu');
+                    }
+                } else {
+                    steps.push('⚠ "More actions" button not found');
+                }
+            } catch (cleanupError) {
+                steps.push(`⚠ Cleanup failed: ${(cleanupError as Error).message}`);
+            }
+
             return {
                 success: true,
                 message: 'Perplexity test completed successfully',
