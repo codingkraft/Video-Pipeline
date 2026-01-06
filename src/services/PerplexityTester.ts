@@ -355,8 +355,11 @@ export class PerplexityTester {
                         lastLength = currentText.length;
                     } else if (currentText.length > 0 && currentText.length === lastLength) {
                         stableCount++;
-                        // If text hasn't changed for 5 checks (approx 5 seconds), assume done
-                        if (stableCount >= 5) {
+
+                        // Safety fallback: Only break if text is stable for a VERY long time (e.g. 60s)
+                        // This handles cases where "Stop generating" button might be stuck or missing
+                        if (stableCount >= 60) {
+                            console.log('Text stable for 60s, assuming complete despite UI state.');
                             responseText = currentText;
                             break;
                         }
@@ -370,8 +373,8 @@ export class PerplexityTester {
                         return !!document.querySelector('button[aria-label="Stop generating response"]');
                     });
 
+                    // PRIMARY CHECK: Done if no longer generating AND text is stable for a few seconds
                     if (!isGenerating && stableCount >= 3) {
-                        // If no stop button and stable for 3s, done
                         responseText = currentText;
                         break;
                     }
