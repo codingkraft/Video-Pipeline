@@ -294,7 +294,16 @@ async function loadSettings() {
 
         if (data.success && data.settings) {
             const settings = data.settings;
-            document.getElementById('perplexityChatUrl').value = settings.perplexityChatUrl || '';
+
+            // Load active profile first
+            document.getElementById('activeProfile').value = settings.activeProfile || 'profile1';
+
+            // Load profile-specific settings (Perplexity URLs from current profile)
+            const currentProfile = settings.profiles?.[settings.activeProfile || 'profile1'] || {};
+            document.getElementById('perplexityChatUrl').value = currentProfile.perplexityChatUrl || settings.perplexityChatUrl || '';
+            document.getElementById('audioNarrationPerplexityUrl').value = currentProfile.audioNarrationPerplexityUrl || '';
+
+            // Load common settings
             document.getElementById('promptText').value = settings.promptText || '';
             document.getElementById('notebookLmChatSettings').value = settings.notebookLmChatSettings || 'Focus on key concepts and provide clear explanations';
             document.getElementById('notebookLmStyleSettings').value = settings.notebookLmStyleSettings || 'Modern, engaging, educational style';
@@ -303,6 +312,13 @@ async function loadSettings() {
             document.getElementById('headlessMode').checked = settings.headlessMode === true;
             document.getElementById('deleteConversation').checked = settings.deleteConversation === true;
             document.getElementById('perplexityModel').value = settings.perplexityModel || 'Best';
+
+            // Load audio generation settings
+            document.getElementById('audioNarrationPrompt').value = settings.audioNarrationPrompt || '';
+            document.getElementById('googleStudioModel').value = settings.googleStudioModel || '';
+            document.getElementById('googleStudioVoice').value = settings.googleStudioVoice || '';
+            document.getElementById('googleStudioStyleInstructions').value = settings.googleStudioStyleInstructions || '';
+
             console.log('Settings loaded from file');
         }
     } catch (error) {
@@ -310,10 +326,70 @@ async function loadSettings() {
     }
 }
 
-// Save settings to localStorage
-function saveSettings() {
+// Handle profile change - reload settings for new profile
+async function onProfileChange() {
+    const newProfile = document.getElementById('activeProfile').value;
+    console.log('Profile changed to:', newProfile);
+
+    // Reload settings to get the new profile's URLs
+    await loadSettings();
+
+    // Re-set the profile dropdown since loadSettings might override it
+    document.getElementById('activeProfile').value = newProfile;
+
+    // Show confirmation with restart warning
+    const hint = document.querySelector('#activeProfile + .hint');
+    if (hint) {
+        const originalText = hint.textContent;
+        hint.innerHTML = `✓ Switched to ${newProfile}<br><strong style="color: var(--warning);">⚠ Browser restart needed - close browser or restart server</strong>`;
+        hint.style.color = 'var(--success)';
+        setTimeout(() => {
+            hint.textContent = originalText;
+            hint.style.color = '';
+        }, 5000);
+    }
+
+    // Save the active profile
+    await saveProfileSettings();
+}
+
+// Save profile-specific settings
+async function saveProfileSettings() {
+    const activeProfile = document.getElementById('activeProfile').value;
+    const profileSettings = {
+        activeProfile,
+        profiles: {
+            [activeProfile]: {
+                perplexityChatUrl: document.getElementById('perplexityChatUrl').value,
+                audioNarrationPerplexityUrl: document.getElementById('audioNarrationPerplexityUrl').value
+            }
+        }
+    };
+
+    try {
+        const response = await fetch('/api/save-profile-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profileSettings)
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            const msg = document.getElementById('saveProfileMessage');
+            if (msg) {
+                msg.style.display = 'block';
+                setTimeout(() => msg.style.display = 'none', 2000);
+            }
+            console.log('Profile settings saved');
+        }
+    } catch (e) {
+        console.error('Save profile settings failed:', e);
+    }
+}
+
+// Save common settings (applies to all profiles)
+async function saveCommonSettings() {
     const settings = {
-        perplexityChatUrl: document.getElementById('perplexityChatUrl').value,
         promptText: document.getElementById('promptText').value,
         notebookLmChatSettings: document.getElementById('notebookLmChatSettings').value,
         notebookLmStyleSettings: document.getElementById('notebookLmStyleSettings').value,
@@ -323,19 +399,31 @@ function saveSettings() {
         headlessMode: document.getElementById('headlessMode').checked,
         deleteConversation: document.getElementById('deleteConversation').checked,
         perplexityModel: document.getElementById('perplexityModel').value,
+        audioNarrationPrompt: document.getElementById('audioNarrationPrompt').value,
+        googleStudioModel: document.getElementById('googleStudioModel').value,
+        googleStudioVoice: document.getElementById('googleStudioVoice').value,
+        googleStudioStyleInstructions: document.getElementById('googleStudioStyleInstructions').value
     };
-    fetch('/api/save-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }).then(r => r.json()).then(d => { if (d.success) { const msg = document.getElementById('saveMessage'); if (msg) { msg.textContent = ' Saved'; msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); } console.log('Saved to:', d.path); } }).catch(e => console.error('Save failed:', e));
 
-    // Show confirmation message
-    const saveMessage = document.getElementById('saveMessage');
-    if (saveMessage) {
-        saveMessage.style.display = 'block';
-        setTimeout(() => {
-            saveMessage.style.display = 'none';
-        }, 2000);
+    try {
+        const response = await fetch('/api/save-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            const msg = document.getElementById('saveCommonMessage');
+            if (msg) {
+                msg.style.display = 'block';
+                setTimeout(() => msg.style.display = 'none', 2000);
+            }
+            console.log('Common settings saved to:', result.path);
+        }
+    } catch (e) {
+        console.error('Save common settings failed:', e);
     }
-
-    console.log('Settings saved:', settings);
 }
 
 // Auto-save settings when inputs change
@@ -558,15 +646,19 @@ async function setupLogin() {
     loginBtn.textContent = 'Opening browser...';
 
     try {
+        const activeProfile = document.getElementById('activeProfile').value;
         const response = await fetch('/api/login', {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId: activeProfile })
         });
 
         const data = await response.json();
 
         if (response.ok) {
             alert(data.message + '\n\nPlease log into:\n- Perplexity\n- NotebookLM\n- Gemini\n\nYour sessions will be saved automatically.');
-            loginBtn.textContent = '✓ Browser Opened';
+            loginBtn.textContent = '🔐 Setup Login';
+            loginBtn.disabled = false;  // Re-enable so it can be used again
 
             // Auto-verify after 30 seconds
             setTimeout(() => {
@@ -699,6 +791,7 @@ async function testPerplexity() {
         const headless = document.getElementById('headlessMode').checked;
         const deleteConversation = document.getElementById('deleteConversation').checked;
         const model = document.getElementById('perplexityModel').value;
+        const activeProfile = document.getElementById('activeProfile').value;
 
         formData.append('chatUrl', perplexityChatUrl);
         formData.append('prompt', promptText);
@@ -707,6 +800,7 @@ async function testPerplexity() {
         formData.append('headless', headless);
         formData.append('deleteConversation', deleteConversation);
         if (model) formData.append('model', model);
+        formData.append('profileId', activeProfile);
 
         const response = await fetch('/api/test-perplexity', {
             method: 'POST',
@@ -812,6 +906,62 @@ async function testNotebookLM(folderPath) {
 
     } catch (error) {
         testMessage.innerHTML += `<br><br><strong>❌ NotebookLM Error:</strong> ${error.message}`;
+    }
+}
+
+// Test Audio Pipeline (Google AI Studio TTS)
+async function testAudioPipeline() {
+    const sourceFolder = document.getElementById('sourceFolder').value;
+
+    if (!sourceFolder) {
+        alert('Please select a source folder first');
+        return;
+    }
+
+    // Show progress section
+    const progressSection = document.getElementById('progressSection');
+    const progressLog = document.getElementById('progressLog');
+    progressSection.style.display = 'block';
+    progressLog.innerHTML = '';
+    addLogEntry('🎙️ Starting Audio Pipeline test...');
+    updateStatus('testing');
+
+    try {
+        const activeProfile = document.getElementById('activeProfile').value;
+        const audioStartPoint = document.getElementById('audioStartPoint').value;
+        const response = await fetch('/api/generate-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourceFolder,
+                headless: document.getElementById('headlessMode').checked,
+                profileId: activeProfile,
+                audioStartPoint
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            addLogEntry('✅ Audio Pipeline completed!', 'success');
+            if (result.details?.steps) {
+                result.details.steps.forEach(step => addLogEntry(step));
+            }
+            if (result.details?.audioFiles) {
+                addLogEntry(`📁 Generated ${result.details.audioFiles.length} audio files`);
+            }
+        } else {
+            addLogEntry(`❌ Error: ${result.message}`, 'error');
+            if (result.details?.steps) {
+                result.details.steps.forEach(step => addLogEntry(step));
+            }
+        }
+
+        updateStatus('idle');
+
+    } catch (error) {
+        addLogEntry(`❌ Audio Pipeline Error: ${error.message}`, 'error');
+        updateStatus('idle');
     }
 }
 

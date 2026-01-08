@@ -162,11 +162,17 @@ app.get('/api/status', (req: Request, res: Response) => {
 // API: Open browser for login
 app.post('/api/login', async (req: Request, res: Response) => {
     try {
+        const { profileId } = req.body;
+
         if (!pipeline) {
             pipeline = new VideoPipeline(2);
         }
 
-        await pipeline.initialize();
+        // Initialize with the selected profile
+        await pipeline.initialize({ profileId: profileId || 'default' });
+
+        // Give browser a moment to fully initialize after profile switch
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         const services = {
             perplexity: 'https://www.perplexity.ai/',
@@ -182,12 +188,13 @@ app.post('/api/login', async (req: Request, res: Response) => {
             await browser.randomDelay(1000, 2000);
         }
 
-        res.json({ message: 'Browser opened for login. Please log into all services.' });
+        res.json({ message: `Browser opened for login with ${profileId || 'default'} profile. Please log into all services.` });
 
         // Notify via socket
         io.emit('login-status', { status: 'opened', message: 'Browser opened. Please log in to all services.' });
 
     } catch (error) {
+        console.error('Error in /api/login:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -421,6 +428,49 @@ app.post('/api/save-settings', (req: Request, res: Response) => {
     }
 });
 
+// API: Save profile-specific settings (merges with existing settings)
+app.post('/api/save-profile-settings', (req: Request, res: Response) => {
+    try {
+        const { activeProfile, profiles } = req.body;
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+
+        // Load existing settings
+        let settings: any = {};
+        if (fs.existsSync(settingsPath)) {
+            settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        }
+
+        // Update active profile
+        if (activeProfile) {
+            settings.activeProfile = activeProfile;
+        }
+
+        // Merge profile settings
+        if (profiles) {
+            settings.profiles = settings.profiles || {};
+            for (const [profileId, profileSettings] of Object.entries(profiles)) {
+                settings.profiles[profileId] = {
+                    ...(settings.profiles[profileId] || {}),
+                    ...(profileSettings as object)
+                };
+            }
+        }
+
+        // Save settings to file
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+
+        res.json({
+            success: true,
+            message: 'Profile settings saved successfully'
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to save profile settings: ' + (error as Error).message
+        });
+    }
+});
+
 // API: Load settings from file
 app.get('/api/load-settings', (req: Request, res: Response) => {
     try {
@@ -548,6 +598,101 @@ app.post('/api/test-notebooklm', async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             message: 'NotebookLM test failed: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Generate audio using Google AI Studio
+app.post('/api/generate-audio', async (req: Request, res: Response) => {
+    try {
+        const { AudioGenerator } = await import('./services/AudioGenerator');
+        const { PerplexityTester } = await import('./services/PerplexityTester');
+        const { sourceFolder, headless, audioStartPoint, profileId } = req.body;
+
+        if (!sourceFolder) {
+            return res.status(400).json({ error: 'sourceFolder is required' });
+        }
+
+        if (!fs.existsSync(sourceFolder)) {
+            return res.status(400).json({ error: `Source folder not found: ${sourceFolder}` });
+        }
+
+        console.log(`Starting audio generation for folder: ${sourceFolder}`);
+        console.log(`Audio start point: ${audioStartPoint || 'start-fresh'}`);
+
+        // Load settings
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+        let googleStudioModel = '';
+        let googleStudioVoice = '';
+        let googleStudioStyleInstructions = '';
+        let audioNarrationPerplexityUrl = '';
+        let activeProfileId = profileId || 'default';
+
+        if (fs.existsSync(settingsPath)) {
+            try {
+                const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+                googleStudioModel = settings.googleStudioModel || '';
+                googleStudioVoice = settings.googleStudioVoice || '';
+                googleStudioStyleInstructions = settings.googleStudioStyleInstructions || '';
+
+                // Get profile-specific audio narration URL
+                activeProfileId = settings.activeProfile || profileId || 'default';
+                const currentProfile = settings.profiles?.[activeProfileId];
+                audioNarrationPerplexityUrl = currentProfile?.audioNarrationPerplexityUrl || '';
+            } catch (e) {
+                console.warn('Could not read settings for audio generation:', e);
+            }
+        }
+
+        const steps: string[] = [];
+
+        // Step 1: Generate narration via Perplexity (if not skipping)
+        if (audioStartPoint !== 'skip-to-audio-generation') {
+            if (!audioNarrationPerplexityUrl) {
+                return res.status(400).json({
+                    error: 'Audio Narration Perplexity URL not configured for active profile. Please set it in profile settings.'
+                });
+            }
+
+            const perplexityTester = new PerplexityTester();
+            const narrationResult = await perplexityTester.generateAudioNarration({
+                sourceFolder,
+                audioNarrationPerplexityUrl,
+                headless: headless === true || headless === 'true',
+                profileId: activeProfileId
+            });
+
+            if (!narrationResult.success) {
+                return res.json(narrationResult);
+            }
+
+            steps.push(...(narrationResult.details?.steps || []));
+        } else {
+            steps.push('⏭ Skipped to audio generation (using existing narration)');
+        }
+
+        // Step 2: Generate audio files
+        const generator = new AudioGenerator();
+        const audioResult = await generator.generateAudio({
+            sourceFolder,
+            headless: headless === true || headless === 'true',
+            googleStudioModel,
+            googleStudioVoice,
+            googleStudioStyleInstructions,
+            profileId: activeProfileId
+        });
+
+        // Combine steps
+        if (audioResult.details) {
+            audioResult.details.steps = [...steps, ...(audioResult.details.steps || [])];
+        }
+
+        res.json(audioResult);
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Audio generation failed: ' + (error as Error).message
         });
     }
 });

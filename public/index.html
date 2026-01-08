@@ -65,95 +65,163 @@
             <section class="card">
                 <h2>⚙️ Step 2: Configure Video Settings</h2>
 
+                <!-- Profile Selector (Always visible) -->
                 <div class="form-group">
-                    <label for="perplexityChatUrl">Perplexity Chat URL (Optional)</label>
-                    <input type="text" id="perplexityChatUrl" placeholder="https://www.perplexity.ai/search/...">
-                    <small class="hint">If you have an existing Perplexity chat with the prompt, paste the URL
-                        here</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="perplexityModel">Select Model:</label>
-                    <select id="perplexityModel"
+                    <label for="activeProfile">🔐 Active Browser Profile:</label>
+                    <select id="activeProfile" onchange="onProfileChange()"
                         style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
-                        <option value="Best">Best (Default)</option>
-                        <option value="Sonar">Sonar</option>
-                        <option value="GPT-5.2">GPT-5.2</option>
-                        <option value="Claude Opus 4.5">Claude Opus 4.5</option>
-                        <option value="Gemini 3 Pro">Gemini 3 Pro</option>
-                        <option value="Gemini 3 Flash">Gemini 3 Flash</option>
-                        <option value="Grok 4.1">Grok 4.1</option>
-                        <option value="Kimi K2 Thinking">Kimi K2 Thinking</option>
-                        <option value="Claude Sonnet 4.5">Claude Sonnet 4.5</option>
+                        <option value="profile1">Profile 1</option>
+                        <option value="profile2">Profile 2</option>
+                        <option value="profile3">Profile 3</option>
+                        <option value="profile4">Profile 4</option>
                     </select>
+                    <small class="hint">Each profile has separate browser logins</small>
                 </div>
 
-                <div class="form-group">
-                    <label for="promptText">Prompt:</label>
-                    <textarea id="promptText" rows="4"
-                        placeholder="Enter your video generation prompt here..."></textarea>
-                    <small class="hint">This will be used if no Perplexity URL is provided</small>
-                </div>
+                <hr style="margin: 1.5rem 0; border-color: var(--border);">
 
-                <div class="form-group">
-                    <label for="notebookLmChatSettings">NotebookLM Chat Settings</label>
-                    <textarea id="notebookLmChatSettings" rows="3"
-                        placeholder="Focus on key concepts and provide clear explanations...">Focus on key concepts and provide clear explanations</textarea>
-                </div>
+                <!-- Profile-Specific Settings (Expandable) -->
+                <details open>
+                    <summary style="cursor: pointer; font-weight: bold; font-size: 1.1rem; margin-bottom: 1rem;">
+                        📋 Profile-Specific Settings
+                    </summary>
 
-                <div class="form-group">
-                    <label for="notebookLmStyleSettings">NotebookLM Style Settings</label>
-                    <textarea id="notebookLmStyleSettings" rows="3"
-                        placeholder="Modern, engaging, educational style">Modern, engaging, educational style</textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="stylePrompt">Gemini Video Style Prompt</label>
-                    <textarea id="stylePrompt" rows="3"
-                        placeholder="Professional with smooth transitions">Professional with smooth transitions</textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="sourceFolder">Local Source Folder Path (Absolute)</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="sourceFolder" placeholder="e.g. F:\MyWork\Docs" style="flex: 1;">
-                        <button type="button" onclick="browseFolder()" class="btn btn-secondary"
-                            style="white-space: nowrap; padding: 0.5rem 1rem;">📂 Browse</button>
+                    <div class="form-group">
+                        <label for="perplexityChatUrl">Perplexity Chat URL for generating video prompt</label>
+                        <input type="text" id="perplexityChatUrl" placeholder="https://www.perplexity.ai/search/...">
+                        <small class="hint">URL for this profile's video prompt generation</small>
                     </div>
-                    <small class="hint">If set, files will be read from here and output saved to 'output'
-                        subfolder.</small>
-                </div>
 
-                <div class="form-group">
-                    <label for="outputDir">Output Directory Override (Optional)</label>
-                    <input type="text" id="outputDir" placeholder="Leave empty to use source folder's output">
-                </div>
+                    <div class="form-group">
+                        <label for="audioNarrationPerplexityUrl">Perplexity Chat URL for audio narration</label>
+                        <input type="text" id="audioNarrationPerplexityUrl"
+                            placeholder="https://www.perplexity.ai/search/...">
+                        <small class="hint">URL for this profile's audio narration generation</small>
+                    </div>
 
-                <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
-                    <input type="checkbox" id="headlessMode" style="width: auto; margin: 0;">
-                    <label for="headlessMode" style="margin: 0; cursor: pointer;">Start Browser Minimized</label>
-                </div>
+                    <button onclick="saveProfileSettings()" class="btn btn-primary"
+                        style="width: 100%; margin-top: 1rem;">
+                        💾 Save Profile Settings
+                    </button>
+                    <p id="saveProfileMessage"
+                        style="text-align: center; margin-top: 0.5rem; color: var(--success); display: none;">
+                        ✓ Profile settings saved!
+                    </p>
+                </details>
 
-                <div class="form-group"
-                    style="flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-                    <input type="checkbox" id="deleteConversation" style="width: auto; margin: 0;">
-                    <label for="deleteConversation" style="margin: 0; cursor: pointer;">Delete Conversation After
-                        Completion</label>
-                </div>
+                <hr style="margin: 1.5rem 0; border-color: var(--border);">
 
-                <div class="form-group"
-                    style="flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-                    <input type="checkbox" id="keepOpen" style="width: auto; margin: 0;">
-                    <label for="keepOpen" style="margin: 0; cursor: pointer;">Keep Browser Open After Test</label>
-                </div>
+                <!-- Common Settings (Expandable) -->
+                <details>
+                    <summary style="cursor: pointer; font-weight: bold; font-size: 1.1rem; margin-bottom: 1rem;">
+                        🌐 Common Settings (All Profiles)
+                    </summary>
 
-                <button onclick="saveSettings()" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
-                    💾 Save Settings
-                </button>
-                <p id="saveMessage"
-                    style="text-align: center; margin-top: 0.5rem; color: var(--success); display: none;">
-                    ✓ Settings saved!
-                </p>
+                    <div class="form-group">
+                        <label for="perplexityModel">Perplexity Model:</label>
+                        <select id="perplexityModel"
+                            style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                            <option value="Best">Best (Default)</option>
+                            <option value="Sonar">Sonar</option>
+                            <option value="GPT-5.2">GPT-5.2</option>
+                            <option value="Claude Opus 4.5">Claude Opus 4.5</option>
+                            <option value="Gemini 3 Pro">Gemini 3 Pro</option>
+                            <option value="Gemini 3 Flash">Gemini 3 Flash</option>
+                            <option value="Grok 4.1">Grok 4.1</option>
+                            <option value="Kimi K2 Thinking">Kimi K2 Thinking</option>
+                            <option value="Claude Sonnet 4.5">Claude Sonnet 4.5</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="promptText">Prompt Template:</label>
+                        <textarea id="promptText" rows="4"
+                            placeholder="Enter your video generation prompt here..."></textarea>
+                        <small class="hint">Used if no Perplexity URL is provided</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notebookLmChatSettings">NotebookLM Chat Settings</label>
+                        <textarea id="notebookLmChatSettings" rows="3"
+                            placeholder="Focus on key concepts and provide clear explanations...">Focus on key concepts and provide clear explanations</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notebookLmStyleSettings">NotebookLM Style Settings</label>
+                        <textarea id="notebookLmStyleSettings" rows="3"
+                            placeholder="Modern, engaging, educational style">Modern, engaging, educational style</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stylePrompt">Gemini Video Style Prompt</label>
+                        <textarea id="stylePrompt" rows="3"
+                            placeholder="Professional with smooth transitions">Professional with smooth transitions</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="audioNarrationPrompt">Audio Narration Prompt</label>
+                        <textarea id="audioNarrationPrompt" rows="3"
+                            placeholder="Generate slide-by-slide narration..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="googleStudioModel">Google Studio Model</label>
+                        <input type="text" id="googleStudioModel" placeholder="e.g., en-US-Wavenet-D">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="googleStudioVoice">Google Studio Voice</label>
+                        <input type="text" id="googleStudioVoice" placeholder="Voice ID">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="googleStudioStyleInstructions">Google Studio Style Instructions</label>
+                        <textarea id="googleStudioStyleInstructions" rows="2"
+                            placeholder="Voice style and tone instructions..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sourceFolder">Local Source Folder Path (Absolute)</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="sourceFolder" placeholder="e.g. F:\MyWork\Docs" style="flex: 1;">
+                            <button type="button" onclick="browseFolder()" class="btn btn-secondary"
+                                style="white-space: nowrap; padding: 0.5rem 1rem;">📂 Browse</button>
+                        </div>
+                        <small class="hint">Files read from here, output saved to 'output' subfolder</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="outputDir">Output Directory Override (Optional)</label>
+                        <input type="text" id="outputDir" placeholder="Leave empty to use source folder's output">
+                    </div>
+
+                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="headlessMode" style="width: auto; margin: 0;">
+                        <label for="headlessMode" style="margin: 0; cursor: pointer;">Start Browser Minimized</label>
+                    </div>
+
+                    <div class="form-group"
+                        style="flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                        <input type="checkbox" id="deleteConversation" style="width: auto; margin: 0;">
+                        <label for="deleteConversation" style="margin: 0; cursor: pointer;">Delete Conversation After
+                            Completion</label>
+                    </div>
+
+                    <div class="form-group"
+                        style="flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                        <input type="checkbox" id="keepOpen" style="width: auto; margin: 0;">
+                        <label for="keepOpen" style="margin: 0; cursor: pointer;">Keep Browser Open After Test</label>
+                    </div>
+
+                    <button onclick="saveCommonSettings()" class="btn btn-primary"
+                        style="width: 100%; margin-top: 1rem;">
+                        💾 Save Common Settings
+                    </button>
+                    <p id="saveCommonMessage"
+                        style="text-align: center; margin-top: 0.5rem; color: var(--success); display: none;">
+                        ✓ Common settings saved!
+                    </p>
+                </details>
             </section>
 
             <!-- Step 3: Generate -->
@@ -163,6 +231,31 @@
                     Generate Video
                 </button>
                 <p class="hint">Select documents first to enable generation</p>
+
+                <hr style="margin: 1rem 0; border-color: var(--border);">
+
+                <h3 style="margin-bottom: 0.5rem;">🔧 Individual Tests</h3>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button onclick="testPerplexity()" class="btn btn-secondary">
+                        🔍 Test Perplexity
+                    </button>
+                    <button onclick="testNotebookLM()" class="btn btn-secondary">
+                        📓 Test NotebookLM
+                    </button>
+
+                    <!-- Audio Pipeline Start Point -->
+                    <div class="input-group">
+                        <label for="audioStartPoint">🎙️ Audio Pipeline Start:</label>
+                        <select id="audioStartPoint" class="input">
+                            <option value="start-fresh">Generate Narration + Audio</option>
+                            <option value="skip-to-audio-generation">Skip to Audio Generation</option>
+                        </select>
+                    </div>
+
+                    <button onclick="testAudioPipeline()" class="btn btn-secondary">
+                        🎙️ Test Audio Pipeline
+                    </button>
+                </div>
             </section>
 
             <!-- Progress Section -->

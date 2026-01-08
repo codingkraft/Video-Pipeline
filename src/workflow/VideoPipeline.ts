@@ -55,9 +55,9 @@ export class VideoPipeline {
     /**
      * Initialize the browser and all services.
      */
-    public async initialize(): Promise<void> {
+    public async initialize(config?: { profileId?: string }): Promise<void> {
         console.log('Initializing Video Pipeline...');
-        await this.browser.initialize();
+        await this.browser.initialize(config);
         console.log('Video Pipeline initialized.');
     }
 

@@ -15,6 +15,7 @@ export interface PerplexityTestConfig {
     headless?: boolean;
     shouldDeleteConversation?: boolean;
     model?: string; // NEW: The model to use (e.g. "GPT-5.2")
+    profileId?: string; // Browser profile to use
 }
 
 export class PerplexityTester {
@@ -29,7 +30,10 @@ export class PerplexityTester {
      */
     public async testWorkflow(config: PerplexityTestConfig): Promise<{ success: boolean; message: string; details?: any }> {
         try {
-            await this.browser.initialize({ headless: config.headless });
+            await this.browser.initialize({
+                headless: config.headless,
+                profileId: config.profileId || 'default'
+            });
 
             const page = await this.browser.getPage('perplexity-test', config.chatUrl || PERPLEXITY_URL);
             await this.browser.randomDelay(2000, 3000);
@@ -494,6 +498,105 @@ export class PerplexityTester {
             return {
                 success: false,
                 message: `Test failed: ${(error as Error).message}`
+            };
+        }
+    }
+
+    /**
+     * Generate audio narration via Perplexity
+     * Uploads narration input file and extracts narration output
+     */
+    public async generateAudioNarration(config: {
+        sourceFolder: string;
+        audioNarrationPerplexityUrl: string;
+        headless?: boolean;
+        profileId?: string;
+    }): Promise<{ success: boolean; message: string; narrationPath?: string; details?: any }> {
+        const steps: string[] = [];
+
+        try {
+            await this.browser.initialize({
+                headless: config.headless,
+                profileId: config.profileId || 'default'
+            });
+
+            // Find narration input file
+            const inputFiles = fs.readdirSync(config.sourceFolder)
+                .filter(f => f.toLowerCase().includes('narration') && f.endsWith('.txt'));
+
+            if (inputFiles.length === 0) {
+                return {
+                    success: false,
+                    message: `No narration input file found in ${config.sourceFolder}. Expected filename to contain "narration".`
+                };
+            }
+
+            const narrationInputPath = path.join(config.sourceFolder, inputFiles[0]);
+            steps.push(`✓ Found narration input: ${inputFiles[0]}`);
+
+            // Open Perplexity chat
+            const page = await this.browser.getPage('perplexity-narration', config.audioNarrationPerplexityUrl);
+            await this.browser.randomDelay(2000, 3000);
+            steps.push(`✓ Opened Perplexity chat`);
+
+            // Upload file
+            steps.push(`📤 Uploading ${inputFiles[0]}...`);
+            const attachButton = await page.waitForSelector('button[aria-label="Attach"]', { timeout: 10000 });
+            await attachButton!.click();
+            await this.browser.randomDelay(500, 1000);
+
+            const fileInput = await page.$('input[type="file"]');
+            if (!fileInput) {
+                throw new Error('File input not found');
+            }
+
+            await fileInput.uploadFile(narrationInputPath);
+            await this.browser.randomDelay(2000, 3000);
+            steps.push(`✓ File uploaded`);
+
+            // Wait for response (code block)
+            steps.push(`⏳ Waiting for Perplexity response...`);
+            await this.browser.randomDelay(5000, 10000);
+
+            // Extract code block content
+            const codeBlock = await page.$('pre code, div[class*="code"] pre, div[data-language] pre');
+            if (!codeBlock) {
+                throw new Error('No code block found in response');
+            }
+
+            const narrationText = await page.evaluate(el => el.textContent, codeBlock);
+            if (!narrationText) {
+                throw new Error('Empty narration text extracted');
+            }
+
+            steps.push(`✓ Extracted narration (${narrationText.length} characters)`);
+
+            // Save to output
+            const outputDir = path.join(config.sourceFolder, 'output');
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+
+            const narrationOutputPath = path.join(outputDir, 'audio_narration.txt');
+            fs.writeFileSync(narrationOutputPath, narrationText, 'utf-8');
+            steps.push(`✓ Saved to: ${path.relative(config.sourceFolder, narrationOutputPath)}`);
+
+            // Mark progress
+            ProgressTracker.markStepComplete(config.sourceFolder, 'audio_narration_generated' as any, {});
+
+            return {
+                success: true,
+                message: 'Audio narration generated successfully',
+                narrationPath: narrationOutputPath,
+                details: { steps }
+            };
+
+        } catch (error) {
+            steps.push(`✗ Error: ${(error as Error).message}`);
+            return {
+                success: false,
+                message: `Failed to generate audio narration: ${(error as Error).message}`,
+                details: { steps }
             };
         }
     }

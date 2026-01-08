@@ -11,6 +11,7 @@ export interface BrowserConfig {
     headless: boolean;
     userDataDir: string;
     defaultViewport: { width: number; height: number };
+    profileId?: string;  // Profile ID for multi-profile support
 }
 
 export class CaptiveBrowser {
@@ -18,6 +19,7 @@ export class CaptiveBrowser {
     private browser: Browser | null = null;
     private pages: Map<string, Page> = new Map();
     private config: BrowserConfig;
+    private currentProfileId: string = 'default';
 
     private constructor(config?: Partial<BrowserConfig>) {
         const defaultUserDataDir = path.join(os.homedir(), '.video-creator', 'browser-profile');
@@ -26,7 +28,9 @@ export class CaptiveBrowser {
             headless: false, // Keep visible for login and debugging
             userDataDir: config?.userDataDir ?? defaultUserDataDir,
             defaultViewport: config?.defaultViewport ?? { width: 1920, height: 1080 },
+            profileId: config?.profileId ?? 'default',
         };
+        this.currentProfileId = this.config.profileId ?? 'default';
     }
 
     public static getInstance(config?: Partial<BrowserConfig>): CaptiveBrowser {
@@ -36,26 +40,60 @@ export class CaptiveBrowser {
         return CaptiveBrowser.instance;
     }
 
+    /**
+     * Get the user data directory for a specific profile
+     */
+    public static getProfileDir(profileId: string): string {
+        return path.join(os.homedir(), '.video-creator', 'profiles', profileId);
+    }
+
     public async initialize(config?: Partial<BrowserConfig>): Promise<void> {
         // Update config if provided
         if (config) {
-            const restartRequired = config.headless !== undefined && config.headless !== this.config.headless;
+            const newProfileId = config.profileId ?? this.currentProfileId;
+            const profileChanged = newProfileId !== this.currentProfileId;
+            const headlessChanged = config.headless !== undefined && config.headless !== this.config.headless;
+
+            // Update userDataDir based on profile
+            if (config.profileId) {
+                config.userDataDir = CaptiveBrowser.getProfileDir(config.profileId);
+            }
+
             this.config = { ...this.config, ...config };
 
-            if (this.browser && restartRequired) {
-                console.log('Headless mode changed, restarting browser...');
-                await this.browser.close();
+            // Restart browser if profile or headless mode changed
+            if (this.browser && (profileChanged || headlessChanged)) {
+                console.log(`Profile changed from ${this.currentProfileId} to ${newProfileId}, restarting browser...`);
+                try {
+                    await this.browser.close();
+                    // Wait for Chrome process to fully exit before relaunching
+                    console.log('Waiting for browser process to exit...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (e) {
+                    console.log('Browser close encountered an error (may already be closed):', (e as Error).message);
+                }
+                this.browser = null;
+                this.pages.clear();
+            }
+
+            this.currentProfileId = newProfileId;
+        }
+
+        if (this.browser) {
+            // Check if browser is actually still connected
+            const isConnected = this.browser.isConnected();
+            if (isConnected) {
+                console.log(`Browser already initialized with profile: ${this.currentProfileId}`);
+                return;
+            } else {
+                console.log('Browser instance exists but is disconnected, reinitializing...');
                 this.browser = null;
                 this.pages.clear();
             }
         }
 
-        if (this.browser) {
-            console.log('Browser already initialized');
-            return;
-        }
+        console.log(`Launching browser with profile: ${this.currentProfileId} (${this.config.userDataDir})`);
 
-        console.log(`Launching browser with profile: ${this.config.userDataDir}`);
 
         const startMinimized = this.config.headless; // "headless" config now triggers minimized mode
 
@@ -149,5 +187,9 @@ export class CaptiveBrowser {
 
     public getBrowser(): Browser | null {
         return this.browser;
+    }
+
+    public getCurrentProfileId(): string {
+        return this.currentProfileId;
     }
 }

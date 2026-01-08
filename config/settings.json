@@ -5,8 +5,19 @@
   "notebookLmStyleSettings": "ACCESSIBILITY SETTING: HIGH CONTRAST DARK MODE\n(White backgrounds cause user glare and are prohibited)\n\nVISUAL THEME:\nTactical hacking aesthetic (Watch Dogs, Deus Ex, Mirror's Edge).\n\nMANDATORY RULES (NON-NEGOTIABLE):\n1. DARK BACKGROUNDS ONLY: Every slide MUST use a black (#000000) or dark grid texture. If a slide is white, it is a failure. THIS IS SUPER CRITICAL\n2. NO NESTED WINDOWS: Content must fill the slide directly. Do NOT put content inside a floating terminal window or gray box.\n3. LOGO SAFE ZONE: Keep bottom-right corner empty for logo.\n4. No text only slide\n5. Make sure the title slide also follows the theme\n\nCOLOR PALETTE:\n- Background: #000000 (Black) or Dark Gray Grid\n- Accents: Teal (#00CED1), Cyan (#00FFFF), Orange (#FFA500)\n- Text: White or Cyan (Never dark text)\n\nCOMPOSITION:\n- Use screenshots as the MAIN visual (60-80% of screen).\n- Do not shrink screenshots into \"picture-in-picture\" boxes.\n- Overlay HUD elements (corner brackets, data streams) ON TOP of the dark background, not behind a window.\n\nCREATIVE FREEDOM:\n- Vary layout and framing between slides—no two slides should look identical but must follow the visual theme.\n- Use annotations (arrows, highlights, glitch effects) freely to explain code.\n- Create visual rhythm with different compositions for each slide.\n- REACTIVE VISUALS: Error slides use orange/yellow warning effects. Success slides use green/cyan \"access granted\" flow. Syntax slides use clean teal organization.\n- Treat code screenshots as \"hero\" visuals that drive the design, not background elements.",
   "stylePrompt": "Professional with smooth transitions",
   "outputDir": "",
-  "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 7",
+  "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 8;F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 7",
   "headlessMode": false,
   "deleteConversation": false,
-  "perplexityModel": "Claude Sonnet 4.5"
+  "perplexityModel": "Claude Sonnet 4.5",
+  "activeProfile": "profile2",
+  "profiles": {
+    "profile2": {
+      "perplexityChatUrl": "https://www.perplexity.ai/search/step3-create-notebooklm-prompt-hlwG.uWSQIyT30zXiy8j4w",
+      "audioNarrationPerplexityUrl": ""
+    },
+    "profile1": {
+      "perplexityChatUrl": "https://www.perplexity.ai/search/step3-create-notebooklm-prompt-hlwG.uWSQIyT30zXiy8j4w",
+      "audioNarrationPerplexityUrl": ""
+    }
+  }
 }

@@ -13,6 +13,7 @@ export interface NotebookLMTestConfig {
     existingNotebookUrl?: string; // If resuming from an existing notebook
     steeringPrompt?: string;      // Prompt from Perplexity
     visualStyle?: string;         // Visual style description
+    profileId?: string;           // Browser profile to use
 }
 
 export interface NotebookLMTestResult {
@@ -44,7 +45,10 @@ export class NotebookLMTester {
         const steps: string[] = [];
 
         try {
-            await this.browser.initialize({ headless: config.headless });
+            await this.browser.initialize({
+                headless: config.headless,
+                profileId: config.profileId || 'default'
+            });
 
             // Determine URL: use existing notebook or go to home
             const targetUrl = config.existingNotebookUrl || NOTEBOOKLM_URL;
