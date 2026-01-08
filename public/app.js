@@ -5,6 +5,66 @@ let selectedDocuments = [];
 let allFolders = []; // Store multiple folders
 let selectedLocalFolders = []; // Array of absolute paths of selected local folders
 
+// Load common settings from server on page load
+async function loadCommonSettings() {
+    try {
+        const response = await fetch('/api/get-settings');
+        const data = await response.json();
+
+        if (data.success && data.settings) {
+            const s = data.settings;
+
+            // Populate form fields
+            if (s.sourceFolder) document.getElementById('sourceFolder').value = s.sourceFolder;
+            if (s.perplexityModel) document.getElementById('perplexityModel').value = s.perplexityModel;
+            if (s.audioNarrationPerplexityModel) document.getElementById('audioNarrationPerplexityModel').value = s.audioNarrationPerplexityModel;
+            if (s.promptText) document.getElementById('promptText').value = s.promptText;
+            if (s.notebookLmChatSettings) document.getElementById('notebookLmChatSettings').value = s.notebookLmChatSettings;
+            if (s.notebookLmStyleSettings) document.getElementById('notebookLmStyleSettings').value = s.notebookLmStyleSettings;
+            if (s.stylePrompt) document.getElementById('stylePrompt').value = s.stylePrompt;
+            if (s.audioNarrationPrompt) document.getElementById('audioNarrationPrompt').value = s.audioNarrationPrompt;
+            // Populate Google Studio Model Dropdown
+            const modelSelect = document.getElementById('googleStudioModel');
+            if (s.googleStudioModels && Array.isArray(s.googleStudioModels)) {
+                modelSelect.innerHTML = '';
+                s.googleStudioModels.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+            }
+            if (s.googleStudioModel) modelSelect.value = s.googleStudioModel;
+
+            // Populate Google Studio Voice Dropdown
+            const voiceSelect = document.getElementById('googleStudioVoice');
+            if (s.googleStudioVoices && Array.isArray(s.googleStudioVoices)) {
+                voiceSelect.innerHTML = '';
+                s.googleStudioVoices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice;
+                    option.textContent = voice;
+                    voiceSelect.appendChild(option);
+                });
+            }
+            if (s.googleStudioVoice) voiceSelect.value = s.googleStudioVoice;
+            if (s.googleStudioStyleInstructions) document.getElementById('googleStudioStyleInstructions').value = s.googleStudioStyleInstructions;
+            if (s.outputDir) document.getElementById('outputDir').value = s.outputDir;
+
+            // Checkboxes
+            if (s.headlessMode !== undefined) document.getElementById('headlessMode').checked = s.headlessMode;
+            if (s.deleteConversation !== undefined) document.getElementById('deleteConversation').checked = s.deleteConversation;
+
+            console.log('Common settings loaded');
+        }
+    } catch (error) {
+        console.error('Failed to load common settings:', error);
+    }
+}
+
+// Call loadCommonSettings when page loads
+document.addEventListener('DOMContentLoaded', loadCommonSettings);
+
 // Select local folder using native Windows dialog
 async function selectLocalFolder() {
     const btn = document.getElementById('selectFolderBtn');
@@ -31,6 +91,9 @@ async function selectLocalFolder() {
 
             // Load files from the folder
             await loadFilesFromFolder(data.path);
+
+            // Update audio start options based on folder progress
+            await updateAudioStartOptions(data.path);
         } else if (data.cancelled) {
             console.log('Folder selection cancelled');
         }
@@ -331,11 +394,25 @@ async function onProfileChange() {
     const newProfile = document.getElementById('activeProfile').value;
     console.log('Profile changed to:', newProfile);
 
-    // Reload settings to get the new profile's URLs
-    await loadSettings();
+    // Fetch settings from server
+    try {
+        const response = await fetch('/api/load-settings');
+        const data = await response.json();
 
-    // Re-set the profile dropdown since loadSettings might override it
-    document.getElementById('activeProfile').value = newProfile;
+        if (data.success && data.settings) {
+            const settings = data.settings;
+
+            // Load the NEW profile's specific settings (not the old activeProfile from file)
+            const profileData = settings.profiles?.[newProfile] || {};
+            document.getElementById('perplexityChatUrl').value = profileData.perplexityChatUrl || '';
+            document.getElementById('audioNarrationPerplexityUrl').value = profileData.audioNarrationPerplexityUrl || '';
+
+            // Keep the dropdown on the new profile
+            document.getElementById('activeProfile').value = newProfile;
+        }
+    } catch (error) {
+        console.error('Failed to load profile settings:', error);
+    }
 
     // Show confirmation with restart warning
     const hint = document.querySelector('#activeProfile + .hint');
@@ -348,9 +425,6 @@ async function onProfileChange() {
             hint.style.color = '';
         }, 5000);
     }
-
-    // Save the active profile
-    await saveProfileSettings();
 }
 
 // Save profile-specific settings
@@ -929,6 +1003,18 @@ async function testAudioPipeline() {
     try {
         const activeProfile = document.getElementById('activeProfile').value;
         const audioStartPoint = document.getElementById('audioStartPoint').value;
+        const googleStudioModel = document.getElementById('googleStudioModel').value;
+        const googleStudioVoice = document.getElementById('googleStudioVoice').value;
+        const googleStudioStyleInstructions = document.getElementById('googleStudioStyleInstructions').value;
+
+        // Check if audio is already complete
+        if (audioStartPoint === 'audio-complete') {
+            addLogEntry('✅ Audio generation is already complete for this folder!', 'success');
+            addLogEntry('💡 Select "Regenerate All" or "Regenerate Audio Files" to run again.');
+            updateStatus('idle');
+            return;
+        }
+
         const response = await fetch('/api/generate-audio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -936,7 +1022,10 @@ async function testAudioPipeline() {
                 sourceFolder,
                 headless: document.getElementById('headlessMode').checked,
                 profileId: activeProfile,
-                audioStartPoint
+                audioStartPoint,
+                googleStudioModel,
+                googleStudioVoice,
+                googleStudioStyleInstructions
             })
         });
 
@@ -1114,3 +1203,121 @@ async function resetAndRunFull() {
         alert('Failed to reset progress: ' + error.message);
     }
 }
+
+// Update audio start options based on folder progress
+async function updateAudioStartOptions(folderPath) {
+    const container = document.getElementById('audioStartContainer');
+    const dropdown = document.getElementById('audioStartPoint');
+
+    if (!dropdown || !container) {
+        return;
+    }
+
+    if (!folderPath) {
+        container.style.display = 'none';
+        return;
+    }
+
+    try {
+        // Fetch progress for the folder
+        const response = await fetch(`/api/folder-progress?path=${encodeURIComponent(folderPath)}`);
+        const data = await response.json();
+
+        // Clear current options
+        dropdown.innerHTML = '';
+
+        // Check progress
+        const progress = data.progress || {};
+        const audioNarrationDone = progress.audio_narration_generated?.completed || false;
+        const audioFilesDone = progress.audio_files_generated?.completed || false;
+
+        // Build valid options based on progress
+
+        // Option 1: Always allow starting fresh (Generate Narration + Audio)
+        const startFreshOption = document.createElement('option');
+        startFreshOption.value = 'start-fresh';
+        startFreshOption.textContent = audioNarrationDone ? 'Regenerate Narration + Audio' : 'Generate Narration + Audio';
+        dropdown.appendChild(startFreshOption);
+
+        // Option 2: Skip to Audio Generation (ONLY if narration exists)
+        if (audioNarrationDone) {
+            const skipOption = document.createElement('option');
+            skipOption.value = 'skip-to-audio-generation';
+            skipOption.textContent = audioFilesDone ? 'Regenerate Audio Files' : 'Skip to Audio Generation';
+            // Default to this if narration is done but files aren't
+            if (!audioFilesDone) {
+                skipOption.selected = true;
+                skipOption.textContent += ' ✓';
+            }
+            dropdown.appendChild(skipOption);
+        }
+
+        // Option 3: Audio Complete State (if everything is done)
+        if (audioFilesDone) {
+            const completeOption = document.createElement('option');
+            completeOption.value = 'audio-complete';
+            completeOption.textContent = '✅ Audio Complete';
+            completeOption.selected = true;
+            dropdown.appendChild(completeOption);
+        }
+
+        // Show the container now that we have options
+        container.style.display = 'flex';
+
+    } catch (error) {
+        console.error('Failed to update audio start options:', error);
+        container.style.display = 'none'; // Hide on error
+    }
+}
+
+// Save common settings (non-profile specific)
+async function saveCommonSettings() {
+    const settings = {
+        sourceFolder: document.getElementById('sourceFolder').value,
+        headlessMode: document.getElementById('headlessMode').checked,
+        deleteConversation: document.getElementById('deleteConversation').checked,
+        perplexityModel: document.getElementById('perplexityModel').value,
+        audioNarrationPerplexityModel: document.getElementById('audioNarrationPerplexityModel').value,
+        promptText: document.getElementById('promptText').value,
+        notebookLmChatSettings: document.getElementById('notebookLmChatSettings').value,
+        notebookLmStyleSettings: document.getElementById('notebookLmStyleSettings').value,
+        stylePrompt: document.getElementById('stylePrompt').value,
+        audioNarrationPrompt: document.getElementById('audioNarrationPrompt').value,
+        googleStudioModel: document.getElementById('googleStudioModel').value,
+        googleStudioVoice: document.getElementById('googleStudioVoice').value,
+        googleStudioStyleInstructions: document.getElementById('googleStudioStyleInstructions').value,
+        outputDir: document.getElementById('outputDir').value
+    };
+
+    try {
+        const response = await fetch('/api/save-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        const result = await response.json();
+        if (result.success) {
+            console.log('Settings saved');
+            // Show success message
+            const message = document.getElementById('saveCommonMessage');
+            if (message) {
+                message.style.display = 'block';
+                setTimeout(() => {
+                    message.style.display = 'none';
+                }, 3000);
+            }
+        } else {
+            console.error('Failed to save settings:', result.message);
+            alert('Failed to save settings: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        alert('Error saving settings: ' + error.message);
+    }
+}
+
+// Keep saveSettings as an alias for compatibility
+async function saveSettings() {
+    await saveCommonSettings();
+}
+

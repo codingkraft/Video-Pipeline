@@ -134,6 +134,23 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="audioNarrationPerplexityModel">Audio Narration Perplexity Model:</label>
+                        <select id="audioNarrationPerplexityModel"
+                            style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                            <option value="Best">Best (Default)</option>
+                            <option value="Sonar">Sonar</option>
+                            <option value="GPT-5.2">GPT-5.2</option>
+                            <option value="Claude Opus 4.5">Claude Opus 4.5</option>
+                            <option value="Gemini 3 Pro">Gemini 3 Pro</option>
+                            <option value="Gemini 3 Flash">Gemini 3 Flash</option>
+                            <option value="Grok 4.1">Grok 4.1</option>
+                            <option value="Kimi K2 Thinking">Kimi K2 Thinking</option>
+                            <option value="Claude Sonnet 4.5">Claude Sonnet 4.5</option>
+                        </select>
+                        <small class="hint">Model used for generating audio narration via Perplexity</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="promptText">Prompt Template:</label>
                         <textarea id="promptText" rows="4"
                             placeholder="Enter your video generation prompt here..."></textarea>
@@ -166,12 +183,18 @@
 
                     <div class="form-group">
                         <label for="googleStudioModel">Google Studio Model</label>
-                        <input type="text" id="googleStudioModel" placeholder="e.g., en-US-Wavenet-D">
+                        <select id="googleStudioModel"
+                            style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                            <!-- Populated by JS -->
+                        </select>
                     </div>
 
                     <div class="form-group">
                         <label for="googleStudioVoice">Google Studio Voice</label>
-                        <input type="text" id="googleStudioVoice" placeholder="Voice ID">
+                        <select id="googleStudioVoice"
+                            style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                            <!-- Populated by JS -->
+                        </select>
                     </div>
 
                     <div class="form-group">
@@ -183,7 +206,8 @@
                     <div class="form-group">
                         <label for="sourceFolder">Local Source Folder Path (Absolute)</label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" id="sourceFolder" placeholder="e.g. F:\MyWork\Docs" style="flex: 1;">
+                            <input type="text" id="sourceFolder" placeholder="e.g. F:\MyWork\Docs" style="flex: 1;"
+                                onchange="updateAudioStartOptions(this.value)">
                             <button type="button" onclick="browseFolder()" class="btn btn-secondary"
                                 style="white-space: nowrap; padding: 0.5rem 1rem;">📂 Browse</button>
                         </div>
@@ -244,11 +268,13 @@
                     </button>
 
                     <!-- Audio Pipeline Start Point -->
-                    <div class="input-group">
-                        <label for="audioStartPoint">🎙️ Audio Pipeline Start:</label>
-                        <select id="audioStartPoint" class="input">
-                            <option value="start-fresh">Generate Narration + Audio</option>
-                            <option value="skip-to-audio-generation">Skip to Audio Generation</option>
+                    <div id="audioStartContainer"
+                        style="display: none; flex-direction: column; gap: 0.25rem; min-width: 250px;">
+                        <label for="audioStartPoint" style="font-size: 0.85rem; font-weight: 500;">🎙️ Audio
+                            Start:</label>
+                        <select id="audioStartPoint" class="input"
+                            style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                            <!-- Options populated dynamically -->
                         </select>
                     </div>
 

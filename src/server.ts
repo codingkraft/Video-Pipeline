@@ -622,18 +622,20 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
 
         // Load settings
         const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
-        let googleStudioModel = '';
-        let googleStudioVoice = '';
-        let googleStudioStyleInstructions = '';
+        let googleStudioModel = req.body.googleStudioModel || '';
+        let googleStudioVoice = req.body.googleStudioVoice || '';
+        let googleStudioStyleInstructions = req.body.googleStudioStyleInstructions || '';
         let audioNarrationPerplexityUrl = '';
+        let audioNarrationPerplexityModel = '';
         let activeProfileId = profileId || 'default';
 
         if (fs.existsSync(settingsPath)) {
             try {
                 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-                googleStudioModel = settings.googleStudioModel || '';
-                googleStudioVoice = settings.googleStudioVoice || '';
-                googleStudioStyleInstructions = settings.googleStudioStyleInstructions || '';
+                if (!googleStudioModel) googleStudioModel = settings.googleStudioModel || '';
+                if (!googleStudioVoice) googleStudioVoice = settings.googleStudioVoice || '';
+                if (!googleStudioStyleInstructions) googleStudioStyleInstructions = settings.googleStudioStyleInstructions || '';
+                audioNarrationPerplexityModel = settings.audioNarrationPerplexityModel || '';
 
                 // Get profile-specific audio narration URL
                 activeProfileId = settings.activeProfile || profileId || 'default';
@@ -659,7 +661,8 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
                 sourceFolder,
                 audioNarrationPerplexityUrl,
                 headless: headless === true || headless === 'true',
-                profileId: activeProfileId
+                profileId: activeProfileId,
+                model: audioNarrationPerplexityModel
             });
 
             if (!narrationResult.success) {
@@ -694,6 +697,54 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
             success: false,
             message: 'Audio generation failed: ' + (error as Error).message
         });
+    }
+});
+
+// API: Get settings from settings.json
+app.get('/api/get-settings', (req: Request, res: Response) => {
+    try {
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+
+        if (fs.existsSync(settingsPath)) {
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            res.json({ success: true, settings });
+        } else {
+            res.json({ success: true, settings: {} });
+        }
+    } catch (error) {
+        console.error('Error reading settings:', error);
+        res.status(500).json({ success: false, message: (error as Error).message });
+    }
+});
+
+// API: Save common settings to settings.json
+app.post('/api/save-settings', (req: Request, res: Response) => {
+    try {
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+
+        // Read existing settings
+        let existingSettings: any = {};
+        if (fs.existsSync(settingsPath)) {
+            try {
+                existingSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            } catch (e) {
+                console.warn('Could not read existing settings, creating new file');
+            }
+        }
+
+        // Merge with new settings from request
+        const updatedSettings = {
+            ...existingSettings,
+            ...req.body
+        };
+
+        // Write to file
+        fs.writeFileSync(settingsPath, JSON.stringify(updatedSettings, null, 2), 'utf-8');
+
+        res.json({ success: true, message: 'Settings saved successfully' });
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        res.status(500).json({ success: false, message: (error as Error).message });
     }
 });
 

@@ -511,6 +511,7 @@ export class PerplexityTester {
         audioNarrationPerplexityUrl: string;
         headless?: boolean;
         profileId?: string;
+        model?: string;
     }): Promise<{ success: boolean; message: string; narrationPath?: string; details?: any }> {
         const steps: string[] = [];
 
@@ -553,6 +554,27 @@ export class PerplexityTester {
             await fileInput.uploadFile(narrationInputPath);
             await this.browser.randomDelay(2000, 3000);
             steps.push(`✓ File uploaded`);
+
+            // Select model if specified
+            if (config.model) {
+                steps.push(`🔧 Selecting model: ${config.model}...`);
+                try {
+                    const modelButton = await page.waitForSelector('button[id="focus-mode-dropdown"]', { timeout: 5000 });
+                    await modelButton?.click();
+                    await this.browser.randomDelay(500, 1000);
+
+                    const modelOption = await page.waitForSelector(`div[data-testid="dropdown-item"]:has-text("${config.model}")`, { timeout: 5000 });
+                    if (modelOption) {
+                        await modelOption.click();
+                        await this.browser.randomDelay(1000, 2000);
+                        steps.push(`✓ Selected model: ${config.model}`);
+                    } else {
+                        steps.push(`⚠ Model ${config.model} not found, using default`);
+                    }
+                } catch (e) {
+                    steps.push(`⚠ Could not select model (using default): ${(e as Error).message}`);
+                }
+            }
 
             // Wait for response (code block)
             steps.push(`⏳ Waiting for Perplexity response...`);

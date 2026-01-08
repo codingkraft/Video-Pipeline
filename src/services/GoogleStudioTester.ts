@@ -101,14 +101,70 @@ export class GoogleStudioTester {
 
             // Set model if provided
             if (studioConfig.model) {
-                // This will need to be customized based on Google Studio UI
-                steps.push(`⚠ Model selection: ${studioConfig.model} (manual selection may be needed)`);
+                // Try to find a model selector (fallback logic as it's not clearly identified in HTML dump)
+                try {
+                    const modelSelector = await page.$('ms-model-selector mat-select, [aria-label*="Model"] mat-select');
+                    if (modelSelector) {
+                        await modelSelector.click();
+                        await this.browser.randomDelay(500, 1000);
+
+                        const optionClicked = await page.evaluate((modelName) => {
+                            const options = Array.from(document.querySelectorAll('mat-option'));
+                            const target = options.find(opt => opt.textContent?.trim() === modelName);
+                            if (target) {
+                                (target as HTMLElement).click();
+                                return true;
+                            }
+                            return false;
+                        }, studioConfig.model);
+
+                        if (optionClicked) {
+                            steps.push(`✓ Selected model: ${studioConfig.model}`);
+                        } else {
+                            steps.push(`⚠ Model "${studioConfig.model}" option not found`);
+                            await page.keyboard.press('Escape'); // Close dropdown
+                        }
+                    } else {
+                        steps.push(`⚠ Model selector not found (skipping model selection)`);
+                    }
+                } catch (e) {
+                    steps.push(`⚠ Failed to set model: ${(e as Error).message}`);
+                }
             }
 
             // Set voice if provided
             if (studioConfig.voice) {
-                // This will need to be customized based on Google Studio UI
-                steps.push(`⚠ Voice selection: ${studioConfig.voice} (manual selection may be needed)`);
+                try {
+                    // Selector based on HTML analysis: ms-voice-selector contains the mat-select
+                    const voiceSelector = await page.waitForSelector('ms-voice-selector mat-select', { timeout: 3000 });
+                    if (voiceSelector) {
+                        await voiceSelector.click();
+                        await this.browser.randomDelay(500, 1000);
+
+                        const optionClicked = await page.evaluate((voiceName) => {
+                            const options = Array.from(document.querySelectorAll('mat-option'));
+                            // Match partial or exact
+                            const target = options.find(opt =>
+                                opt.textContent?.includes(voiceName) ||
+                                opt.querySelector('.mat-option-text')?.textContent?.includes(voiceName)
+                            );
+                            if (target) {
+                                (target as HTMLElement).click();
+                                return true;
+                            }
+                            return false;
+                        }, studioConfig.voice);
+
+                        if (optionClicked) {
+                            steps.push(`✓ Selected voice: ${studioConfig.voice}`);
+                        } else {
+                            steps.push(`⚠ Voice "${studioConfig.voice}" option not found`);
+                            await page.keyboard.press('Escape'); // Close dropdown
+                        }
+                    }
+                } catch (e) {
+                    steps.push(`⚠ Failed to set voice: ${(e as Error).message}`);
+                }
             }
 
             // Find and fill the main text input
