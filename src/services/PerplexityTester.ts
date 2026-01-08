@@ -16,6 +16,7 @@ export interface PerplexityTestConfig {
     shouldDeleteConversation?: boolean;
     model?: string; // NEW: The model to use (e.g. "GPT-5.2")
     profileId?: string; // Browser profile to use
+    outputFilename?: string; // Custom output filename (without extension)
 }
 
 export class PerplexityTester {
@@ -70,11 +71,7 @@ export class PerplexityTester {
                 outputDir = path.join(process.cwd(), 'output');
             }
 
-            // Check if output files already exist and warn
-            const existingResponse = path.join(outputDir, 'perplexity_response.txt');
-            if (fs.existsSync(existingResponse)) {
-                steps.push('⚠ Existing output files will be overwritten');
-            }
+            // Output directory is ready - files will be overwritten if they exist
 
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
@@ -189,10 +186,25 @@ export class PerplexityTester {
                         await inputElement.uploadFile(...filesToUpload);
                         steps.push(`✓ Attached ${filesToUpload.length} file(s)`);
 
-                        // Wait for upload to complete
+                    }
+                    if (filesToUpload.length > 0) {
                         steps.push('⏳ Waiting for files to upload...');
-                        await this.browser.randomDelay(3000, 5000);
-                        steps.push('✓ Files uploaded');
+
+                        // Wait for file loading spinner to appear and then disappear
+                        try {
+                            // Wait for spinner to appear (indicates upload started)
+                            await page.waitForSelector('[data-testid="file-loading-icon"]', { timeout: 5000 });
+                            steps.push('📤 Upload in progress...');
+
+                            // Wait for spinner to disappear (indicates upload complete)
+                            await page.waitForSelector('[data-testid="file-loading-icon"]', { hidden: true, timeout: 30000 });
+                            steps.push('✓ Files uploaded');
+                        } catch (e) {
+                            // Fallback to delay if spinner detection fails
+                            steps.push('⚠ Could not detect upload spinner, using fallback delay');
+                            await this.browser.randomDelay(3000, 5000);
+                            steps.push('✓ Files uploaded (fallback)');
+                        }
 
                         await this.browser.randomDelay(2000, 3000);
                     } else {
@@ -385,7 +397,7 @@ export class PerplexityTester {
 
             // Step 8: Save
             // Clean up extra blank lines (textContent can include many newlines from nested HTML)
-            const cleanedResponse = responseText
+            let cleanedResponse = responseText
                 .split('\n')
                 .map(line => line.trim())
                 .filter((line, index, arr) => {
@@ -397,7 +409,14 @@ export class PerplexityTester {
                 .join('\n')
                 .trim();
 
-            const responseFilePath = path.join(outputDir, 'perplexity_response.txt');
+            // Remove 'text' from the beginning if it starts with exactly those 4 characters (case-sensitive)
+            if (cleanedResponse.startsWith('text')) {
+                cleanedResponse = cleanedResponse.substring(4).trim();
+            }
+
+            // Use custom filename or default to 'perplexity_response'
+            const outputBasename = config.outputFilename || 'perplexity_response';
+            const responseFilePath = path.join(outputDir, `${outputBasename}.txt`);
             fs.writeFileSync(responseFilePath, cleanedResponse, 'utf-8');
             steps.push(`✓ Response saved to: ${responseFilePath}`);
 
@@ -405,13 +424,13 @@ export class PerplexityTester {
             const sourceFolder = config.sourceFolder || (filesToUpload && filesToUpload.length > 0 ? path.dirname(filesToUpload[0]) : null);
             if (sourceFolder) {
                 ProgressTracker.markStepComplete(sourceFolder, 'perplexity', {
-                    outputFile: 'perplexity_response.txt',
+                    outputFile: `${outputBasename}.txt`,
                     steeringPrompt: cleanedResponse  // Save for NotebookLM to use
                 });
                 steps.push('✓ Progress saved (including steering prompt)');
             }
 
-            const screenshotPath = path.join(outputDir, 'perplexity_screenshot.png');
+            const screenshotPath = path.join(outputDir, `${outputBasename}_screenshot.png`);
 
             // Scroll to bottom before screenshot
             await page.evaluate(() => {
@@ -505,6 +524,7 @@ export class PerplexityTester {
     /**
      * Generate audio narration via Perplexity
      * Uploads narration input file and extracts narration output
+     * REFACTORED: Now uses the existing testWorkflow function to avoid code duplication
      */
     public async generateAudioNarration(config: {
         sourceFolder: string;
@@ -512,15 +532,11 @@ export class PerplexityTester {
         headless?: boolean;
         profileId?: string;
         model?: string;
+        prompt?: string;
     }): Promise<{ success: boolean; message: string; narrationPath?: string; details?: any }> {
         const steps: string[] = [];
 
         try {
-            await this.browser.initialize({
-                headless: config.headless,
-                profileId: config.profileId || 'default'
-            });
-
             // Find narration input file
             const inputFiles = fs.readdirSync(config.sourceFolder)
                 .filter(f => f.toLowerCase().includes('narration') && f.endsWith('.txt'));
@@ -535,73 +551,34 @@ export class PerplexityTester {
             const narrationInputPath = path.join(config.sourceFolder, inputFiles[0]);
             steps.push(`✓ Found narration input: ${inputFiles[0]}`);
 
-            // Open Perplexity chat
-            const page = await this.browser.getPage('perplexity-narration', config.audioNarrationPerplexityUrl);
-            await this.browser.randomDelay(2000, 3000);
-            steps.push(`✓ Opened Perplexity chat`);
+            // Use the existing testWorkflow function to handle Perplexity interaction
+            const result = await this.testWorkflow({
+                chatUrl: config.audioNarrationPerplexityUrl,
+                files: [narrationInputPath],
+                prompt: config.prompt || '', // Use provided prompt or empty string
+                sourceFolder: config.sourceFolder,
+                headless: config.headless,
+                shouldDeleteConversation: false,
+                model: config.model,
+                profileId: config.profileId,
+                outputFilename: 'audio_narration' // Custom filename for audio narration
+            });
 
-            // Upload file
-            steps.push(`📤 Uploading ${inputFiles[0]}...`);
-            const attachButton = await page.waitForSelector('button[aria-label="Attach"]', { timeout: 10000 });
-            await attachButton!.click();
-            await this.browser.randomDelay(500, 1000);
-
-            const fileInput = await page.$('input[type="file"]');
-            if (!fileInput) {
-                throw new Error('File input not found');
+            if (!result.success) {
+                return {
+                    success: false,
+                    message: result.message,
+                    details: { steps: [...steps, ...(result.details?.steps || [])] }
+                };
             }
 
-            await fileInput.uploadFile(narrationInputPath);
-            await this.browser.randomDelay(2000, 3000);
-            steps.push(`✓ File uploaded`);
-
-            // Select model if specified
-            if (config.model) {
-                steps.push(`🔧 Selecting model: ${config.model}...`);
-                try {
-                    const modelButton = await page.waitForSelector('button[id="focus-mode-dropdown"]', { timeout: 5000 });
-                    await modelButton?.click();
-                    await this.browser.randomDelay(500, 1000);
-
-                    const modelOption = await page.waitForSelector(`div[data-testid="dropdown-item"]:has-text("${config.model}")`, { timeout: 5000 });
-                    if (modelOption) {
-                        await modelOption.click();
-                        await this.browser.randomDelay(1000, 2000);
-                        steps.push(`✓ Selected model: ${config.model}`);
-                    } else {
-                        steps.push(`⚠ Model ${config.model} not found, using default`);
-                    }
-                } catch (e) {
-                    steps.push(`⚠ Could not select model (using default): ${(e as Error).message}`);
-                }
-            }
-
-            // Wait for response (code block)
-            steps.push(`⏳ Waiting for Perplexity response...`);
-            await this.browser.randomDelay(5000, 10000);
-
-            // Extract code block content
-            const codeBlock = await page.$('pre code, div[class*="code"] pre, div[data-language] pre');
-            if (!codeBlock) {
-                throw new Error('No code block found in response');
-            }
-
-            const narrationText = await page.evaluate(el => el.textContent, codeBlock);
-            if (!narrationText) {
-                throw new Error('Empty narration text extracted');
-            }
-
-            steps.push(`✓ Extracted narration (${narrationText.length} characters)`);
-
-            // Save to output
+            // The response is already saved by testWorkflow as audio_narration.txt
             const outputDir = path.join(config.sourceFolder, 'output');
-            if (!fs.existsSync(outputDir)) {
-                fs.mkdirSync(outputDir, { recursive: true });
-            }
-
             const narrationOutputPath = path.join(outputDir, 'audio_narration.txt');
-            fs.writeFileSync(narrationOutputPath, narrationText, 'utf-8');
-            steps.push(`✓ Saved to: ${path.relative(config.sourceFolder, narrationOutputPath)}`);
+
+            if (!fs.existsSync(narrationOutputPath)) {
+                throw new Error('Audio narration file was not created');
+            }
 
             // Mark progress
             ProgressTracker.markStepComplete(config.sourceFolder, 'audio_narration_generated' as any, {});
@@ -610,7 +587,7 @@ export class PerplexityTester {
                 success: true,
                 message: 'Audio narration generated successfully',
                 narrationPath: narrationOutputPath,
-                details: { steps }
+                details: { steps: [...steps, ...(result.details?.steps || [])] }
             };
 
         } catch (error) {
@@ -622,6 +599,7 @@ export class PerplexityTester {
             };
         }
     }
+
 
     public async close(): Promise<void> {
         await this.browser.closePage('perplexity-test');

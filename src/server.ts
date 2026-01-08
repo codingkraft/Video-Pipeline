@@ -412,8 +412,25 @@ app.post('/api/save-settings', (req: Request, res: Response) => {
             fs.mkdirSync(configDir, { recursive: true });
         }
 
-        // Save settings to file
-        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+        // Load existing settings to preserve arrays and profiles
+        let existingSettings: any = {};
+        if (fs.existsSync(settingsPath)) {
+            existingSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        }
+
+        // Merge settings, preserving configuration arrays and profiles
+        const mergedSettings = {
+            ...existingSettings,
+            ...settings,
+            // Always preserve these configuration arrays
+            googleStudioModels: existingSettings.googleStudioModels || [],
+            googleStudioVoices: existingSettings.googleStudioVoices || [],
+            // Preserve profiles structure
+            profiles: existingSettings.profiles || {}
+        };
+
+        // Save merged settings to file
+        fs.writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2), 'utf-8');
 
         res.json({
             success: true,
@@ -555,6 +572,63 @@ app.post('/api/reset-progress', (req: Request, res: Response) => {
     }
 });
 
+// API: Check audio progress for folders
+app.post('/api/check-audio-progress', (req: Request, res: Response) => {
+    try {
+        const { ProgressTracker } = require('./services/ProgressTracker');
+        const { folders } = req.body; // Array of folder paths
+
+        if (!folders || !Array.isArray(folders)) {
+            return res.status(400).json({ error: 'folders array is required' });
+        }
+
+        const results = folders.map((folderPath: string) => {
+            const progress = ProgressTracker.getProgress(folderPath);
+            const summary = ProgressTracker.getCompletionSummary(folderPath);
+
+            // Get list of files in the folder
+            let files: string[] = [];
+            try {
+                if (fs.existsSync(folderPath)) {
+                    files = fs.readdirSync(folderPath)
+                        .filter(f => !f.startsWith('.') && !fs.statSync(path.join(folderPath, f)).isDirectory())
+                        .slice(0, 10); // Limit to 10 files for UI
+                }
+            } catch (e) {
+                // Ignore file read errors
+            }
+
+            return {
+                folderPath,
+                folderName: path.basename(folderPath),
+                progress,
+                summary,
+                files,
+                audioStage: getAudioStage(progress)
+            };
+        });
+
+        res.json({
+            success: true,
+            folders: results
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to check audio progress: ' + (error as Error).message
+        });
+    }
+});
+
+// Helper function to determine audio stage
+function getAudioStage(progress: any): string {
+    if (!progress) return 'not-started';
+    if (progress.audioComplete) return 'complete';
+    if (progress.audioGenerated) return 'audio-generated';
+    if (progress.narrationGenerated) return 'narration-generated';
+    return 'not-started';
+}
+
 // API: Test NotebookLM workflow
 app.post('/api/test-notebooklm', async (req: Request, res: Response) => {
     try {
@@ -627,6 +701,7 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
         let googleStudioStyleInstructions = req.body.googleStudioStyleInstructions || '';
         let audioNarrationPerplexityUrl = '';
         let audioNarrationPerplexityModel = '';
+        let audioNarrationPrompt = '';
         let activeProfileId = profileId || 'default';
 
         if (fs.existsSync(settingsPath)) {
@@ -635,7 +710,8 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
                 if (!googleStudioModel) googleStudioModel = settings.googleStudioModel || '';
                 if (!googleStudioVoice) googleStudioVoice = settings.googleStudioVoice || '';
                 if (!googleStudioStyleInstructions) googleStudioStyleInstructions = settings.googleStudioStyleInstructions || '';
-                audioNarrationPerplexityModel = settings.audioNarrationPerplexityModel || '';
+                audioNarrationPerplexityModel = settings.perplexityModel || '';
+                audioNarrationPrompt = settings.audioNarrationPrompt || '   ';
 
                 // Get profile-specific audio narration URL
                 activeProfileId = settings.activeProfile || profileId || 'default';
@@ -662,7 +738,8 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
                 audioNarrationPerplexityUrl,
                 headless: headless === true || headless === 'true',
                 profileId: activeProfileId,
-                model: audioNarrationPerplexityModel
+                model: audioNarrationPerplexityModel,
+                prompt: audioNarrationPrompt
             });
 
             if (!narrationResult.success) {

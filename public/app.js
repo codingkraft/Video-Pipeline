@@ -1321,3 +1321,223 @@ async function saveSettings() {
     await saveCommonSettings();
 }
 
+// Check audio progress for selected folders
+async function checkAudioProgress() {
+    const sourceFolderInput = document.getElementById('sourceFolder').value;
+    if (!sourceFolderInput) {
+        return;
+    }
+
+    // Split by semicolon to support multiple folders
+    const folders = sourceFolderInput.split(';').map(f => f.trim()).filter(f => f);
+
+    if (folders.length === 0) {
+        document.getElementById('audioProgressSection').style.display = 'none';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/check-audio-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folders })
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.folders) {
+            displayAudioProgress(result.folders);
+        }
+    } catch (error) {
+        console.error('Failed to check audio progress:', error);
+    }
+}
+
+// Display audio progress with expandable folders
+function displayAudioProgress(folders) {
+    const container = document.getElementById('documentList');
+
+    if (folders.length === 0) {
+        return;
+    }
+
+    // Clear existing audio progress displays
+    const existingAudioProgress = container.querySelectorAll('.audio-pipeline-progress');
+    existingAudioProgress.forEach(el => el.remove());
+
+    folders.forEach((folder, index) => {
+        // Create audio progress container for this folder
+        const audioProgressDiv = document.createElement('div');
+        audioProgressDiv.className = 'audio-pipeline-progress';
+        audioProgressDiv.style.cssText = 'background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;';
+
+        const audioStartOptions = getAudioStartOptions(folder.audioStage);
+        const stageBadge = getAudioStageBadge(folder.audioStage);
+
+        // Build progress checkmarks
+        const stages = [
+            { label: 'Perplexity Prompt', done: folder.audioStage !== 'not-started' },
+            { label: 'NotebookLM Created', done: folder.audioStage !== 'not-started' },
+            { label: 'Sources Uploaded', done: folder.audioStage !== 'not-started' },
+            { label: 'Video Shared', done: folder.audioStage !== 'not-started' },
+            { label: 'Narration Generated', done: folder.audioStage === 'narration-generated' || folder.audioStage === 'audio-generated' || folder.audioStage === 'complete' },
+            { label: 'Audio Generated', done: folder.audioStage === 'audio-generated' || folder.audioStage === 'complete' }
+        ];
+
+        const stagesHTML = stages.map(stage =>
+            `<span style="color: ${stage.done ? 'var(--success)' : 'var(--text-muted)'};">
+                ${stage.done ? '✅' : '⬜'} ${stage.label}
+            </span>`
+        ).join('  ');
+
+        audioProgressDiv.innerHTML = `
+            <div style="margin-bottom: 0.75rem;">
+                <strong style="color: var(--text); font-size: 0.95rem;">📁 ${folder.folderName}</strong>
+                <span style="margin-left: 1rem; padding: 0.25rem 0.75rem; background: var(--${folder.audioStage === 'complete' ? 'success' : folder.audioStage === 'not-started' ? 'border' : 'warning'}); color: white; border-radius: 1rem; font-size: 0.75rem; font-weight: 600;">${stageBadge}</span>
+            </div>
+            <div style="font-size: 0.85rem; margin-bottom: 0.75rem; line-height: 1.8;">
+                ${stagesHTML}
+            </div>
+            ${folder.audioStage !== 'complete' ? `
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                    <label style="font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Start pipeline from:</label>
+                    <select id="audio-start-${index}" style="flex: 1; min-width: 200px; max-width: 300px; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 0.375rem; color: var(--text);">
+                        ${audioStartOptions}
+                    </select>
+                    <button onclick="testAudioForFolder('${folder.folderPath.replace(/\\/g, '\\\\')}', ${index})" class="btn btn-secondary btn-small">
+                        🎙️ Test Audio
+                    </button>
+                </div>
+            ` : `
+                <div style="padding-top: 0.75rem; border-top: 1px solid var(--border); color: var(--success); font-weight: 500;">
+                    ✅ Audio pipeline complete for this folder
+                </div>
+            `}
+            ${folder.files && folder.files.length > 0 ? `
+                <details style="margin-top: 0.75rem;">
+                    <summary style="cursor: pointer; font-size: 0.85rem; color: var(--text-muted); user-select: none;">📄 View files (${folder.files.length})</summary>
+                    <div style="margin-top: 0.5rem; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem; font-size: 0.8rem;">
+                        ${folder.files.map(file => `<div style="padding: 0.25rem 0; color: var(--text-muted);">• ${file}</div>`).join('')}
+                    </div>
+                </details>
+            ` : ''}
+        `;
+
+        container.appendChild(audioProgressDiv);
+    });
+}
+
+// Get audio start options based on current stage
+function getAudioStartOptions(stage) {
+    const options = [];
+
+    if (stage === 'complete' || stage === 'audio-generated') {
+        options.push('<option value="regenerate-all">Regenerate All</option>');
+        options.push('<option value="regenerate-audio">Regenerate Audio Files Only</option>');
+    } else if (stage === 'narration-generated') {
+        options.push('<option value="skip-to-audio-generation">Skip to Audio Generation</option>');
+        options.push('<option value="regenerate-all">Regenerate All</option>');
+    } else {
+        options.push('<option value="generate-narration-audio">Generate Narration + Audio</option>');
+    }
+
+    return options.join('');
+}
+
+// Test audio pipeline for specific folder
+async function testAudioForFolder(folderPath, folderIndex) {
+    const audioStartPoint = document.getElementById(`audio-start-${folderIndex}`).value;
+    const activeProfile = document.getElementById('activeProfile').value;
+
+    // Show progress section
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('progressLog').innerHTML = '';
+
+    addLogEntry(`🎙️ Starting Audio Pipeline for: ${folderPath}`);
+    addLogEntry(`📍 Start point: ${audioStartPoint}`);
+    updateStatus('testing');
+
+    try {
+        const googleStudioModel = document.getElementById('googleStudioModel').value;
+        const googleStudioVoice = document.getElementById('googleStudioVoice').value;
+        const googleStudioStyleInstructions = document.getElementById('googleStudioStyleInstructions').value;
+
+        const response = await fetch('/api/generate-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourceFolder: folderPath,
+                headless: document.getElementById('headlessMode').checked,
+                profileId: activeProfile,
+                audioStartPoint,
+                googleStudioModel,
+                googleStudioVoice,
+                googleStudioStyleInstructions
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            addLogEntry('✅ Audio Pipeline completed!', 'success');
+            if (result.details?.steps) {
+                result.details.steps.forEach(step => addLogEntry(step));
+            }
+            if (result.details?.audioFiles) {
+                addLogEntry(`📁 Generated ${result.details.audioFiles.length} audio files`);
+            }
+
+            // Refresh audio progress
+            await checkAudioProgress();
+        } else {
+            addLogEntry(`❌ Error: ${result.message}`, 'error');
+            if (result.details?.steps) {
+                result.details.steps.forEach(step => addLogEntry(step));
+            }
+        }
+
+        updateStatus('idle');
+
+    } catch (error) {
+        addLogEntry(`❌ Request failed: ${error.message}`, 'error');
+        updateStatus('idle');
+    }
+}
+
+
+// Toggle folder expansion
+function toggleFolder(index) {
+    const content = document.getElementById(`folder-content-${index}`);
+    if (content) {
+        content.classList.toggle('collapsed');
+    }
+}
+
+// Get audio stage badge text
+function getAudioStageBadge(stage) {
+    switch (stage) {
+        case 'complete': return 'Complete';
+        case 'audio-generated': return 'Audio Generated';
+        case 'narration-generated': return 'Narration Ready';
+        default: return 'Not Started';
+    }
+}
+
+// Get audio stage progress elements
+function getAudioStageElements(stage) {
+    const stages = [
+        { id: 'narration', label: '✓ Narration Generated', class: stage === 'not-started' ? 'pending' : 'complete' },
+        { id: 'audio', label: stage === 'audio-generated' || stage === 'complete' ? '✓ Audio Generated' : '⏳ Generating Audio...', class: stage === 'complete' || stage === 'audio-generated' ? 'complete' : (stage === 'narration-generated' ? 'in-progress' : 'pending') },
+        { id: 'complete', label: stage === 'complete' ? '✓ Audio Complete' : 'Audio Complete', class: stage === 'complete' ? 'complete' : 'pending' }
+    ];
+
+    return stages.map(s => `<div class="stage ${s.class}">${s.label}</div>`).join('');
+}
+
+// Call checkAudioProgress when source folder changes
+const originalUpdateAudioStartOptions = window.updateAudioStartOptions || function () { };
+window.updateAudioStartOptions = function (folderPath) {
+    originalUpdateAudioStartOptions(folderPath);
+    checkAudioProgress();
+};
+
