@@ -89,8 +89,10 @@ async function selectLocalFolder() {
             document.getElementById('sourceFolder').value = selectedLocalFolders.join(';');
             saveSettings();
 
-            // Load files from the folder
-            await loadFilesFromFolder(data.path);
+            // Reload all folders with collapsible sections
+            for (let i = 0; i < selectedLocalFolders.length; i++) {
+                await loadFilesFromFolder(selectedLocalFolders[i], i);
+            }
 
             // Update audio start options based on folder progress
             await updateAudioStartOptions(data.path);
@@ -114,11 +116,13 @@ function updateLocalFolderDisplay() {
     if (selectedLocalFolders.length === 0) {
         folderPathEl.textContent = 'No folder selected';
         outputPreviewEl.textContent = '[Selected Folder]/output/';
+        // Clear document list
+        document.getElementById('documentList').innerHTML = '';
     } else if (selectedLocalFolders.length === 1) {
         folderPathEl.textContent = selectedLocalFolders[0];
         outputPreviewEl.textContent = selectedLocalFolders[0] + '\\output\\';
     } else {
-        folderPathEl.innerHTML = selectedLocalFolders.map(f => `📁 ${f}`).join('<br>');
+        folderPathEl.innerHTML = `${selectedLocalFolders.length} folders selected`;
         outputPreviewEl.textContent = 'Each folder will have its own output subfolder';
     }
 }
@@ -132,10 +136,251 @@ function clearLocalFolders() {
     saveSettings();
 }
 
-// Load and display files from a local folder
-async function loadFilesFromFolder(folderPath) {
+// Remove folder at specific index
+async function removeFolderAt(index) {
+    selectedLocalFolders.splice(index, 1);
+    updateLocalFolderDisplay();
+
+    // Reload all remaining folders
+    for (let i = 0; i < selectedLocalFolders.length; i++) {
+        await loadFilesFromFolder(selectedLocalFolders[i], i);
+    }
+
+    saveSettings();
+}
+
+// Run pipeline for a specific folder
+async function runPipelineForFolder(folderPath, dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) {
+        alert('Error: Dropdown not found');
+        return;
+    }
+    const startPoint = dropdown.value;
+
+    // UI Feedback
+    const btn = dropdown.nextElementSibling;
+    const originalText = btn ? btn.textContent : '▶ Run';
+    if (btn) {
+        btn.textContent = '⏱ Starting...';
+        btn.disabled = true;
+    }
+
+    try {
+        const response = await fetch('/api/run-pipeline-step', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                folderPath,
+                profileId: 'default', // Default profile for single runs
+                startPoint
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Log to batch log if available, otherwise console
+            if (typeof addBatchLog === 'function') {
+                addBatchLog(`Started ${startPoint} for ${folderPath.split('\\').pop()}`);
+            }
+            // Button stays disabled until process completes or page reloads? 
+            // Better to re-enable after a few seconds so user can click again if needed (or if they want to cancel/status)
+            setTimeout(() => {
+                if (btn) {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            }, 3000);
+        } else {
+            alert(`Error: ${data.message}`);
+            if (btn) {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+    } catch (err) {
+        alert('Network error: ' + err.message);
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    }
+}
+
+// Scan parent folder for subdirectories
+async function scanParentFolder() {
+    const parentPath = document.getElementById('parentFolderPath').value.trim();
+    const subdirList = document.getElementById('subdirectoryList');
+
+    if (!parentPath) {
+        subdirList.innerHTML = '<p style="color: var(--danger); margin: 0;">Please enter a parent folder path</p>';
+        return;
+    }
+
+    subdirList.innerHTML = '<p style="color: var(--text-muted); margin: 0;">Scanning...</p>';
+
+    try {
+        const response = await fetch('/api/scan-subdirectories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parentPath })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            subdirList.innerHTML = `<p style="color: var(--danger); margin: 0;">${data.message}</p>`;
+            return;
+        }
+
+        if (data.subdirectories.length === 0) {
+            subdirList.innerHTML = '<p style="color: var(--text-muted); margin: 0;">No subdirectories found</p>';
+            return;
+        }
+
+        // Display subdirectories with checkboxes
+        subdirList.innerHTML = `
+            <div style="margin-bottom: 8px;">
+                <strong>${data.subdirectories.length} subdirectories found</strong>
+            </div>
+            ${data.subdirectories.map((subdir, index) => {
+            const folderName = subdir.split('\\').pop();
+            const isAlreadyAdded = selectedLocalFolders.includes(subdir);
+            return `
+                    <label style="display: flex; align-items: center; padding: 6px; border-bottom: 1px solid var(--border); cursor: pointer;">
+                        <input 
+                            type="checkbox" 
+                            class="subdir-checkbox" 
+                            value="${subdir}"
+                            ${isAlreadyAdded ? 'checked disabled' : ''}
+                            style="margin-right: 8px;"
+                        >
+                        <span style="${isAlreadyAdded ? 'color: var(--text-muted); opacity: 0.6;' : ''}">
+                            📁 ${folderName}
+                            ${isAlreadyAdded ? '<span style="margin-left: 8px; font-size: 0.85em;">(already added)</span>' : ''}
+                        </span>
+                    </label>
+                `;
+        }).join('')}
+            <button 
+                onclick="addSelectedSubdirectories()" 
+                class="btn btn-primary" 
+                style="width: 100%; margin-top: 12px;"
+            >
+                Add Selected Folders
+            </button>
+        `;
+    } catch (error) {
+        subdirList.innerHTML = `<p style="color: var(--danger); margin: 0;">Error: ${error.message}</p>`;
+    }
+}
+
+// Add selected subdirectories to folder list
+async function addSelectedSubdirectories() {
+    const checkboxes = document.querySelectorAll('.subdir-checkbox:checked:not([disabled])');
+    const newFolders = Array.from(checkboxes).map(cb => cb.value);
+
+    if (newFolders.length === 0) {
+        return;
+    }
+
+    // Add to selectedLocalFolders
+    newFolders.forEach(folder => {
+        if (!selectedLocalFolders.includes(folder)) {
+            selectedLocalFolders.push(folder);
+        }
+    });
+
+    // Update display and reload all folders
+    updateLocalFolderDisplay();
+    for (let i = 0; i < selectedLocalFolders.length; i++) {
+        await loadFilesFromFolder(selectedLocalFolders[i], i);
+    }
+
+    saveSettings();
+
+    // Clear the subdirectory list and show success
+    document.getElementById('subdirectoryList').innerHTML = `
+        <p style="color: var(--success); margin: 0;">
+            ✓ Added ${newFolders.length} folder${newFolders.length !== 1 ? 's' : ''}
+        </p>
+    `;
+
+    // Clear parent path input
+    document.getElementById('parentFolderPath').value = '';
+    saveSettings();
+}
+
+// Run pipeline for specific folder from selected start point
+async function runPipelineForFolder(folderPath, dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) {
+        alert('Could not find pipeline dropdown');
+        return;
+    }
+
+    const startPoint = dropdown.value;
+    const activeProfile = document.getElementById('activeProfile').value;
+
+    // Show progress section
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('progressLog').innerHTML = '';
+
+    addLogEntry(`🚀 Starting pipeline for: ${folderPath}`);
+    addLogEntry(`📍 Start point: ${startPoint}`);
+    addLogEntry(`👤 Profile: ${activeProfile}`);
+    updateStatus('testing');
+
+    try {
+        // Call the appropriate pipeline endpoint based on start point
+        let endpoint = '/api/generate-video';
+        let body = {
+            sourceFolder: folderPath,
+            profileId: activeProfile,
+            startPoint: startPoint
+        };
+
+        // Different endpoints for different steps
+        if (startPoint === 'fire-videos' || startPoint === 'generate-videos') {
+            endpoint = '/api/batch/fire';
+            body = { folders: [folderPath], profileIds: [activeProfile] };
+        } else if (startPoint === 'collect-videos' || startPoint === 'download-videos') {
+            endpoint = '/api/batch/collect';
+            body = { folders: [folderPath] };
+        } else if (startPoint === 'generate-narration' || startPoint === 'generate-audio') {
+            endpoint = '/api/generate-audio';
+            body = { sourceFolder: folderPath, profileId: activeProfile, startPoint: startPoint };
+        }
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            addLogEntry(`✅ Pipeline started successfully`);
+        } else {
+            addLogEntry(`❌ Error: ${result.message || 'Unknown error'}`);
+        }
+
+    } catch (error) {
+        addLogEntry(`❌ Error: ${error.message}`);
+        updateStatus('error');
+    }
+}
+
+// Load and display files from a local folder (creates collapsible sections)
+async function loadFilesFromFolder(folderPath, folderIndex) {
     const docList = document.getElementById('documentList');
-    docList.innerHTML = '<p style="color: var(--text-muted);">Loading files...</p>';
+
+    // If first folder, clear the list
+    if (folderIndex === 0) {
+        docList.innerHTML = '';
+    }
 
     try {
         const response = await fetch('/api/list-folder?path=' + encodeURIComponent(folderPath));
@@ -145,106 +390,169 @@ async function loadFilesFromFolder(folderPath) {
         const progressResponse = await fetch('/api/folder-progress?path=' + encodeURIComponent(folderPath));
         const progressData = await progressResponse.json();
 
+        const folderName = folderPath.split('\\').pop() || folderPath;
+        const fileCount = data.files ? data.files.length : 0;
+
+        // Create collapsible folder section
+        const folderSection = document.createElement('details');
+        folderSection.className = 'folder-section';
+        folderSection.open = selectedLocalFolders.length === 1; // Auto-open if only one folder
+        folderSection.style.cssText = 'border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; padding: 0;';
+
+        // Create folder header
+        const folderHeader = document.createElement('summary');
+        folderHeader.style.cssText = 'padding: 12px; cursor: pointer; font-weight: 600; background: var(--bg-alt); border-radius: 8px; user-select: none; display: flex; justify-content: space-between; align-items: center;';
+        folderHeader.innerHTML = `
+            <div>
+                📁 ${folderName}
+                <span style="color: var(--text-muted); font-weight: normal; margin-left: 8px; font-size: 0.9em;">
+                    (${fileCount} file${fileCount !== 1 ? 's' : ''})
+                </span>
+            </div>
+            <button onclick="removeFolderAt(${folderIndex}); event.stopPropagation();" 
+                    style="background: var(--danger); color: white; border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 0.85em;">
+                ✕ Remove
+            </button>
+        `;
+
+        // Create folder content container
+        const folderContent = document.createElement('div');
+        folderContent.style.cssText = 'padding: 12px;';
+
         if (data.files && data.files.length > 0) {
-            docList.innerHTML = '';
+            // Always show pipeline control section
+            const pipelineDiv = document.createElement('div');
+            pipelineDiv.className = 'pipeline-control';
+            pipelineDiv.style.cssText = 'background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;';
 
-            // Show progress status if any steps are complete
-            if (progressData.success && progressData.summary && progressData.summary.completedSteps.length > 0) {
-                const progressDiv = document.createElement('div');
-                progressDiv.className = 'progress-status';
-                progressDiv.style.cssText = 'background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;';
+            const completedSteps = progressData.success && progressData.summary ? progressData.summary.completedSteps : [];
 
+            // Show progress checkmarks if any steps are complete
+            let progressHtml = '';
+            if (completedSteps.length > 0) {
                 const stepLabels = {
-                    'perplexity': '✅ Perplexity Prompt',
-                    'notebooklm_notebook_created': '✅ Notebook Created',
-                    'notebooklm_sources_uploaded': '✅ Sources Uploaded',
-                    'notebooklm_video_started': '✅ Video Started'
+                    'perplexity': '✅ Perplexity',
+                    'perplexity_narration': '✅ Narration',
+                    'audio_slides_parsed': '✅ Slides Parsed',
+                    'audio_generated': '✅ Audio',
+                    'notebooklm_notebook_created': '✅ Notebook',
+                    'notebooklm_sources_uploaded': '✅ Sources',
+                    'notebooklm_video_1_started': '✅ Video 1 Started',
+                    'notebooklm_video_2_started': '✅ Video 2 Started',
+                    'notebooklm_video_1_downloaded': '✅ Video 1 Done',
+                    'notebooklm_video_2_downloaded': '✅ Video 2 Done'
                 };
-
-                const completedHtml = progressData.summary.completedSteps
-                    .map(step => `<span style="color: #4caf50; margin-right: 12px;">${stepLabels[step] || step}</span>`)
+                progressHtml = completedSteps
+                    .map(step => `<span style="color: #4caf50; font-size: 0.85em; margin-right: 8px;">${stepLabels[step] || step}</span>`)
                     .join('');
-
-                const nextStep = progressData.summary.nextStep;
-                const nextStepText = nextStep ?
-                    `<br><strong style="color: var(--text-muted);">Next: ${nextStep.replace(/_/g, ' ')}</strong>` :
-                    '<br><strong style="color: #4caf50;">All steps complete!</strong>';
-
-                // Build dropdown options based on completed steps
-                let dropdownOptions = '<option value="start-fresh">🔄 Start Fresh (from Perplexity)</option>';
-                let lastOption = 'start-fresh'; // Track the last option added
-
-                // If Perplexity is done, show option to skip to NotebookLM
-                if (progressData.summary.completedSteps.includes('perplexity')) {
-                    dropdownOptions += '<option value="skip-to-notebooklm">📓 Skip to NotebookLM</option>';
-                    lastOption = 'skip-to-notebooklm';
-                }
-
-                // If notebook is created, show option to continue from there
-                if (progressData.summary.completedSteps.includes('notebooklm_notebook_created')) {
-                    // Check if sources are also uploaded
-                    if (progressData.summary.completedSteps.includes('notebooklm_sources_uploaded')) {
-                        dropdownOptions += '<option value="continue-from-notebook">📂 Continue (Sources Uploaded)</option>';
-                    } else {
-                        dropdownOptions += '<option value="continue-from-notebook">📂 Open Existing Notebook</option>';
-                    }
-                    lastOption = 'continue-from-notebook';
-                }
-
-                const dropdownHtml = `
-                    <div style="margin-top: 10px;">
-                        <label for="pipelineStartPoint" style="display: block; margin-bottom: 4px; font-size: 0.9em; color: var(--text-muted);">
-                            <strong>Start pipeline from:</strong>
-                        </label>
-                        <select id="pipelineStartPoint" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #4caf50; background: var(--bg); color: var(--text); font-size: 0.9em;">
-                            ${dropdownOptions}
-                        </select>
-                    </div>
-                `;
-
-                progressDiv.innerHTML = `
-                    <div style="font-size: 0.9em;">
-                        <strong style="color: var(--text);">Pipeline Progress:</strong><br>
-                        ${completedHtml}
-                        ${nextStepText}
-                        ${dropdownHtml}
-                    </div>
-                `;
-                docList.appendChild(progressDiv);
-
-                // Set the last option as selected after rendering
-                setTimeout(() => {
-                    const dropdown = document.getElementById('pipelineStartPoint');
-                    if (dropdown) {
-                        dropdown.value = lastOption;
-                    }
-                }, 50);
-
-                // Store progress for later use
-                window.currentFolderProgress = progressData;
+            } else {
+                progressHtml = '<span style="color: var(--text-muted); font-size: 0.85em;">No progress yet - ready to start</span>';
             }
+
+            // Build dropdown options based on completed steps
+            let dropdownOptions = '<option value="start-fresh">🚀 Start Fresh (Full Pipeline)</option>';
+            let lastOption = 'start-fresh';
+
+            if (completedSteps.includes('perplexity')) {
+                dropdownOptions += '<option value="skip-to-notebooklm">📓 Skip to NotebookLM</option>';
+                lastOption = 'skip-to-notebooklm';
+            }
+
+            if (completedSteps.includes('notebooklm_notebook_created')) {
+                dropdownOptions += '<option value="continue-from-notebook">📂 Continue from Notebook</option>';
+                lastOption = 'continue-from-notebook';
+            }
+
+            if (completedSteps.includes('notebooklm_sources_uploaded')) {
+                dropdownOptions += '<option value="fire-videos">🎬 Fire Videos (Start Generation)</option>';
+                lastOption = 'fire-videos';
+            }
+
+            if (completedSteps.includes('notebooklm_video_1_started') ||
+                completedSteps.includes('notebooklm_video_2_started')) {
+                dropdownOptions += '<option value="generate-narration">🎙️ Generate Narration</option>';
+                lastOption = 'generate-narration';
+            }
+
+            if (completedSteps.includes('perplexity_narration')) {
+                dropdownOptions += '<option value="generate-audio">🔊 Generate Audio</option>';
+                lastOption = 'generate-audio';
+            }
+
+            if (completedSteps.includes('audio_generated') ||
+                completedSteps.includes('notebooklm_video_1_started')) {
+                dropdownOptions += '<option value="collect-videos">📥 Collect/Download Videos</option>';
+                lastOption = 'collect-videos';
+            }
+
+            if (completedSteps.includes('notebooklm_video_1_downloaded') &&
+                completedSteps.includes('notebooklm_video_2_downloaded') &&
+                completedSteps.includes('audio_generated')) {
+                dropdownOptions += '<option value="complete">✅ Complete - All Done</option>';
+                lastOption = 'complete';
+            }
+
+            const dropdownId = `pipelineStartPoint_${folderIndex}`;
+            pipelineDiv.innerHTML = `
+                <div style="font-size: 0.9em; margin-bottom: 8px;">
+                    <strong style="color: var(--text);">Pipeline Progress:</strong><br>
+                    ${progressHtml}
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <select id="${dropdownId}" style="flex: 1; min-width: 200px; padding: 8px; border-radius: 4px; border: 1px solid var(--primary); background: var(--bg); color: var(--text); font-size: 0.9em;">
+                        ${dropdownOptions}
+                    </select>
+                    <button onclick="runPipelineForFolder('${folderPath.replace(/\\/g, '\\\\')}', '${dropdownId}')" class="btn btn-primary btn-small" style="white-space: nowrap;">
+                        ▶ Run
+                    </button>
+                </div>
+            `;
+            folderContent.appendChild(pipelineDiv);
+
+            // Set dropdown to last option after render
+            setTimeout(() => {
+                const dropdown = document.getElementById(dropdownId);
+                if (dropdown) dropdown.value = lastOption;
+            }, 50);
 
             // Show warning if perplexity output already exists
             if (data.warning) {
                 const warningDiv = document.createElement('div');
                 warningDiv.className = 'warning-banner';
                 warningDiv.style.cssText = 'background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; color: #ffc107; font-size: 0.9em;';
-                warningDiv.innerHTML = `⚠ ${data.warning}. Running again will overwrite existing output.`;
-                docList.appendChild(warningDiv);
+                warningDiv.innerHTML = `⚠ ${data.warning}`;
+                folderContent.appendChild(warningDiv);
             }
 
-            data.files.forEach(file => {
+            // File list (show first 5, sleeker display)
+            const filesToShow = data.files.slice(0, 5);
+            filesToShow.forEach(file => {
                 const item = document.createElement('div');
-                item.className = 'document-item';
-                item.innerHTML = `<span>📄 ${file}</span>`;
-                docList.appendChild(item);
+                item.style.cssText = 'padding: 2px 0; color: var(--text-muted); font-size: 0.85em; font-family: monospace;';
+                item.innerHTML = `<span style="opacity: 0.5;">•</span> ${file}`;
+                folderContent.appendChild(item);
             });
+
+            if (data.files.length > 5) {
+                const moreItem = document.createElement('div');
+                moreItem.style.cssText = 'padding: 4px 0; color: var(--text-muted); font-size: 0.9em; font-style: italic;';
+                moreItem.textContent = `... and ${data.files.length - 5} more files`;
+                folderContent.appendChild(moreItem);
+            }
         } else {
-            docList.innerHTML = '<p style="color: var(--text-muted);">No supported files found in this folder.</p>';
+            folderContent.innerHTML = '<p style="color: var(--text-muted); margin: 0;">No supported files found</p>';
         }
+
+        folderSection.appendChild(folderHeader);
+        folderSection.appendChild(folderContent);
+        docList.appendChild(folderSection);
+
     } catch (error) {
         console.error('Error loading files:', error);
-        docList.innerHTML = '<p style="color: var(--danger);">Error loading files: ' + error.message + '</p>';
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'padding: 12px; color: var(--danger); border: 1px solid var(--danger); border-radius: 8px; margin-bottom: 12px;';
+        errorDiv.textContent = `Error loading ${folderPath}: ${error.message}`;
+        docList.appendChild(errorDiv);
     }
 }
 
@@ -1204,71 +1512,13 @@ async function resetAndRunFull() {
     }
 }
 
-// Update audio start options based on folder progress
+// Update audio start options based on folder progress (DEPRECATED)
 async function updateAudioStartOptions(folderPath) {
-    const container = document.getElementById('audioStartContainer');
-    const dropdown = document.getElementById('audioStartPoint');
-
-    if (!dropdown || !container) {
-        return;
-    }
-
-    if (!folderPath) {
-        container.style.display = 'none';
-        return;
-    }
-
-    try {
-        // Fetch progress for the folder
-        const response = await fetch(`/api/folder-progress?path=${encodeURIComponent(folderPath)}`);
-        const data = await response.json();
-
-        // Clear current options
-        dropdown.innerHTML = '';
-
-        // Check progress
-        const progress = data.progress || {};
-        const audioNarrationDone = progress.audio_narration_generated?.completed || false;
-        const audioFilesDone = progress.audio_files_generated?.completed || false;
-
-        // Build valid options based on progress
-
-        // Option 1: Always allow starting fresh (Generate Narration + Audio)
-        const startFreshOption = document.createElement('option');
-        startFreshOption.value = 'start-fresh';
-        startFreshOption.textContent = audioNarrationDone ? 'Regenerate Narration + Audio' : 'Generate Narration + Audio';
-        dropdown.appendChild(startFreshOption);
-
-        // Option 2: Skip to Audio Generation (ONLY if narration exists)
-        if (audioNarrationDone) {
-            const skipOption = document.createElement('option');
-            skipOption.value = 'skip-to-audio-generation';
-            skipOption.textContent = audioFilesDone ? 'Regenerate Audio Files' : 'Skip to Audio Generation';
-            // Default to this if narration is done but files aren't
-            if (!audioFilesDone) {
-                skipOption.selected = true;
-                skipOption.textContent += ' ✓';
-            }
-            dropdown.appendChild(skipOption);
-        }
-
-        // Option 3: Audio Complete State (if everything is done)
-        if (audioFilesDone) {
-            const completeOption = document.createElement('option');
-            completeOption.value = 'audio-complete';
-            completeOption.textContent = '✅ Audio Complete';
-            completeOption.selected = true;
-            dropdown.appendChild(completeOption);
-        }
-
-        // Show the container now that we have options
-        container.style.display = 'flex';
-
-    } catch (error) {
-        console.error('Failed to update audio start options:', error);
-        container.style.display = 'none'; // Hide on error
-    }
+    // Logic moved to unified pipeline UI
+    return;
 }
+
+
 
 // Save common settings (non-profile specific)
 async function saveCommonSettings() {
@@ -1354,16 +1604,12 @@ async function checkAudioProgress() {
 }
 
 // Display audio progress with expandable folders
+// NOTE: This is now handled by the unified collapsible folder UI in loadFilesFromFolder
+// This function is kept for backward compatibility but doesn't create duplicate displays
 function displayAudioProgress(folders) {
-    const container = document.getElementById('documentList');
-
-    if (folders.length === 0) {
-        return;
-    }
-
-    // Clear existing audio progress displays
-    const existingAudioProgress = container.querySelectorAll('.audio-pipeline-progress');
-    existingAudioProgress.forEach(el => el.remove());
+    // Skip - the unified folder UI already shows pipeline progress
+    // The collapsible folder sections in loadFilesFromFolder handle both video and audio steps
+    return;
 
     folders.forEach((folder, index) => {
         // Create audio progress container for this folder
@@ -1432,13 +1678,14 @@ function getAudioStartOptions(stage) {
     const options = [];
 
     if (stage === 'complete' || stage === 'audio-generated') {
+        options.push('<option value="do-not-process" selected>Do Not Process (Already Complete)</option>');
         options.push('<option value="regenerate-all">Regenerate All</option>');
         options.push('<option value="regenerate-audio">Regenerate Audio Files Only</option>');
     } else if (stage === 'narration-generated') {
-        options.push('<option value="skip-to-audio-generation">Skip to Audio Generation</option>');
+        options.push('<option value="skip-to-audio-generation" selected>Skip to Audio Generation</option>');
         options.push('<option value="regenerate-all">Regenerate All</option>');
     } else {
-        options.push('<option value="generate-narration-audio">Generate Narration + Audio</option>');
+        options.push('<option value="generate-narration-audio" selected>Generate Narration + Audio</option>');
     }
 
     return options.join('');
@@ -1541,3 +1788,323 @@ window.updateAudioStartOptions = function (folderPath) {
     checkAudioProgress();
 };
 
+// ========== BATCH PROCESSING FUNCTIONS ==========
+
+// Load available profiles for batch processing
+async function loadBatchProfiles() {
+    try {
+        const response = await fetch('/api/profiles');
+        const data = await response.json();
+
+        const container = document.getElementById('batchProfileSelector');
+        if (!container) return;
+
+        if (data.success && data.profiles.length > 0) {
+            container.innerHTML = data.profiles.map(profile => `
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="batchProfile" value="${profile}" checked>
+                    <span>${profile}</span>
+                </label>
+            `).join('');
+        } else {
+            container.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">No profiles configured</p>';
+        }
+
+        updateBatchButtons();
+    } catch (error) {
+        console.error('Failed to load profiles:', error);
+    }
+}
+
+// Update batch folder list display
+function updateBatchFolderList() {
+    const container = document.getElementById('batchFolderList');
+    if (!container) return;
+
+    if (selectedLocalFolders.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Add folders using "📂 Add Folder" above</p>';
+    } else {
+        container.innerHTML = selectedLocalFolders.map((folder, index) => {
+            const folderName = folder.split('\\').pop() || folder;
+            return `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span>📁 ${folderName}</span>
+                    <button onclick="removeBatchFolder(${index})" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">✕</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    updateBatchButtons();
+}
+
+// Remove a folder from batch list
+function removeBatchFolder(index) {
+    selectedLocalFolders.splice(index, 1);
+    updateLocalFolderDisplay();
+    updateBatchFolderList();
+}
+
+// Get selected profiles for batch
+function getSelectedBatchProfiles() {
+    const checkboxes = document.querySelectorAll('input[name="batchProfile"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+// Update batch button states
+function updateBatchButtons() {
+    const selectedProfiles = getSelectedBatchProfiles();
+    const hasFolders = selectedLocalFolders.length > 0;
+    const hasProfiles = selectedProfiles.length > 0;
+
+    const startBtn = document.getElementById('startBatchBtn');
+    const fireBtn = document.getElementById('fireOnlyBtn');
+
+    if (startBtn) startBtn.disabled = !hasFolders || !hasProfiles;
+    if (fireBtn) fireBtn.disabled = !hasFolders || !hasProfiles;
+}
+
+// Start full batch processing
+async function startBatchProcessing() {
+    const folders = selectedLocalFolders;
+    const selectedProfiles = getSelectedBatchProfiles();
+
+    if (folders.length === 0) {
+        alert('Please add at least one folder');
+        return;
+    }
+
+    if (selectedProfiles.length === 0) {
+        alert('Please select at least one profile');
+        return;
+    }
+
+    try {
+        document.getElementById('startBatchBtn').disabled = true;
+        document.getElementById('fireOnlyBtn').disabled = true;
+        document.getElementById('abortBatchBtn').style.display = 'inline-block';
+        document.getElementById('batchStatusContainer').style.display = 'block';
+        document.getElementById('batchLogContainer').style.display = 'block';
+
+        const response = await fetch('/api/batch/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folders, selectedProfiles })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            addBatchLog(`Started batch processing: ${data.folderCount} folders with profiles: ${data.profiles.join(', ')}`);
+        } else {
+            addBatchLog(`Error: ${data.error || data.message}`, 'error');
+            resetBatchButtons();
+        }
+    } catch (error) {
+        addBatchLog(`Error: ${error.message}`, 'error');
+        resetBatchButtons();
+    }
+}
+
+// Start fire phase only
+async function startFirePhase() {
+    const folders = selectedLocalFolders;
+    const selectedProfiles = getSelectedBatchProfiles();
+
+    if (folders.length === 0 || selectedProfiles.length === 0) {
+        alert('Please add folders and select profiles');
+        return;
+    }
+
+    try {
+        document.getElementById('fireOnlyBtn').disabled = true;
+        document.getElementById('abortBatchBtn').style.display = 'inline-block';
+        document.getElementById('batchStatusContainer').style.display = 'block';
+        document.getElementById('batchLogContainer').style.display = 'block';
+
+        const response = await fetch('/api/batch/fire', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folders, selectedProfiles })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            addBatchLog(`Fire phase started: ${data.folderCount} folders`);
+        } else {
+            addBatchLog(`Error: ${data.error || data.message}`, 'error');
+            resetBatchButtons();
+        }
+    } catch (error) {
+        addBatchLog(`Error: ${error.message}`, 'error');
+        resetBatchButtons();
+    }
+}
+
+// Start collect phase only
+async function startCollectPhase() {
+    try {
+        document.getElementById('collectOnlyBtn').disabled = true;
+        document.getElementById('abortBatchBtn').style.display = 'inline-block';
+        document.getElementById('batchStatusContainer').style.display = 'block';
+        document.getElementById('batchLogContainer').style.display = 'block';
+
+        const response = await fetch('/api/batch/collect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folders: selectedLocalFolders })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            addBatchLog('Collect phase started');
+        } else {
+            addBatchLog(`Error: ${data.error || data.message}`, 'error');
+        }
+    } catch (error) {
+        addBatchLog(`Error: ${error.message}`, 'error');
+    } finally {
+        document.getElementById('collectOnlyBtn').disabled = false;
+    }
+}
+
+// Abort batch processing
+async function abortBatch() {
+    try {
+        const response = await fetch('/api/batch/abort', {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+        addBatchLog(`Abort: ${data.message}`);
+    } catch (error) {
+        addBatchLog(`Error aborting: ${error.message}`, 'error');
+    }
+}
+
+// Reset batch button states
+function resetBatchButtons() {
+    document.getElementById('startBatchBtn').disabled = false;
+    document.getElementById('fireOnlyBtn').disabled = false;
+    document.getElementById('collectOnlyBtn').disabled = false;
+    document.getElementById('abortBatchBtn').style.display = 'none';
+    updateBatchButtons();
+}
+
+// Add entry to batch log
+function addBatchLog(message, type = 'info') {
+    const logEl = document.getElementById('batchLog');
+    if (!logEl) return;
+
+    const time = new Date().toLocaleTimeString();
+    const colorClass = type === 'error' ? 'color: var(--danger);' : '';
+
+    logEl.innerHTML += `<div style="${colorClass}">[${time}] ${message}</div>`;
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+// Update batch status table
+function updateBatchStatusTable(statuses) {
+    const tbody = document.getElementById('batchStatusBody');
+    if (!tbody) return;
+
+    const statusIcons = {
+        'pending': '⏳',
+        'video_generating': '🎬',
+        'video_ready': '✅',
+        'downloading': '📥',
+        'audio_generating': '🎙️',
+        'complete': '✓',
+        'error': '❌'
+    };
+
+    tbody.innerHTML = statuses.map(folder => {
+        const elapsed = folder.elapsedMs ? formatElapsedTime(folder.elapsedMs) : '-';
+        const icon = statusIcons[folder.status] || '❓';
+
+        return `
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.5rem;">${folder.folderName}</td>
+                <td style="padding: 0.5rem;">${folder.profileId || '-'}</td>
+                <td style="padding: 0.5rem; text-align: center;">${icon} ${folder.status}</td>
+                <td style="padding: 0.5rem; text-align: right;">${elapsed}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Format elapsed time
+function formatElapsedTime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) {
+        return `${hours}h ${minutes % 60}m`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${seconds % 60}s`;
+    } else {
+        return `${seconds}s`;
+    }
+}
+
+// Socket.IO event listeners for batch processing
+socket.on('batch-status', (data) => {
+    if (data.statuses) {
+        updateBatchStatusTable(data.statuses);
+    }
+});
+
+socket.on('batch-log', (data) => {
+    addBatchLog(data.message);
+});
+
+socket.on('batch-complete', (data) => {
+    addBatchLog(`Batch complete: ${data.completed}/${data.totalFolders} succeeded, ${data.failed} failed`);
+    resetBatchButtons();
+});
+
+socket.on('batch-fire-complete', (data) => {
+    addBatchLog(`Fire phase complete: ${data.message}`);
+    resetBatchButtons();
+});
+
+socket.on('batch-collect-complete', (data) => {
+    addBatchLog(`Collect phase complete: ${data.message}`);
+    resetBatchButtons();
+});
+
+socket.on('batch-error', (data) => {
+    addBatchLog(`Batch error: ${data.error}`, 'error');
+    resetBatchButtons();
+});
+
+// Listen for individual pipeline step completion (single folder mode)
+socket.on('pipeline-step-complete', async (data) => {
+    if (data.folderPath) {
+        console.log(`Step ${data.step} completed for ${data.folderPath}`);
+        // Find index if needed, but loadFilesFromFolder handles regex ID matching usually
+        // We iterate to find the index of this folder in selectedLocalFolders
+        const index = selectedLocalFolders.indexOf(data.folderPath);
+        if (index !== -1) {
+            await loadFilesFromFolder(data.folderPath, index);
+        }
+    }
+});
+
+// Initialize batch processing on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadBatchProfiles();
+
+    // Hook into folder selection to update batch list
+    const originalUpdateLocalFolderDisplay = window.updateLocalFolderDisplay;
+    window.updateLocalFolderDisplay = function () {
+        originalUpdateLocalFolderDisplay.call(this);
+        updateBatchFolderList();
+    };
+
+    // Add change listener to profile checkboxes
+    document.getElementById('batchProfileSelector')?.addEventListener('change', updateBatchButtons);
+});

@@ -14,6 +14,7 @@ export interface PipelineInput {
     customVideoPrompt?: string;
     stylePrompt?: string;
     chatSettings?: NotebookLMConfig['chatSettings'];
+    startFromStep?: string;
     outputDir: string;
 }
 

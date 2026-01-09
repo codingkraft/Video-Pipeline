@@ -12,6 +12,7 @@ export interface NotebookLMTestConfig {
     headless?: boolean;
     existingNotebookUrl?: string; // If resuming from an existing notebook
     steeringPrompt?: string;      // Prompt from Perplexity
+    videoPrompt?: string;         // Direct video prompt override
     visualStyle?: string;         // Visual style description
     profileId?: string;           // Browser profile to use
 }
@@ -66,15 +67,27 @@ export class NotebookLMTester {
                     config.steeringPrompt = progress.steps.perplexity.steeringPrompt;
                     steps.push(`✓ Loaded steering prompt from progress`);
                 } else {
-                    // Fallback: Read from perplexity_response.txt file directly
-                    const perplexityResponsePath = path.join(config.sourceFolder, 'output', 'perplexity_response.txt');
-                    if (fs.existsSync(perplexityResponsePath)) {
-                        try {
-                            config.steeringPrompt = fs.readFileSync(perplexityResponsePath, 'utf-8');
-                            steps.push(`✓ Loaded steering prompt from perplexity_response.txt`);
-                        } catch (e) {
-                            steps.push(`⚠ Could not read perplexity_response.txt: ${(e as Error).message}`);
+                    // Get prompt from file or config
+                    let prompt = config.videoPrompt;
+                    if (!prompt) {
+                        const promptPath = path.join(config.sourceFolder, 'perplexity_video_response.txt');
+                        const legacyPromptPath = path.join(config.sourceFolder, 'perplexity_response.txt');
+                        const legacyPromptPath2 = path.join(config.sourceFolder, 'output', 'perplexity_response.txt'); // Check output if not in root
+
+                        if (fs.existsSync(promptPath)) {
+                            prompt = fs.readFileSync(promptPath, 'utf-8');
+                            steps.push('✓ Loaded prompt from perplexity_video_response.txt');
+                        } else if (fs.existsSync(legacyPromptPath)) {
+                            prompt = fs.readFileSync(legacyPromptPath, 'utf-8');
+                            steps.push('✓ Loaded prompt from perplexity_response.txt');
+                        } else if (fs.existsSync(legacyPromptPath2)) {
+                            prompt = fs.readFileSync(legacyPromptPath2, 'utf-8');
+                            steps.push('✓ Loaded prompt from output/perplexity_response.txt');
                         }
+                    }
+
+                    if (prompt) {
+                        config.steeringPrompt = prompt;
                     } else {
                         steps.push(`⚠ No steering prompt found (run Perplexity first)`);
                     }
@@ -702,6 +715,193 @@ export class NotebookLMTester {
 
         } catch (error) {
             steps.push(`⚠ Navigation error: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Check if video generation is complete for a notebook.
+     * @param notebookUrl URL of the notebook to check
+     * @returns 'generating' | 'ready' | 'error'
+     */
+    public async checkVideoStatus(notebookUrl: string): Promise<'generating' | 'ready' | 'error'> {
+        try {
+            const page = await this.browser.getPage('notebooklm-test', notebookUrl);
+            await this.browser.randomDelay(2000, 3000);
+
+            // Look for video status indicators based on actual NotebookLM HTML
+            const status = await page.evaluate(() => {
+                // Check for GENERATING state:
+                // - Button is disabled with class 'mat-mdc-button-disabled'
+                // - Has rotating sync icon with class 'rotate'
+                // - Contains text "Generating Video Overview..."
+                const generatingButton = document.querySelector(
+                    'button.mat-mdc-button-disabled mat-icon.sync.rotate, ' +
+                    'button[disabled] mat-icon.rotate'
+                );
+                if (generatingButton) return 'generating';
+
+                // Also check for "Generating" text
+                const generatingText = document.querySelector('.artifact-title');
+                if (generatingText?.textContent?.includes('Generating')) {
+                    return 'generating';
+                }
+
+                // Check for READY state:
+                // - Button is NOT disabled
+                // - Has subscriptions icon (not sync)
+                // - Has Play button (play_arrow icon)
+                const subscriptionsIcon = document.querySelector(
+                    'artifact-library-item mat-icon[data-mat-icon-type="font"]'
+                );
+                const playButton = document.querySelector(
+                    'button[aria-label="Play"], button mat-icon'
+                );
+
+                // If subscriptions icon exists and Play button exists, video is ready
+                if (subscriptionsIcon &&
+                    subscriptionsIcon.textContent?.trim() === 'subscriptions' &&
+                    playButton) {
+                    return 'ready';
+                }
+
+                // Alternative ready check: look for non-disabled video button without rotating icon
+                const videoButton = document.querySelector(
+                    'artifact-library-item button:not([disabled])'
+                );
+                const noRotatingIcon = !document.querySelector('mat-icon.rotate');
+                if (videoButton && noRotatingIcon) {
+                    return 'ready';
+                }
+
+                // Check for error indicators
+                const errorEl = document.querySelector(
+                    '[class*="error"], [role="alert"], .generation-failed'
+                );
+                if (errorEl) return 'error';
+
+                // Default to generating if no clear indicator
+                return 'generating';
+            });
+
+            return status as 'generating' | 'ready' | 'error';
+
+        } catch (error) {
+            console.error('Error checking video status:', error);
+            return 'error';
+        }
+    }
+
+    /**
+     * Download the completed video from a notebook.
+     * @param notebookUrl URL of the notebook with the completed video
+     * @param outputPath Path where the video should be saved
+     * @returns true if download was successful
+     */
+    public async downloadVideo(notebookUrl: string, outputPath: string): Promise<boolean> {
+        try {
+            const page = await this.browser.getPage('notebooklm-test', notebookUrl);
+            await this.browser.randomDelay(2000, 3000);
+
+            // Ensure output directory exists
+            const outputDir = path.dirname(outputPath);
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+
+            // Set up download behavior using CDP
+            const client = await page.createCDPSession();
+            await client.send('Page.setDownloadBehavior', {
+                behavior: 'allow',
+                downloadPath: outputDir
+            });
+
+            // Try to find and click the download button
+            const downloadClicked = await page.evaluate(() => {
+                // Try various download button selectors
+                const selectors = [
+                    'button[aria-label*="Download"]',
+                    'button[aria-label*="download"]',
+                    'a[download]',
+                    '[class*="download-button"]',
+                    'button:has(mat-icon[fonticon="download"])',
+                    // Menu button that might open download options
+                    'button[aria-label*="More options"]'
+                ];
+
+                for (const selector of selectors) {
+                    const btn = document.querySelector(selector) as HTMLElement;
+                    if (btn) {
+                        btn.click();
+                        return true;
+                    }
+                }
+
+                // Try finding by text content
+                const buttons = Array.from(document.querySelectorAll('button, a'));
+                const downloadBtn = buttons.find(b =>
+                    b.textContent?.toLowerCase().includes('download')
+                ) as HTMLElement;
+
+                if (downloadBtn) {
+                    downloadBtn.click();
+                    return true;
+                }
+
+                return false;
+            });
+
+            if (!downloadClicked) {
+                console.log('Download button not found, trying alternative methods...');
+
+                // Try to extract video URL from page
+                const videoUrl = await page.evaluate(() => {
+                    const video = document.querySelector('video');
+                    if (video?.src) return video.src;
+
+                    const source = document.querySelector('video source');
+                    if (source instanceof HTMLSourceElement) return source.src;
+
+                    return null;
+                });
+
+                if (videoUrl) {
+                    console.log(`Found video URL: ${videoUrl}`);
+                    // Navigate directly to trigger download
+                    await page.goto(videoUrl);
+                    await this.browser.randomDelay(5000, 10000);
+                    return true;
+                }
+
+                return false;
+            }
+
+            console.log('Download initiated, waiting for file...');
+
+            // Wait for download to complete
+            await this.browser.randomDelay(10000, 20000);
+
+            // Check if file was downloaded (look for any video file in output dir)
+            const files = fs.readdirSync(outputDir);
+            const videoFile = files.find(f =>
+                f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mov')
+            );
+
+            if (videoFile) {
+                // Rename to expected output path
+                const downloadedPath = path.join(outputDir, videoFile);
+                if (downloadedPath !== outputPath && fs.existsSync(downloadedPath)) {
+                    fs.renameSync(downloadedPath, outputPath);
+                }
+                console.log(`Video saved to: ${outputPath}`);
+                return true;
+            }
+
+            console.log('Video file not found after download attempt');
+            return false;
+
+        } catch (error) {
+            console.error('Error downloading video:', error);
+            return false;
         }
     }
 

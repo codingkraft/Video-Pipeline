@@ -58,6 +58,29 @@
                 <small class="hint" style="display: block; margin-top: 0.5rem;">Output will be saved to: <strong
                         id="outputPathPreview">[Selected Folder]/output/</strong></small>
 
+                <!-- Parent Folder Scanner -->
+                <details style="margin-top: 1rem; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; user-select: none;">
+                        📂 Scan Parent Folder for Subdirectories
+                    </summary>
+                    <div style="margin-top: 12px;">
+                        <p class="hint" style="margin-bottom: 8px;">
+                            Enter a parent folder path to scan all its subdirectories. You can then select which ones to
+                            add.
+                        </p>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 12px;">
+                            <input type="text" id="parentFolderPath" placeholder="F:\Workspaces\MyProject"
+                                style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); color: var(--text);">
+                            <button onclick="scanParentFolder()" class="btn btn-secondary">
+                                🔍 Scan
+                            </button>
+                        </div>
+                        <div id="subdirectoryList" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Populated after scan -->
+                        </div>
+                    </div>
+                </details>
+
                 <div id="documentList" class="document-list" style="margin-top: 1rem;"></div>
             </section>
 
@@ -290,6 +313,81 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <div id="progressLog" class="progress-log"></div>
+            </section>
+
+            <!-- Batch Processing Section -->
+            <section class="card" id="batchSection">
+                <h2>📦 Batch Video Processing</h2>
+                <p style="margin-bottom: 1rem; color: var(--text-muted);">
+                    Process multiple folders with automatic video generation and profile rotation.
+                </p>
+
+                <!-- Profile Selector -->
+                <div class="form-group">
+                    <label style="font-weight: bold;">Select Profiles for Rotation:</label>
+                    <div id="batchProfileSelector"
+                        style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.5rem;">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <small class="hint">Selected profiles will be rotated across folders to reduce rate limiting</small>
+                </div>
+
+                <!-- Folder List for Batch -->
+                <div class="form-group">
+                    <label style="font-weight: bold;">Folders to Process:</label>
+                    <div id="batchFolderList"
+                        style="margin-top: 0.5rem; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem;">
+                        <p style="color: var(--text-muted); font-style: italic;">Add folders using "📂 Add Folder" above
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Batch Control Buttons -->
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;">
+                    <button onclick="startBatchProcessing()" class="btn btn-success" id="startBatchBtn" disabled>
+                        ▶️ Start Full Batch
+                    </button>
+                    <button onclick="startFirePhase()" class="btn btn-primary" id="fireOnlyBtn" disabled>
+                        🔥 Fire Videos Only
+                    </button>
+                    <button onclick="startCollectPhase()" class="btn btn-primary" id="collectOnlyBtn">
+                        📥 Collect Videos
+                    </button>
+                    <button onclick="abortBatch()" class="btn btn-danger" id="abortBatchBtn" style="display: none;">
+                        ⏹️ Abort
+                    </button>
+                </div>
+
+                <!-- Batch Status Table -->
+                <div id="batchStatusContainer" style="display: none; margin-top: 1rem;">
+                    <h3>Batch Status</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: var(--bg-alt);">
+                                <th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border);">
+                                    Folder</th>
+                                <th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border);">
+                                    Profile</th>
+                                <th
+                                    style="padding: 0.5rem; text-align: center; border-bottom: 1px solid var(--border);">
+                                    Status</th>
+                                <th style="padding: 0.5rem; text-align: right; border-bottom: 1px solid var(--border);">
+                                    Elapsed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchStatusBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Batch Log -->
+                <div id="batchLogContainer" style="display: none; margin-top: 1rem;">
+                    <h3>Batch Log</h3>
+                    <div id="batchLog"
+                        style="max-height: 200px; overflow-y: auto; background: var(--bg); padding: 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.85rem;">
+                    </div>
+                </div>
             </section>
 
             <!-- Results Section -->

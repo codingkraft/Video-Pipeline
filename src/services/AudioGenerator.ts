@@ -128,8 +128,18 @@ export class AudioGenerator {
             });
 
             // Determine narration file path
-            const narrationPath = config.narrationFilePath ||
-                path.join(config.sourceFolder, 'output', 'audio_narration.txt');
+            let narrationPath = config.narrationFilePath;
+
+            if (!narrationPath) {
+                const defaultPath = path.join(config.sourceFolder, 'output', 'perplexity_audio_response.txt');
+                const legacyPath1 = path.join(config.sourceFolder, 'output', 'audio_narration.txt');
+                const legacyPath2 = path.join(config.sourceFolder, 'output', 'audio_narration.md');
+
+                if (fs.existsSync(defaultPath)) narrationPath = defaultPath;
+                else if (fs.existsSync(legacyPath1)) narrationPath = legacyPath1;
+                else if (fs.existsSync(legacyPath2)) narrationPath = legacyPath2;
+                else narrationPath = defaultPath; // Default for error message
+            }
 
             if (!fs.existsSync(narrationPath)) {
                 return {

@@ -604,7 +604,7 @@ app.post('/api/check-audio-progress', (req: Request, res: Response) => {
                 progress,
                 summary,
                 files,
-                audioStage: getAudioStage(progress)
+                audioStage: getAudioStage(progress, folderPath)
             };
         });
 
@@ -621,11 +621,30 @@ app.post('/api/check-audio-progress', (req: Request, res: Response) => {
 });
 
 // Helper function to determine audio stage
-function getAudioStage(progress: any): string {
-    if (!progress) return 'not-started';
-    if (progress.audioComplete) return 'complete';
-    if (progress.audioGenerated) return 'audio-generated';
-    if (progress.narrationGenerated) return 'narration-generated';
+function getAudioStage(progress: any, folderPath: string): string {
+    // 1. Check ProgressTracker state first
+    if (progress && progress.steps) {
+        if (progress.steps['audio_generated']?.completed) return 'complete'; // Audio generation complete
+        if (progress.steps['perplexity_narration']?.completed) return 'narration-generated';
+    }
+
+    // 2. Fallback: Check for physical files if progress is missing or incomplete
+    try {
+        const outputDir = path.join(folderPath, 'output');
+
+        // Check for audio files (simplistic check: if audio_narration.txt exists AND some mp3s exist)
+        // Actually, we can just check if we have the narration file
+        const narrationPath = path.join(outputDir, 'audio_narration.txt');
+        if (fs.existsSync(narrationPath)) {
+            // If we have narration, check if we also have the final audio marker or files
+            // For now, let's just return narration-generated if the file exists
+            // This ensures "Skip to Audio Generation" appears even if progress.json is stale
+            return 'narration-generated';
+        }
+    } catch (e) {
+        // Ignore errors
+    }
+
     return 'not-started';
 }
 
@@ -723,6 +742,15 @@ app.post('/api/generate-audio', async (req: Request, res: Response) => {
         }
 
         const steps: string[] = [];
+
+        // Check if user wants to skip processing (audio already complete)
+        if (audioStartPoint === 'do-not-process') {
+            return res.json({
+                success: true,
+                message: 'Audio generation skipped - already complete',
+                details: { steps: ['✓ Audio already complete, no processing needed'] }
+            });
+        }
 
         // Step 1: Generate narration via Perplexity (if not skipping)
         if (audioStartPoint !== 'skip-to-audio-generation') {
@@ -822,6 +850,490 @@ app.post('/api/save-settings', (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error saving settings:', error);
         res.status(500).json({ success: false, message: (error as Error).message });
+    }
+});
+
+// API: Scan subdirectories of a parent folder
+app.post('/api/scan-subdirectories', async (req: Request, res: Response) => {
+    try {
+        const { parentPath } = req.body;
+
+        if (!parentPath) {
+            return res.status(400).json({
+                success: false,
+                message: 'parentPath is required'
+            });
+        }
+
+        if (!fs.existsSync(parentPath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Parent folder not found'
+            });
+        }
+
+        const subdirs: string[] = [];
+
+        // Read all subdirectories (one level deep)
+        const entries = fs.readdirSync(parentPath, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const subPath = path.join(parentPath, entry.name);
+                subdirs.push(subPath);
+            }
+        }
+
+        res.json({
+            success: true,
+            parentPath,
+            subdirectories: subdirs
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to scan subdirectories: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Run pipeline step for a specific folder
+app.post('/api/run-pipeline-step', async (req: Request, res: Response) => {
+    try {
+        const { folderPath, profileId, startPoint } = req.body;
+
+        if (!folderPath) {
+            return res.status(400).json({ success: false, message: 'Folder path is required' });
+        }
+
+        console.log(`Pipeline request: ${folderPath} -> ${startPoint} (Profile: ${profileId})`);
+
+        // Handle different start points
+        if (startPoint === 'start-fresh') {
+            if (isProcessing) return res.status(400).json({ success: false, message: 'Already processing a request' });
+
+            const { PerplexityTester } = await import('./services/PerplexityTester');
+            const tester = new PerplexityTester();
+            isProcessing = true;
+            const jobId = `job_${Date.now()}`;
+            res.json({ success: true, jobId, message: 'Pipeline started (Perplexity Step)' });
+
+            (async () => {
+                try {
+                    const files = fs.readdirSync(folderPath).filter(f => /\.(pdf|txt|md|docx?|jpe?g|png)$/i.test(f)).map(f => path.join(folderPath, f));
+                    const settings = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'config', 'settings.json'), 'utf-8'));
+                    io.emit('progress', { jobId, step: 'started', message: `Sending to Perplexity...` });
+                    const result = await tester.testWorkflow({
+                        chatUrl: settings.profiles?.[profileId]?.perplexityChatUrl || settings.perplexityChatUrl,
+                        files, prompt: settings.promptText, sourceFolder: folderPath,
+                        headless: settings.headlessMode, shouldDeleteConversation: settings.deleteConversation,
+                        model: settings.perplexityModel, profileId
+                    });
+                    if (result.success) {
+                        io.emit('progress', { jobId, step: 'completed', outputPath: result.details?.responseFilePath });
+                        const { ProgressTracker } = require('./services/ProgressTracker');
+                        ProgressTracker.markStepComplete(folderPath, 'perplexity');
+                    } else io.emit('progress', { jobId, step: 'failed', error: result.message });
+                } catch (err) { io.emit('progress', { jobId, step: 'failed', error: (err as Error).message }); }
+                finally { isProcessing = false; }
+            })();
+            return;
+        } else if (startPoint === 'skip-to-notebooklm' || startPoint === 'continue-from-notebook') {
+            // Checks
+            if (isProcessing) {
+                return res.status(400).json({ success: false, message: 'Already processing a video request' });
+            }
+
+            const { VideoPipeline } = await import('./workflow/VideoPipeline');
+
+            // Initialize pipeline if needed
+            await initPipeline();
+
+            isProcessing = true;
+            const jobId = `job_${Date.now()}`;
+
+            // Send immediate response
+            res.json({ success: true, jobId, message: 'Pipeline started' });
+
+            // Run in background
+            (async () => {
+                try {
+                    // Update profile
+                    if (profileId) {
+                        await pipeline!.initialize({ profileId });
+                    }
+
+                    // Get files
+                    const files = fs.readdirSync(folderPath)
+                        .filter(f => /\.(pdf|txt|md|docx?)$/i.test(f))
+                        .map(f => path.join(folderPath, f));
+
+                    // Load settings
+                    const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+                    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+                    const profileSettings = settings.profiles?.[profileId] || {};
+
+                    const input: PipelineInput = {
+                        id: jobId,
+                        documentPaths: files,
+                        stylePrompt: settings.stylePrompt || 'Professional with smooth transitions',
+                        customVideoPrompt: settings.promptText || undefined,
+                        chatSettings: {
+                            customInstructions: settings.notebookLmChatSettings || 'Focus on key concepts',
+                        },
+                        // Important: Pass startPoint to resume/skip steps
+                        startFromStep: startPoint === 'start-fresh' ? undefined :
+                            startPoint === 'skip-to-notebooklm' ? 'notebooklm_notebook_created' :
+                                'notebooklm_sources_uploaded',
+                        outputDir: path.join(folderPath, 'output'),
+                    };
+
+                    // Add perplexity URL
+                    (input as any).perplexityChatUrl = profileSettings.perplexityChatUrl || settings.perplexityChatUrl;
+
+                    io.emit('progress', { jobId, step: 'started', message: `Starting pipeline from ${startPoint}...` });
+
+                    const result = await pipeline!.processVideo(input);
+
+                    if (result.success) {
+                        io.emit('progress', { jobId, step: 'completed', outputPath: result.outputVideoPath });
+                        // Update progress tracker
+                        const { ProgressTracker } = require('./services/ProgressTracker');
+                        ProgressTracker.markStepComplete(folderPath, 'notebooklm_sources_uploaded');
+                    } else {
+                        io.emit('progress', { jobId, step: 'failed', error: result.error });
+                    }
+                } catch (err) {
+                    console.error('Pipeline background error:', err);
+                    io.emit('progress', { jobId, step: 'failed', error: (err as Error).message });
+                } finally {
+                    isProcessing = false;
+                }
+            })();
+
+            return;
+
+        } else if (startPoint === 'fire-videos' || startPoint === 'generate-videos') {
+            const { BatchProcessor } = await import('./services/BatchProcessor');
+            // Use existing batch processor or create new
+            if (!batchProcessor) batchProcessor = new BatchProcessor();
+
+            res.json({ success: true, message: 'Video generation (Fire) started' });
+
+            batchProcessor.processAll({
+                folders: [folderPath],
+                selectedProfiles: [profileId],
+                operation: 'fire'
+            }).catch((err: Error) => console.error('Fire error:', err));
+
+            return;
+
+        } else if (startPoint === 'collect-videos' || startPoint === 'download-videos') {
+            const { BatchProcessor } = await import('./services/BatchProcessor');
+            if (!batchProcessor) batchProcessor = new BatchProcessor();
+
+            res.json({ success: true, message: 'Video collection started' });
+
+            batchProcessor.processAll({
+                folders: [folderPath],
+                selectedProfiles: [profileId], // Ignored for collect but good for types
+                operation: 'collect'
+            }).catch((err: Error) => console.error('Collect error:', err));
+
+            return;
+
+        } else if (startPoint === 'generate-narration' || startPoint === 'generate-audio') {
+            const { BatchProcessor } = await import('./services/BatchProcessor');
+            if (!batchProcessor) batchProcessor = new BatchProcessor();
+
+            res.json({ success: true, message: 'Audio generation started' });
+
+            batchProcessor.processAll({
+                folders: [folderPath],
+                selectedProfiles: [profileId],
+                operation: 'audio'
+            }).catch((err: Error) => console.error('Audio error:', err));
+
+            return;
+        } else if (startPoint === 'complete') {
+            res.json({ success: true, message: 'Pipeline already marked as complete' });
+            return;
+        }
+
+        res.status(400).json({ success: false, message: `Unknown start point: ${startPoint}` });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: (error as Error).message });
+    }
+});
+
+// Store batch processor instance
+let batchProcessor: any = null;
+
+// API: Start batch processing
+app.post('/api/batch/start', async (req: Request, res: Response) => {
+    try {
+        const { BatchProcessor } = await import('./services/BatchProcessor');
+        const { folders, selectedProfiles } = req.body;
+
+        if (!folders || !Array.isArray(folders) || folders.length === 0) {
+            return res.status(400).json({ error: 'folders array is required' });
+        }
+
+        if (!selectedProfiles || !Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
+            return res.status(400).json({ error: 'selectedProfiles array is required' });
+        }
+
+        // Check for existing batch
+        if (batchProcessor && batchProcessor.isRunning()) {
+            return res.status(400).json({ error: 'Batch processing already in progress' });
+        }
+
+        // Load visual style from settings
+        let visualStyle: string | undefined;
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+        if (fs.existsSync(settingsPath)) {
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            visualStyle = settings.notebookLmStyleSettings;
+        }
+
+        // Create batch processor
+        batchProcessor = new BatchProcessor();
+
+        // Set up event handlers for Socket.IO updates
+        batchProcessor.onStatusChange = (statuses: any[]) => {
+            io.emit('batch-status', { statuses });
+        };
+
+        batchProcessor.onLog = (message: string) => {
+            io.emit('batch-log', { message, timestamp: new Date().toISOString() });
+        };
+
+        // Start processing in background
+        res.json({
+            success: true,
+            message: 'Batch processing started',
+            folderCount: folders.length,
+            profiles: selectedProfiles
+        });
+
+        // Run the full batch process
+        try {
+            const result = await batchProcessor.processAll({
+                folders,
+                selectedProfiles,
+                visualStyle
+            });
+
+            io.emit('batch-complete', result);
+        } catch (error) {
+            io.emit('batch-error', { error: (error as Error).message });
+        }
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to start batch processing: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Get batch processing status
+app.get('/api/batch/status', (req: Request, res: Response) => {
+    try {
+        if (!batchProcessor) {
+            return res.json({
+                isRunning: false,
+                statuses: []
+            });
+        }
+
+        res.json({
+            isRunning: batchProcessor.isRunning(),
+            statuses: batchProcessor.getStatus()
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get batch status: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Abort batch processing
+app.post('/api/batch/abort', (req: Request, res: Response) => {
+    try {
+        if (!batchProcessor) {
+            return res.json({ success: true, message: 'No batch processing to abort' });
+        }
+
+        batchProcessor.abort();
+        res.json({ success: true, message: 'Abort requested' });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to abort batch: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Fire videos only (no collect or audio)
+app.post('/api/batch/fire', async (req: Request, res: Response) => {
+    try {
+        const { BatchProcessor } = await import('./services/BatchProcessor');
+        const { folders, selectedProfiles } = req.body;
+
+        if (!folders || !Array.isArray(folders) || folders.length === 0) {
+            return res.status(400).json({ error: 'folders array is required' });
+        }
+
+        if (!selectedProfiles || !Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
+            return res.status(400).json({ error: 'selectedProfiles array is required' });
+        }
+
+        // Check for existing batch
+        if (batchProcessor && batchProcessor.isRunning()) {
+            return res.status(400).json({ error: 'Batch processing already in progress' });
+        }
+
+        // Load visual style
+        let visualStyle: string | undefined;
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+        if (fs.existsSync(settingsPath)) {
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            visualStyle = settings.notebookLmStyleSettings;
+        }
+
+        batchProcessor = new BatchProcessor();
+
+        batchProcessor.onStatusChange = (statuses: any[]) => {
+            io.emit('batch-status', { statuses });
+        };
+
+        batchProcessor.onLog = (message: string) => {
+            io.emit('batch-log', { message, timestamp: new Date().toISOString() });
+        };
+
+        res.json({
+            success: true,
+            message: 'Fire phase started',
+            folderCount: folders.length
+        });
+
+        // Run only fire phase
+        try {
+            await batchProcessor.fireAllVideos({
+                folders,
+                selectedProfiles,
+                visualStyle
+            });
+
+            io.emit('batch-fire-complete', { message: 'Fire phase complete' });
+        } catch (error) {
+            io.emit('batch-error', { error: (error as Error).message });
+        }
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to start fire phase: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Collect videos only (download ready videos)
+app.post('/api/batch/collect', async (req: Request, res: Response) => {
+    try {
+        if (!batchProcessor) {
+            const { BatchProcessor } = await import('./services/BatchProcessor');
+            batchProcessor = new BatchProcessor();
+        }
+
+        if (batchProcessor.isRunning()) {
+            return res.status(400).json({ error: 'Batch processing already in progress' });
+        }
+
+        batchProcessor.onStatusChange = (statuses: any[]) => {
+            io.emit('batch-status', { statuses });
+        };
+
+        batchProcessor.onLog = (message: string) => {
+            io.emit('batch-log', { message, timestamp: new Date().toISOString() });
+        };
+
+        // Get folders from request body (required for collect to work)
+        const { folders } = req.body;
+
+        res.json({ success: true, message: 'Collect phase started' });
+
+        // Run only collect phase (will auto-discover pending from ProgressTracker)
+        try {
+            await batchProcessor.collectAllVideos(folders);
+            io.emit('batch-collect-complete', { message: 'Collect phase complete' });
+        } catch (error) {
+            io.emit('batch-error', { error: (error as Error).message });
+        }
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to start collect phase: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Get list of available profiles
+app.get('/api/profiles', (req: Request, res: Response) => {
+    try {
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+
+        if (fs.existsSync(settingsPath)) {
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            const profiles = Object.keys(settings.profiles || {});
+            res.json({ success: true, profiles });
+        } else {
+            res.json({ success: true, profiles: [] });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get profiles: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Discover pending folders (videos started but not downloaded)
+app.post('/api/batch/pending', (req: Request, res: Response) => {
+    try {
+        const { ProgressTracker } = require('./services/ProgressTracker');
+        const { folders } = req.body; // Optional: specific folders to check
+
+        const foldersToCheck = folders || [];
+        const pending: any[] = [];
+
+        for (const folderPath of foldersToCheck) {
+            const progress = ProgressTracker.getProgress(folderPath);
+            if (!progress) continue;
+
+            const videoStarted = progress.steps['notebooklm_video_started']?.completed;
+            const videoDownloaded = progress.steps['notebooklm_video_downloaded']?.completed;
+
+            if (videoStarted && !videoDownloaded) {
+                pending.push({
+                    folderPath,
+                    folderName: path.basename(folderPath),
+                    notebookUrl: progress.steps['notebooklm_video_started']?.notebookUrl,
+                    videoStartedAt: progress.steps['notebooklm_video_started']?.videoStartedAt,
+                    profileId: progress.profileId
+                });
+            }
+        }
+
+        res.json({ success: true, pending, count: pending.length });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get pending folders: ' + (error as Error).message
+        });
     }
 });
 

@@ -54,8 +54,17 @@ export class GoogleStudioTester {
         studioConfig: GoogleStudioConfig,
         steps: string[]
     ): Promise<boolean> {
+        // const steps: string[] = []; // steps is now passed in
         try {
-            steps.push(`⏳ Processing Slide ${config.slideNumber}...`);
+            steps.push(`🎬 Processing slide ${config.slideNumber}...`);
+
+            // Reload page to ensure fresh state (avoid downloading cached files from previous runs)
+            steps.push('🔄 Reloading page to clear previous state...');
+            await page.reload({ waitUntil: 'networkidle2' });
+            await this.browser.randomDelay(2000, 3000);
+
+            // Wait for text area to be available
+            await page.waitForSelector('textarea', { timeout: 10000 });
 
             // Navigate to Google Studio if not already there
             const currentUrl = page.url();
@@ -76,6 +85,44 @@ export class GoogleStudioTester {
 
             // Wait for page to be ready
             await this.browser.randomDelay(1000, 2000);
+
+            // CRITICAL: Set to "Single speaker audio" mode FIRST before changing any settings
+            steps.push('⏳ Checking/Setting mode to Single speaker audio...');
+            try {
+                const modeResult = await page.evaluate(() => {
+                    // Find the ms-toggle-button with text "Single-speaker audio"
+                    const toggleButtons = Array.from(document.querySelectorAll('ms-toggle-button'));
+                    const singleSpeakerButton = toggleButtons.find(btn =>
+                        btn.textContent?.includes('Single-speaker audio')
+                    );
+
+                    if (singleSpeakerButton) {
+                        // Click the button inside the ms-toggle-button
+                        const button = singleSpeakerButton.querySelector('button');
+                        if (button) {
+                            // Check if already active to avoid re-clicking
+                            if (button.classList.contains('ms-button-active')) {
+                                return 'already_active';
+                            }
+                            button.click();
+                            return 'clicked';
+                        }
+                    }
+
+                    return 'not_found';
+                });
+
+                if (modeResult === 'already_active') {
+                    steps.push('✓ Mode already set to Single speaker audio');
+                } else if (modeResult === 'clicked') {
+                    steps.push('✓ Set mode to Single speaker audio');
+                    await this.browser.randomDelay(500, 1000); // Wait for mode change to apply
+                } else {
+                    steps.push('⚠ Could not find Single speaker audio button (check credentials/UI)');
+                }
+            } catch (e) {
+                steps.push(`⚠ Error setting mode: ${(e as Error).message}`);
+            }
 
             // Set style instructions if provided
             if (studioConfig.styleInstructions) {
@@ -101,31 +148,75 @@ export class GoogleStudioTester {
 
             // Set model if provided
             if (studioConfig.model) {
-                // Try to find a model selector (fallback logic as it's not clearly identified in HTML dump)
+                steps.push(`🔧 Selecting model: ${studioConfig.model}...`);
                 try {
-                    const modelSelector = await page.$('ms-model-selector mat-select, [aria-label*="Model"] mat-select');
+                    // Click the model selector button (ms-model-selector button)
+                    const modelSelector = await page.$('ms-model-selector button');
                     if (modelSelector) {
                         await modelSelector.click();
-                        await this.browser.randomDelay(500, 1000);
+                        await this.browser.randomDelay(1000, 2000);
 
-                        const optionClicked = await page.evaluate((modelName) => {
-                            const options = Array.from(document.querySelectorAll('mat-option'));
-                            const target = options.find(opt => opt.textContent?.trim() === modelName);
-                            if (target) {
-                                (target as HTMLElement).click();
-                                return true;
+                        // Wait for the carousel
+                        try {
+                            await page.waitForSelector('ms-model-carousel', { timeout: 5000 });
+
+                            // Click "Audio" category button to ensure correct models are shown
+                            const audioCategorySet = await page.evaluate(() => {
+                                const buttons = Array.from(document.querySelectorAll('ms-model-carousel button'));
+                                const audioBtn = buttons.find(b => b.textContent?.trim() === 'Audio');
+
+                                if (audioBtn) {
+                                    if (audioBtn.classList.contains('ms-button-active') || audioBtn.getAttribute('aria-selected') === 'true') {
+                                        return 'already_active';
+                                    }
+                                    // @ts-ignore
+                                    audioBtn.click();
+                                    return 'clicked';
+                                }
+                                return 'not_found';
+                            });
+
+                            if (audioCategorySet === 'clicked') {
+                                steps.push('✓ Selected "Audio" category');
+                                await this.browser.randomDelay(1000, 2000); // Wait for list to filters
+                            }
+
+                        } catch (e) {
+                            steps.push('⚠ Model carousel did not appear or Audio category failed: ' + (e as Error).message);
+                        }
+
+                        const modelSelected = await page.evaluate((targetModel) => {
+                            // Find all content buttons in the carousel rows
+                            const buttons = Array.from(document.querySelectorAll('ms-model-carousel-row button.content-button'));
+                            const searchStr = targetModel.trim().toLowerCase();
+
+                            // Use indexed loop to be absolutely safe with execution context (avoiding Illegal return)
+                            for (let i = 0; i < buttons.length; i++) {
+                                const btn = buttons[i];
+                                const title = btn.querySelector('.model-title-text')?.textContent?.trim();
+                                const subtitle = btn.querySelector('.model-subtitle')?.textContent?.trim();
+
+                                const titleMatch = title && title.toLowerCase().includes(searchStr);
+                                const subtitleMatch = subtitle && subtitle.toLowerCase().includes(searchStr);
+
+                                if (titleMatch || subtitleMatch) {
+                                    // @ts-ignore
+                                    btn.click();
+                                    return true;
+                                }
                             }
                             return false;
                         }, studioConfig.model);
 
-                        if (optionClicked) {
+                        if (modelSelected) {
                             steps.push(`✓ Selected model: ${studioConfig.model}`);
+                            await this.browser.randomDelay(1000, 2000); // Wait for selection to apply
                         } else {
-                            steps.push(`⚠ Model "${studioConfig.model}" option not found`);
-                            await page.keyboard.press('Escape'); // Close dropdown
+                            steps.push(`⚠ Model '${studioConfig.model}' not found in carousel`);
+                            await page.keyboard.press('Escape'); // Close dialog
                         }
                     } else {
-                        steps.push(`⚠ Model selector not found (skipping model selection)`);
+                        steps.push('⚠ Could not find model selector button (ms-model-selector button)');
                     }
                 } catch (e) {
                     steps.push(`⚠ Failed to set model: ${(e as Error).message}`);
@@ -223,7 +314,7 @@ export class GoogleStudioTester {
 
             // Wait for download button or audio element to appear
             let downloadReady = false;
-            for (let attempt = 0; attempt < 30; attempt++) {
+            for (let attempt = 0; attempt < 200; attempt++) {
                 downloadReady = await page.evaluate(() => {
                     // Look for download button or audio element
                     const downloadBtn = document.querySelector('button[aria-label*="download"], button[title*="download"], a[download]');

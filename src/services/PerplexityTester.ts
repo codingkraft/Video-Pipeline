@@ -414,8 +414,8 @@ export class PerplexityTester {
                 cleanedResponse = cleanedResponse.substring(4).trim();
             }
 
-            // Use custom filename or default to 'perplexity_response'
-            const outputBasename = config.outputFilename || 'perplexity_response';
+            // Use custom filename or default to 'perplexity_video_response'
+            const outputBasename = config.outputFilename || 'perplexity_video_response';
             const responseFilePath = path.join(outputDir, `${outputBasename}.txt`);
             fs.writeFileSync(responseFilePath, cleanedResponse, 'utf-8');
             steps.push(`✓ Response saved to: ${responseFilePath}`);

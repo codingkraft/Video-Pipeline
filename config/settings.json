@@ -1,5 +1,5 @@
 {
-  "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 8",
+  "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6",
   "headlessMode": false,
   "deleteConversation": false,
   "perplexityModel": "Claude Sonnet 4.5",
@@ -67,5 +67,11 @@
     "Sadachbia",
     "Sadaltager",
     "Sulafat"
-  ]
+  ],
+  "delays": {
+    "betweenVideoStartsMs": 300000,
+    "betweenAudioSlidesMs": 120000,
+    "videoCheckIntervalMs": 300000,
+    "maxWaitForVideoMs": 3600000
+  }
 }

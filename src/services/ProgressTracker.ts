@@ -6,13 +6,18 @@ import * as path from 'path';
  * When resetting from a step, all steps after it are also reset.
  */
 export const PIPELINE_STEPS = [
-    'perplexity',
-    'perplexity_narration',         // Audio narration text from Perplexity
-    'audio_slides_parsed',          // Slides extracted from narration
-    'audio_generated',              // All audio generated
-    'notebooklm_notebook_created',
-    'notebooklm_sources_uploaded',
-    'notebooklm_video_started'
+    'perplexity',                     // Generate video prompt
+    'notebooklm_notebook_created',    // Create notebook
+    'notebooklm_sources_uploaded',    // Upload sources
+    'notebooklm_video_1_started',     // FIRE: First video generation started
+    'notebooklm_video_2_started',     // FIRE: Second video generation started
+    // While videos generate, do audio:
+    'perplexity_narration',           // Generate narration text
+    'audio_slides_parsed',            // Parse slides from narration
+    'audio_generated',                // Generate audio files
+    // COLLECT: Download videos after audio is done
+    'notebooklm_video_1_downloaded',  // First video downloaded
+    'notebooklm_video_2_downloaded'   // Second video downloaded - COMPLETE
 ] as const;
 
 export type StaticPipelineStep = typeof PIPELINE_STEPS[number];
@@ -29,6 +34,8 @@ export interface StepProgress {
     textHash?: string;        // Hash of slide text for change detection
     slideCount?: number;      // Number of slides processed
     audioFiles?: string[];    // List of generated audio files
+    videoStartedAt?: string;  // ISO timestamp when video generation was started
+    videoFilePath?: string;   // Path to downloaded video file
     error?: string;
 }
 
@@ -216,5 +223,23 @@ export class ProgressTracker {
             nextStep: ProgressTracker.getNextIncompleteStep(folderPath),
             notebookUrl
         };
+    }
+
+    /**
+     * Set the profile ID for a folder (persists across sessions).
+     */
+    public static setFolderProfile(folderPath: string, profileId: string): FolderProgress {
+        const progress = ProgressTracker.initProgress(folderPath);
+        progress.profileId = profileId;
+        ProgressTracker.saveProgress(folderPath, progress);
+        return progress;
+    }
+
+    /**
+     * Get the profile ID assigned to a folder, or null if none assigned.
+     */
+    public static getFolderProfile(folderPath: string): string | null {
+        const progress = ProgressTracker.getProgress(folderPath);
+        return progress?.profileId ?? null;
     }
 }
