@@ -54,6 +54,15 @@ async function loadCommonSettings() {
             // Checkboxes
             if (s.headlessMode !== undefined) document.getElementById('headlessMode').checked = s.headlessMode;
             if (s.deleteConversation !== undefined) document.getElementById('deleteConversation').checked = s.deleteConversation;
+            if (s.keepOpen !== undefined) document.getElementById('keepOpen').checked = s.keepOpen;
+
+            // Delays (convert ms to seconds for UI)
+            if (s.delays) {
+                if (s.delays.betweenVideoStartsMs) document.getElementById('betweenVideoStartsMs').value = s.delays.betweenVideoStartsMs / 1000;
+                if (s.delays.betweenAudioSlidesMs) document.getElementById('betweenAudioSlidesMs').value = s.delays.betweenAudioSlidesMs / 1000;
+                if (s.delays.videoCheckIntervalMs) document.getElementById('videoCheckIntervalMs').value = s.delays.videoCheckIntervalMs / 1000;
+                if (s.delays.maxWaitForVideoMs) document.getElementById('maxWaitForVideoMs').value = s.delays.maxWaitForVideoMs / 1000;
+            }
 
             console.log('Common settings loaded');
         }
@@ -660,7 +669,7 @@ function updateSelectedDocuments() {
 // Load saved settings from server (file-based)
 async function loadSettings() {
     try {
-        const response = await fetch('/api/load-settings');
+        const response = await fetch('/api/get-settings');
         const data = await response.json();
 
         if (data.success && data.settings) {
@@ -680,15 +689,26 @@ async function loadSettings() {
             document.getElementById('notebookLmStyleSettings').value = settings.notebookLmStyleSettings || 'Modern, engaging, educational style';
             document.getElementById('stylePrompt').value = settings.stylePrompt || 'Professional with smooth transitions';
             document.getElementById('sourceFolder').value = settings.sourceFolder || '';
+            document.getElementById('outputDir').value = settings.outputDir || '';
             document.getElementById('headlessMode').checked = settings.headlessMode === true;
             document.getElementById('deleteConversation').checked = settings.deleteConversation === true;
+            document.getElementById('keepOpen').checked = settings.keepOpen === true;
             document.getElementById('perplexityModel').value = settings.perplexityModel || 'Best';
+            document.getElementById('audioNarrationPerplexityModel').value = settings.audioNarrationPerplexityModel || 'Best';
 
             // Load audio generation settings
             document.getElementById('audioNarrationPrompt').value = settings.audioNarrationPrompt || '';
             document.getElementById('googleStudioModel').value = settings.googleStudioModel || '';
             document.getElementById('googleStudioVoice').value = settings.googleStudioVoice || '';
             document.getElementById('googleStudioStyleInstructions').value = settings.googleStudioStyleInstructions || '';
+
+            // Load delays (convert ms to seconds for UI)
+            if (settings.delays) {
+                if (settings.delays.betweenVideoStartsMs) document.getElementById('betweenVideoStartsMs').value = settings.delays.betweenVideoStartsMs / 1000;
+                if (settings.delays.betweenAudioSlidesMs) document.getElementById('betweenAudioSlidesMs').value = settings.delays.betweenAudioSlidesMs / 1000;
+                if (settings.delays.videoCheckIntervalMs) document.getElementById('videoCheckIntervalMs').value = settings.delays.videoCheckIntervalMs / 1000;
+                if (settings.delays.maxWaitForVideoMs) document.getElementById('maxWaitForVideoMs').value = settings.delays.maxWaitForVideoMs / 1000;
+            }
 
             console.log('Settings loaded from file');
         }
@@ -704,7 +724,7 @@ async function onProfileChange() {
 
     // Fetch settings from server
     try {
-        const response = await fetch('/api/load-settings');
+        const response = await fetch('/api/get-settings');
         const data = await response.json();
 
         if (data.success && data.settings) {
@@ -780,11 +800,20 @@ async function saveCommonSettings() {
         sourceFolder: document.getElementById('sourceFolder').value,
         headlessMode: document.getElementById('headlessMode').checked,
         deleteConversation: document.getElementById('deleteConversation').checked,
+        keepOpen: document.getElementById('keepOpen').checked,
         perplexityModel: document.getElementById('perplexityModel').value,
+        audioNarrationPerplexityModel: document.getElementById('audioNarrationPerplexityModel').value,
         audioNarrationPrompt: document.getElementById('audioNarrationPrompt').value,
         googleStudioModel: document.getElementById('googleStudioModel').value,
         googleStudioVoice: document.getElementById('googleStudioVoice').value,
-        googleStudioStyleInstructions: document.getElementById('googleStudioStyleInstructions').value
+        googleStudioStyleInstructions: document.getElementById('googleStudioStyleInstructions').value,
+        // Convert seconds from UI to milliseconds for backend
+        delays: {
+            betweenVideoStartsMs: (parseInt(document.getElementById('betweenVideoStartsMs').value) || 300) * 1000,
+            betweenAudioSlidesMs: (parseInt(document.getElementById('betweenAudioSlidesMs').value) || 120) * 1000,
+            videoCheckIntervalMs: (parseInt(document.getElementById('videoCheckIntervalMs').value) || 60) * 1000,
+            maxWaitForVideoMs: (parseInt(document.getElementById('maxWaitForVideoMs').value) || 600) * 1000
+        }
     };
 
     try {
@@ -820,7 +849,11 @@ function setupAutoSave() {
         'sourceFolder',
         'headlessMode',
         'deleteConversation',
-        'perplexityModel'
+        'perplexityModel',
+        'betweenVideoStartsMs',
+        'betweenAudioSlidesMs',
+        'videoCheckIntervalMs',
+        'maxWaitForVideoMs'
     ];
 
     inputIds.forEach(id => {
@@ -828,12 +861,12 @@ function setupAutoSave() {
         if (element) {
             // Save on blur (when user leaves the field)
             element.addEventListener('blur', () => {
-                saveSettings();
+                saveCommonSettings();
             });
             // Also save on change for checkboxes
             if (element.type === 'checkbox') {
                 element.addEventListener('change', () => {
-                    saveSettings();
+                    saveCommonSettings();
                 });
             }
         }
@@ -1519,52 +1552,6 @@ async function updateAudioStartOptions(folderPath) {
 }
 
 
-
-// Save common settings (non-profile specific)
-async function saveCommonSettings() {
-    const settings = {
-        sourceFolder: document.getElementById('sourceFolder').value,
-        headlessMode: document.getElementById('headlessMode').checked,
-        deleteConversation: document.getElementById('deleteConversation').checked,
-        perplexityModel: document.getElementById('perplexityModel').value,
-        audioNarrationPerplexityModel: document.getElementById('audioNarrationPerplexityModel').value,
-        promptText: document.getElementById('promptText').value,
-        notebookLmChatSettings: document.getElementById('notebookLmChatSettings').value,
-        notebookLmStyleSettings: document.getElementById('notebookLmStyleSettings').value,
-        stylePrompt: document.getElementById('stylePrompt').value,
-        audioNarrationPrompt: document.getElementById('audioNarrationPrompt').value,
-        googleStudioModel: document.getElementById('googleStudioModel').value,
-        googleStudioVoice: document.getElementById('googleStudioVoice').value,
-        googleStudioStyleInstructions: document.getElementById('googleStudioStyleInstructions').value,
-        outputDir: document.getElementById('outputDir').value
-    };
-
-    try {
-        const response = await fetch('/api/save-settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
-        });
-        const result = await response.json();
-        if (result.success) {
-            console.log('Settings saved');
-            // Show success message
-            const message = document.getElementById('saveCommonMessage');
-            if (message) {
-                message.style.display = 'block';
-                setTimeout(() => {
-                    message.style.display = 'none';
-                }, 3000);
-            }
-        } else {
-            console.error('Failed to save settings:', result.message);
-            alert('Failed to save settings: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error saving settings:', error);
-        alert('Error saving settings: ' + error.message);
-    }
-}
 
 // Keep saveSettings as an alias for compatibility
 async function saveSettings() {

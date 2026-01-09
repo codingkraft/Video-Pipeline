@@ -1,7 +1,7 @@
 {
   "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6",
-  "headlessMode": false,
-  "deleteConversation": false,
+  "headlessMode": true,
+  "deleteConversation": true,
   "perplexityModel": "Claude Sonnet 4.5",
   "audioNarrationPerplexityModel": "Claude Sonnet 4.5",
   "promptText": "henceforth when I give you a prompt in this do not add any explanations before or after the result. Do not give confirmation of reading the files. Just give the answer in plain text format\nCreate a steering prompt based on the attached document. Output **only the raw prompt text** starting with \"Create a Video...\" and ending with the last instruction. DO NOT include any statements, explanations, or commentary before or after the prompt. Here is an example of a steering prompt below created for chapter2 video7. : \n\nCreate a Video Overview (~115 seconds) using the DOCX as the single source.\n\nCRITICAL: SINGLE-VOICE NARRATION ONLY\n\nThe narration file (video7_narration.txt) is the SOLE source of all audio content. JACK is the only voice. There is NO second speaker, NO dialogue, NO host interruptions, NO banter.\n\nABSOLUTE RULES:\n\n1. Read ONLY the exact text in the narration file—verbatim, word-for-word.\n2. JACK narrates every single line. Do NOT introduce a second voice, character, or host.\n3. Do NOT add intro/outro, transitions, filler words (\"So,\" \"Okay,\" \"Well\"), definitions, or summaries.\n4. Do NOT create dialogue between speakers.\n5. Do NOT switch voices mid-video.\n6. ALWAYS complete full narration for every segment—even if images are missing.\n\nSLIDE TIMING (EXACT):\nSlide 1 (10s), Slide 2 (18s), Slide 3 (15s), Slide 4 (16s), Slide 5 (18s), Slide 6 (15s), Slide 7 (12s), Slide 8 (12s). Total: ~115 seconds.\n\nVISUAL ASSETS TO FEATURE:\n\nSlide 2: chapter2_video7_example1_why_values_change.jpg\nSlide 3: Visual analogy of whiteboard with text being erased and replaced\nSlide 4: chapter2_video7_example2_step_by_step_update.jpg\nSlide 5: chapter2_video7_example3_using_the_current_value.jpg\nSlide 6: Visual analogy of piggy bank showing money accumulation\nSlide 7: chapter2_video7_example4_rpg_enemy_defeat_pattern.jpg\nSlide 8: chapter2_video7_example5_key_takeaway.jpg\n\nNON-IMAGE SLIDES (Create these visuals):\n\nSlide 1: Title Screen \"Video 7: Changing Stored Values\" with update/refresh aesthetic.\n\nTONE:\n\nTactical surveillance operator (male voice: JACK). Professional, energetic. Ages 15–25. Cybersecurity/hacking theme.\n\nAudience: Prefers a male narration\n\nFORMAT REQUIREMENT:\n\nUse the \"Audio Overview\" format that produces single narration, NOT dialogue/podcast format. If NotebookLM defaults to \"Deep Dive\" (two hosts), switch to \"The Brief\" or equivalent single-speaker mode.",
@@ -73,5 +73,6 @@
     "betweenAudioSlidesMs": 120000,
     "videoCheckIntervalMs": 300000,
     "maxWaitForVideoMs": 3600000
-  }
+  },
+  "keepOpen": false
 }

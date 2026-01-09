@@ -204,6 +204,35 @@
                             placeholder="Generate slide-by-slide narration..."></textarea>
                     </div>
 
+                    <!-- Delay Settings -->
+                    <!-- Delay Settings -->
+                    <div style="margin-top: 1rem; border: 1px dashed var(--border); padding: 10px; border-radius: 4px;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px;">⏱️ Timing & Delays (Seconds)</h4>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label for="betweenVideoStartsMs" style="font-size: 0.9em;">Delay Between Videos</label>
+                                <input type="number" id="betweenVideoStartsMs" value="300" step="1">
+                                <small class="hint">Wait time before starting next video</small>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label for="betweenAudioSlidesMs" style="font-size: 0.9em;">Delay Between Audio
+                                    Slides</label>
+                                <input type="number" id="betweenAudioSlidesMs" value="120" step="1">
+                                <small class="hint">Wait time between audio generations</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="videoCheckIntervalMs" style="font-size: 0.9em;">Video Check Interval</label>
+                                <input type="number" id="videoCheckIntervalMs" value="60" step="1">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="maxWaitForVideoMs" style="font-size: 0.9em;">Max Wait for Video</label>
+                                <input type="number" id="maxWaitForVideoMs" value="600" step="1">
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Google Studio dropdowns in 2-column grid -->
                     <div class="form-row">
                         <div class="form-group" style="margin-bottom: 0;">
