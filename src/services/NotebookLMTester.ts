@@ -15,6 +15,8 @@ export interface NotebookLMTestConfig {
     videoPrompt?: string;         // Direct video prompt override
     visualStyle?: string;         // Visual style description
     profileId?: string;           // Browser profile to use
+    skipSourcesUpload?: boolean;  // Whether to skip source upload
+    skipNotebookCreation?: boolean; // Whether to skip notebook creation (must use existing)
 }
 
 export interface NotebookLMTestResult {
@@ -115,7 +117,22 @@ export class NotebookLMTester {
             let notebookUrl: string | undefined;
 
             // Step 1: Create new notebook (if not using existing)
-            if (!config.existingNotebookUrl) {
+            if (config.existingNotebookUrl) {
+                notebookUrl = config.existingNotebookUrl;
+                steps.push(`✓ Using existing notebook: ${notebookUrl}`);
+            } else if (config.skipNotebookCreation) {
+                // If skipNotebookCreation is true but no URL provided, we still need to navigate to video
+                steps.push(`⚠ skipNotebookCreation is true but no existing URL provided. Attempting to find existing notebook...`);
+                // Try to retrieve notebook URL from progress
+                const savedProgress = ProgressTracker.getProgress(config.sourceFolder);
+                notebookUrl = savedProgress?.steps.notebooklm_notebook_created?.notebookUrl;
+                if (notebookUrl) {
+                    steps.push(`✓ Found existing notebook URL in progress: ${notebookUrl}`);
+                } else {
+                    steps.push(`❌ No existing notebook URL found in progress. Cannot proceed.`);
+                    throw new Error('No existing notebook URL found. Cannot skip notebook creation.');
+                }
+            } else {
                 const folderName = path.basename(config.sourceFolder);
                 notebookUrl = await this.createNotebook(page, folderName, steps);
 
@@ -126,15 +143,16 @@ export class NotebookLMTester {
                     });
                     steps.push(`✓ Notebook created: ${notebookUrl}`);
                 }
-            } else {
-                notebookUrl = config.existingNotebookUrl;
-                steps.push(`✓ Using existing notebook: ${notebookUrl}`);
             }
 
             // Step 2: Upload sources
             if (filesToUpload.length > 0) {
-                // Check if sources are already uploaded
-                if (config.sourceFolder && ProgressTracker.isStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded')) {
+                // Check if we should skip upload
+                const alreadyUploaded = config.sourceFolder && ProgressTracker.isStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded');
+
+                if (config.skipSourcesUpload) {
+                    steps.push(`✓ skipSourcesUpload is true (skipping upload)`);
+                } else if (alreadyUploaded) {
                     steps.push(`✓ Sources already uploaded (skipping upload)`);
                 } else {
                     steps.push(`⏳ Uploading ${filesToUpload.length} source files...`);
@@ -151,8 +169,6 @@ export class NotebookLMTester {
             // Step 3: Navigate to video creation
             steps.push('⏳ Navigating to video creation...');
             await this.navigateToVideoCreation(page, steps, config);
-
-            ProgressTracker.markStepComplete(config.sourceFolder, 'notebooklm_video_started');
 
             // Take screenshot
             const screenshotPath = path.join(outputDir, 'notebooklm_screenshot.png');

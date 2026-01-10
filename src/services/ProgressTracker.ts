@@ -17,8 +17,113 @@ export const PIPELINE_STEPS = [
     'audio_generated',                // Generate audio files
     // COLLECT: Download videos after audio is done
     'notebooklm_video_1_downloaded',  // First video downloaded
-    'notebooklm_video_2_downloaded'   // Second video downloaded - COMPLETE
+    'notebooklm_video_2_downloaded',  // Second video downloaded
+    // Post-processing:
+    'logo_removed',                   // [FUTURE] Logo removed from videos
+    'video_processed'                 // [FUTURE] Final video processing complete
 ] as const;
+
+/**
+ * Start points for UI dropdown.
+ * Each maps to the pipeline step it resumes FROM.
+ * Order matters - determines which options to show based on progress.
+ */
+export const START_POINTS = [
+    { key: 'start-fresh', label: 'Start Fresh', resumeFrom: 'perplexity', description: 'Clear all, regenerate everything' },
+    { key: 'create-notebook', label: 'Create Notebook', resumeFrom: 'notebooklm_notebook_created', description: 'Skip perplexity, create new notebook with fresh sources' },
+    { key: 'update-sources', label: 'Update Sources', resumeFrom: 'notebooklm_sources_uploaded', description: 'Reuse notebook, re-upload sources' },
+    { key: 'fire-video-1', label: 'Fire Video 1', resumeFrom: 'notebooklm_video_1_started', description: 'Assumes notebook exists, fire video 1' },
+    { key: 'fire-video-2', label: 'Fire Video 2', resumeFrom: 'notebooklm_video_2_started', description: 'Fire video 2' },
+    { key: 'audio-prompt', label: 'Audio Prompt', resumeFrom: 'perplexity_narration', description: 'Skip to audio narration generation' },
+    { key: 'generate-audio', label: 'Generate Audio', resumeFrom: 'audio_generated', description: 'Skip to TTS' },
+    { key: 'collect-videos', label: 'Collect Videos', resumeFrom: 'notebooklm_video_1_downloaded', description: 'Skip to video download' },
+    { key: 'remove-logo', label: 'Remove Logo', resumeFrom: 'logo_removed', description: '[FUTURE] Remove branding' },
+    { key: 'process-video', label: 'Process Video', resumeFrom: 'video_processed', description: '[FUTURE] Final processing' },
+] as const;
+
+export type StartPointKey = typeof START_POINTS[number]['key'];
+export type VideoBehavior = 'skip' | 'if-needed' | 'force';
+
+export interface StartPointConfig {
+    key: StartPointKey;
+    label: string;
+    description: string;
+    // Configuration Flags
+    clearProgress: boolean;         // Start Fresh: Clear all progress
+    skipPerplexity: boolean;        // Skip video steering prompt generation
+    skipNotebookCreation: boolean;  // Skip creating new notebook (reuse existing)
+    skipSourcesUpload: boolean;     // Skip uploading sources (reuse existing)
+    video1Behavior: VideoBehavior;  // Behavior for first video
+    video2Behavior: VideoBehavior;  // Behavior for second video
+    forceRegenerateNarration: boolean; // Force regeneration of narration prompt
+    skipNarrationGeneration: boolean;  // Skip narration prompt generation (direct to TTS)
+    skipAudioGeneration: boolean;   // Skip audio generation entirely
+    skipLogoRemoval: boolean;       // Skip logo removal
+    skipVideoProcessing: boolean;   // Skip final video processing
+}
+
+export const START_POINT_CONFIGS: Record<StartPointKey, StartPointConfig> = {
+    'start-fresh': {
+        key: 'start-fresh', label: 'Start Fresh', description: 'Clear all, regenerate everything',
+        clearProgress: true, skipPerplexity: false, skipNotebookCreation: false, skipSourcesUpload: false,
+        video1Behavior: 'force', video2Behavior: 'force', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'create-notebook': {
+        key: 'create-notebook', label: 'Create Notebook', description: 'Skip perplexity, create new notebook with fresh sources',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: false, skipSourcesUpload: false,
+        video1Behavior: 'force', video2Behavior: 'force', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'update-sources': {
+        key: 'update-sources', label: 'Update Sources', description: 'Reuse notebook, re-upload sources',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: false,
+        video1Behavior: 'force', video2Behavior: 'force', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'fire-video-1': {
+        key: 'fire-video-1', label: 'Fire Video 1', description: 'Assumes notebook exists, fire video 1',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'force', video2Behavior: 'force', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'fire-video-2': {
+        key: 'fire-video-2', label: 'Fire Video 2', description: 'Fire video 2',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'force', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'audio-prompt': {
+        key: 'audio-prompt', label: 'Audio Prompt', description: 'Skip to audio narration generation',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'generate-audio': {
+        key: 'generate-audio', label: 'Generate Audio', description: 'Skip to TTS',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: false, skipNarrationGeneration: true, skipAudioGeneration: false,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'collect-videos': {
+        key: 'collect-videos', label: 'Collect Videos', description: 'Skip to video download',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: false, skipNarrationGeneration: true, skipAudioGeneration: true,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'remove-logo': {
+        key: 'remove-logo', label: 'Remove Logo', description: '[FUTURE] Remove branding',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: false, skipNarrationGeneration: true, skipAudioGeneration: true,
+        skipLogoRemoval: false, skipVideoProcessing: false
+    },
+    'process-video': {
+        key: 'process-video', label: 'Process Video', description: '[FUTURE] Final processing',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: false, skipNarrationGeneration: true, skipAudioGeneration: true,
+        skipLogoRemoval: true, skipVideoProcessing: false
+    }
+};
 
 export type StaticPipelineStep = typeof PIPELINE_STEPS[number];
 export type PipelineStepName = StaticPipelineStep | `audio_slide_${number}` | string;
@@ -241,5 +346,42 @@ export class ProgressTracker {
     public static getFolderProfile(folderPath: string): string | null {
         const progress = ProgressTracker.getProgress(folderPath);
         return progress?.profileId ?? null;
+    }
+
+    /**
+     * Get available start points for a folder based on completed steps.
+     * Returns all start points where the previous step is complete.
+     * "Start Fresh" is always available.
+     */
+    public static getAvailableStartPoints(folderPath: string): typeof START_POINTS[number][] {
+        const available: typeof START_POINTS[number][] = [];
+
+        for (const startPoint of START_POINTS) {
+            if (startPoint.key === 'start-fresh') {
+                // Always available
+                available.push(startPoint);
+            } else {
+                // Check if the step BEFORE this start point is complete
+                const stepIndex = PIPELINE_STEPS.indexOf(startPoint.resumeFrom as StaticPipelineStep);
+                if (stepIndex > 0) {
+                    const previousStep = PIPELINE_STEPS[stepIndex - 1];
+                    if (ProgressTracker.isStepComplete(folderPath, previousStep)) {
+                        available.push(startPoint);
+                    }
+                }
+            }
+        }
+
+        return available;
+    }
+
+    /**
+     * Clear all progress for a folder (used when "Start Fresh" is selected).
+     */
+    public static clearProgress(folderPath: string): void {
+        const progressPath = ProgressTracker.getProgressFilePath(folderPath);
+        if (fs.existsSync(progressPath)) {
+            fs.unlinkSync(progressPath);
+        }
     }
 }

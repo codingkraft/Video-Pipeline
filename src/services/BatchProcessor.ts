@@ -1,4 +1,4 @@
-import { ProgressTracker, FolderProgress } from './ProgressTracker';
+import { ProgressTracker, PIPELINE_STEPS, START_POINTS, StartPointKey, START_POINT_CONFIGS } from './ProgressTracker';
 import { NotebookLMTester, NotebookLMTestConfig } from './NotebookLMTester';
 import { PerplexityTester } from './PerplexityTester';
 import { GoogleStudioTester } from './GoogleStudioTester';
@@ -19,14 +19,22 @@ export type FolderStatus =
     | 'error';            // Error occurred
 
 /**
+ * Configuration for a single folder in the batch
+ */
+export interface FolderConfig {
+    path: string;
+    startPoint: 'start-fresh' | 'create-notebook' | 'fire-video-1' | 'fire-video-2' | 'audio-prompt' | 'generate-audio' | 'collect-videos' | 'remove-logo' | 'process-video';
+}
+
+/**
  * Batch processing configuration
  */
 export interface BatchConfig {
-    folders: string[];              // List of folder paths to process
-    selectedProfiles: string[];     // Profiles selected by user for rotation
-    visualStyle?: string;           // Global visual style setting
+    folders: FolderConfig[];            // Folders with their start points
+    selectedProfiles: string[];         // Profiles selected by user for rotation
+    visualStyle?: string;               // Global visual style setting
     notebookLmChatSettings?: string;
-    operation?: 'fire' | 'collect' | 'audio';
+    // NOTE: operation field removed - startPoint in FolderConfig is now the single source of truth
 }
 
 /**
@@ -156,97 +164,101 @@ export class BatchProcessor {
     }
 
     /**
-     * PHASE 1: Fire video generation for all folders (2 videos per folder)
+     * Process video generation for a single folder (2 videos)
      */
-    public async fireAllVideos(config: BatchConfig): Promise<FolderBatchStatus[]> {
-        this.log(`Starting PHASE 1: Fire video generation for ${config.folders.length} folders (2 videos each)`);
+    private async processFolderVideos(
+        folderConfig: FolderConfig,
+        config: BatchConfig,
+        profileIndex: number
+    ): Promise<number> {
+        const folderPath = folderConfig.path;
+        const folderName = path.basename(folderPath);
+        const startPoint = folderConfig.startPoint;
+        const spConfig = START_POINT_CONFIGS[startPoint] || START_POINT_CONFIGS['start-fresh'];
 
-        let profileIndex = 0;
+        let currentProfileIndex = profileIndex;
 
-        for (let i = 0; i < config.folders.length; i++) {
-            if (this.abortRequested) {
-                this.log('Abort requested, stopping fire phase');
-                break;
+        for (let videoNum = 1; videoNum <= 2; videoNum++) {
+            if (this.abortRequested) break;
+
+            const behavior = videoNum === 1 ? spConfig.video1Behavior : spConfig.video2Behavior;
+            const videoStepName = `notebooklm_video_${videoNum}_started` as const;
+
+            // 1. Evaluate Behavior
+            if (behavior === 'skip') {
+                this.log(`${folderName}: Video ${videoNum} behavior is 'skip', skipping`);
+                continue;
             }
 
-            const folderPath = config.folders[i];
-            const folderName = path.basename(folderPath);
+            const isComplete = ProgressTracker.isStepComplete(folderPath, videoStepName);
+            if (behavior === 'if-needed' && isComplete) {
+                this.log(`${folderName}: Video ${videoNum} already started and behavior is 'if-needed', skipping`);
+                continue;
+            }
 
-            // Generate 2 videos per folder
-            for (let videoNum = 1; videoNum <= 2; videoNum++) {
-                if (this.abortRequested) break;
+            // If behavior is 'force' or ('if-needed' and !isComplete), we proceed to fire
+            if (behavior === 'force') {
+                this.log(`${folderName}: Video ${videoNum} behavior is 'force', regenerating...`);
+            }
 
-                const videoStepName = `notebooklm_video_${videoNum}_started` as const;
+            try {
+                const profileId = this.assignProfile(folderPath, config.selectedProfiles, currentProfileIndex);
+                currentProfileIndex++;
 
-                // Check if this video already started
-                if (ProgressTracker.isStepComplete(folderPath, videoStepName)) {
-                    this.log(`${folderName}: Video ${videoNum} already started, skipping`);
-                    continue;
-                }
+                this.updateFolderStatus(folderPath, {
+                    status: 'video_generating',
+                    profileId
+                });
 
-                try {
-                    // Assign profile
-                    const profileId = this.assignProfile(folderPath, config.selectedProfiles, profileIndex);
-                    profileIndex++;
+                await this.browser.initialize({ profileId });
+
+                const progress = ProgressTracker.getProgress(folderPath);
+                const existingNotebookUrl = spConfig.skipNotebookCreation ? progress?.steps.notebooklm_notebook_created?.notebookUrl : undefined;
+
+                const testConfig: NotebookLMTestConfig = {
+                    sourceFolder: folderPath,
+                    headless: false,
+                    visualStyle: config.visualStyle,
+                    profileId,
+                    existingNotebookUrl,
+                    skipSourcesUpload: spConfig.skipSourcesUpload,
+                    skipNotebookCreation: spConfig.skipNotebookCreation
+                };
+
+                this.log(`${folderName}: Starting video ${videoNum}/2 generation with profile ${profileId}`);
+                const result = await this.notebookLMTester.testWorkflow(testConfig);
+
+                if (result.success) {
+                    ProgressTracker.updateStep(folderPath, videoStepName, {
+                        completed: true,
+                        videoStartedAt: new Date().toISOString(),
+                        notebookUrl: result.details?.notebookUrl
+                    });
 
                     this.updateFolderStatus(folderPath, {
                         status: 'video_generating',
-                        profileId
+                        videoStartedAt: new Date().toISOString(),
+                        notebookUrl: result.details?.notebookUrl
                     });
 
-                    // Initialize browser with this profile
-                    await this.browser.initialize({ profileId });
-
-                    // Run NotebookLM workflow (creates notebook, uploads, starts video)
-                    const testConfig: NotebookLMTestConfig = {
-                        sourceFolder: folderPath,
-                        headless: false,
-                        visualStyle: config.visualStyle,
-                        profileId
-                    };
-
-                    this.log(`${folderName}: Starting video ${videoNum}/2 generation with profile ${profileId}`);
-                    const result = await this.notebookLMTester.testWorkflow(testConfig);
-
-                    if (result.success) {
-                        // Mark video started with timestamp
-                        ProgressTracker.updateStep(folderPath, videoStepName, {
-                            completed: true,
-                            videoStartedAt: new Date().toISOString(),
-                            notebookUrl: result.details?.notebookUrl
-                        });
-
-                        this.updateFolderStatus(folderPath, {
-                            status: 'video_generating',
-                            videoStartedAt: new Date().toISOString(),
-                            notebookUrl: result.details?.notebookUrl
-                        });
-
-                        this.log(`${folderName}: Video ${videoNum}/2 generation started successfully`);
-                    } else {
-                        this.updateFolderStatus(folderPath, {
-                            status: 'error',
-                            error: result.message
-                        });
-                        this.log(`${folderName}: Failed to start video ${videoNum}/2 - ${result.message}`);
-                    }
-
-                    // Wait before next video (rate limiting)
-                    if (!(i === config.folders.length - 1 && videoNum === 2)) {
-                        const delayMs = this.delays.betweenVideoStartsMs;
-                        this.log(`Waiting ${delayMs / 1000}s before next video (rate limiting)...`);
-                        await this.sleep(delayMs);
-                    }
-
-                } catch (error) {
-                    const errorMsg = error instanceof Error ? error.message : String(error);
-                    this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
-                    this.log(`${folderName}: Error on video ${videoNum}/2 - ${errorMsg}`);
+                    this.log(`${folderName}: Video ${videoNum}/2 generation started successfully`);
+                } else {
+                    this.updateFolderStatus(folderPath, { status: 'error', error: result.message });
+                    this.log(`${folderName}: Failed to start video ${videoNum}/2 - ${result.message}`);
                 }
+
+                if (!this.abortRequested) {
+                    const delayMs = this.delays.betweenVideoStartsMs;
+                    this.log(`Waiting ${delayMs / 1000}s before next video (rate limiting)...`);
+                    await this.sleep(delayMs);
+                }
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
+                this.log(`${folderName}: Error on video ${videoNum}/2 - ${errorMsg}`);
             }
         }
-
-        return this.currentBatch;
+        return currentProfileIndex;
     }
 
     /**
@@ -413,138 +425,117 @@ export class BatchProcessor {
     }
 
     /**
-     * Generate audio for all folders that have videos but no audio
+     * Process audio generation for a single folder
      */
-    public async generateAudioForAll(): Promise<void> {
-        this.log('Starting audio generation (while videos generate on NotebookLM)');
+    private async processFolderAudio(
+        folderPath: string,
+        startPoint: StartPointKey,
+        config: BatchConfig
+    ): Promise<void> {
+        const folderName = path.basename(folderPath);
+        const spConfig = START_POINT_CONFIGS[startPoint] || START_POINT_CONFIGS['start-fresh'];
 
-        const foldersNeedingAudio = this.currentBatch.filter(f => {
-            // Check if videos have been STARTED (fired) - audio runs while videos generate
-            const hasVideoStarted1 = ProgressTracker.isStepComplete(f.folderPath, 'notebooklm_video_1_started');
-            const hasVideoStarted2 = ProgressTracker.isStepComplete(f.folderPath, 'notebooklm_video_2_started');
-            const hasAudio = ProgressTracker.isStepComplete(f.folderPath, 'audio_generated');
-            // Generate audio if at least one video has started generating AND audio not done
-            return (hasVideoStarted1 || hasVideoStarted2) && !hasAudio && f.status !== 'error';
-        });
-
-        if (foldersNeedingAudio.length === 0) {
-            this.log('No folders need audio generation');
+        if (spConfig.skipAudioGeneration) {
+            this.log(`${folderName}: Skipping audio generation`);
             return;
         }
 
-        this.log(`${foldersNeedingAudio.length} folder(s) need audio generation`);
+        const hasVideoStarted1 = ProgressTracker.isStepComplete(folderPath, 'notebooklm_video_1_started');
+        const hasVideoStarted2 = ProgressTracker.isStepComplete(folderPath, 'notebooklm_video_2_started');
+        const hasAudio = ProgressTracker.isStepComplete(folderPath, 'audio_generated');
 
-        for (const folder of foldersNeedingAudio) {
-            if (this.abortRequested) break;
+        const shouldForce = spConfig.forceRegenerateNarration || spConfig.skipNarrationGeneration;
+        if (!shouldForce && !((hasVideoStarted1 || hasVideoStarted2) && !hasAudio)) {
+            this.log(`${folderName}: Audio not needed or already done`);
+            return;
+        }
 
-            const folderName = path.basename(folder.folderPath);
-            this.log(`${folderName}: Generating audio...`);
+        this.log(`${folderName}: Starting audio generation...`);
 
-            try {
-                this.updateFolderStatus(folder.folderPath, { status: 'audio_generating' });
+        try {
+            this.updateFolderStatus(folderPath, { status: 'audio_generating' });
 
-                // Initialize browser with folder's profile
-                const profileId = folder.profileId || ProgressTracker.getFolderProfile(folder.folderPath);
-                if (profileId) {
-                    await this.browser.initialize({ profileId });
-                }
+            const profileId = ProgressTracker.getFolderProfile(folderPath) || config.selectedProfiles[0] || 'profile1';
+            await this.browser.initialize({ profileId });
 
-                // Check if narration file exists
-                const outputDir = path.join(folder.folderPath, 'output');
-                const narrationPath = path.join(outputDir, 'perplexity_audio_response.txt');
-                const legacyNarrationPath1 = path.join(outputDir, 'audio_narration.txt');
-                const legacyNarrationPath2 = path.join(outputDir, 'audio_narration.md');
+            const outputDir = path.join(folderPath, 'output');
+            const narrationPath = path.join(outputDir, 'perplexity_audio_response.txt');
+            const legacyPath1 = path.join(outputDir, 'audio_narration.txt');
+            const legacyPath2 = path.join(outputDir, 'audio_narration.md');
 
-                let hasNarration = fs.existsSync(narrationPath) || fs.existsSync(legacyNarrationPath1) || fs.existsSync(legacyNarrationPath2);
+            let hasNarration = fs.existsSync(narrationPath) || fs.existsSync(legacyPath1) || fs.existsSync(legacyPath2);
+            const shouldGenerateNarration = spConfig.forceRegenerateNarration || (!hasNarration && !spConfig.skipNarrationGeneration);
 
-                // If no narration, generate it via Perplexity
-                if (!hasNarration) {
-                    this.log(`${folderName}: No narration file found, generating via Perplexity...`);
+            if (shouldGenerateNarration) {
+                this.log(`${folderName}: Generating narration via Perplexity...`);
+                const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+                const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
-                    // Load settings
-                    const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
-                    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+                const videoResponsePath = path.join(folderPath, 'output', 'perplexity_video_response.txt');
+                const legacyVR1 = path.join(folderPath, 'perplexity_response.txt');
+                const legacyVR2 = path.join(folderPath, 'output', 'perplexity_response.txt');
 
-                    // Identify input file (perplexity response)
-                    const videoResponsePath = path.join(folder.folderPath, 'output', 'perplexity_video_response.txt');
-                    const legacyVideoResponsePath = path.join(folder.folderPath, 'perplexity_response.txt');
-                    const legacyVideoResponsePath2 = path.join(folder.folderPath, 'output', 'perplexity_response.txt'); // Just in case
+                let contextFile = '';
+                if (fs.existsSync(videoResponsePath)) contextFile = videoResponsePath;
+                else if (fs.existsSync(legacyVR1)) contextFile = legacyVR1;
+                else if (fs.existsSync(legacyVR2)) contextFile = legacyVR2;
 
-                    let contextFile = '';
-                    if (fs.existsSync(videoResponsePath)) contextFile = videoResponsePath;
-                    else if (fs.existsSync(legacyVideoResponsePath)) contextFile = legacyVideoResponsePath;
-                    else if (fs.existsSync(legacyVideoResponsePath2)) contextFile = legacyVideoResponsePath2;
+                if (contextFile) {
+                    // Get profile-specific audio narration URL
+                    const audioNarrationUrl = settings.profiles?.[profileId]?.audioNarrationPerplexityUrl || settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/';
 
-                    if (contextFile) {
-                        this.updateFolderStatus(folder.folderPath, { status: 'audio_generating' });
-
-                        const genResult = await this.perplexityTester.testWorkflow({
-                            chatUrl: settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/',
-                            files: [contextFile],
-                            prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
-                            sourceFolder: folder.folderPath,
-                            headless: settings.headlessMode,
-                            shouldDeleteConversation: settings.deleteConversation,
-                            model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
-                            profileId: profileId || undefined,
-                            outputFilename: 'perplexity_audio_response'
-                        });
-
-                        if (genResult.success) {
-                            hasNarration = true;
-                            this.log(`${folderName}: Narration script generated successfully`);
-                            // Wait a bit to ensure FS sync
-                            await this.sleep(2000);
-                        } else {
-                            this.log(`${folderName}: Failed to generate narration - ${genResult.message}`);
-                            this.updateFolderStatus(folder.folderPath, { status: 'error', error: 'Narration generation failed' });
-                            continue;
-                        }
-                    } else {
-                        this.log(`${folderName}: No input content (perplexity_video_response.txt) found for narration`);
-                        // Can't generate without input
-                        continue;
-                    }
-                }
-
-                if (hasNarration) {
-                    // Use AudioGenerator which handles the full audio pipeline
-                    const { AudioGenerator } = await import('./AudioGenerator');
-                    const audioGen = new AudioGenerator();
-
-                    let finalNarrationPath = narrationPath;
-                    if (fs.existsSync(legacyNarrationPath1)) finalNarrationPath = legacyNarrationPath1;
-                    if (fs.existsSync(legacyNarrationPath2)) finalNarrationPath = legacyNarrationPath2;
-
-                    // Load settings for audio generation
-                    const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
-                    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-                    const audioProfileId = profileId || 'profile1';
-
-                    await audioGen.generateAudio({
-                        sourceFolder: folder.folderPath,
-                        profileId: audioProfileId,
-                        narrationFilePath: finalNarrationPath
+                    const genResult = await this.perplexityTester.testWorkflow({
+                        chatUrl: audioNarrationUrl,
+                        files: [contextFile],
+                        prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
+                        sourceFolder: folderPath,
+                        headless: settings.headlessMode,
+                        shouldDeleteConversation: settings.deleteConversation,
+                        model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
+                        profileId: profileId,
+                        outputFilename: 'perplexity_audio_response'
                     });
 
-                    ProgressTracker.markStepComplete(folder.folderPath, 'audio_generated');
-                    this.log(`${folderName}: Audio generation complete`);
-                    this.updateFolderStatus(folder.folderPath, { status: 'complete' });
+                    if (genResult.success) {
+                        hasNarration = true;
+                        // Mark the audio narration step as complete
+                        ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
+                        await this.sleep(2000);
+                    } else {
+                        throw new Error(`Narration failed: ${genResult.message}`);
+                    }
                 }
-
-            } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : String(error);
-                this.updateFolderStatus(folder.folderPath, { status: 'error', error: errorMsg });
-                this.log(`${folderName}: Audio error - ${errorMsg}`);
             }
 
-            // Rate limiting between audio generations
-            await this.sleep(this.delays.betweenAudioSlidesMs);
+            if (hasNarration) {
+                const { AudioGenerator } = await import('./AudioGenerator');
+                const audioGen = new AudioGenerator();
+                let finalNarrationPath = narrationPath;
+                if (!fs.existsSync(finalNarrationPath)) {
+                    finalNarrationPath = fs.existsSync(legacyPath1) ? legacyPath1 : legacyPath2;
+                }
+
+                await audioGen.generateAudio({
+                    sourceFolder: folderPath,
+                    profileId: profileId,
+                    narrationFilePath: finalNarrationPath
+                });
+
+                ProgressTracker.markStepComplete(folderPath, 'audio_generated');
+                this.updateFolderStatus(folderPath, { status: 'complete' });
+                this.log(`${folderName}: Audio generation complete`);
+            }
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
+            this.log(`${folderName}: Audio error - ${errorMsg}`);
         }
+
+        await this.sleep(this.delays.betweenAudioSlidesMs);
     }
 
     /**
-     * Full batch processing workflow: Fire → Collect → Audio
+     * Full batch processing workflow: Sequential Folder Processing (Prompt -> Fire -> Audio) then Batch Collect
      */
     public async processAll(config: BatchConfig): Promise<BatchResult> {
         if (this.isProcessing) {
@@ -554,34 +545,37 @@ export class BatchProcessor {
         this.isProcessing = true;
         this.abortRequested = false;
 
-        // Initialize batch status
-        this.currentBatch = config.folders.map(folderPath => ({
-            folderPath,
-            folderName: path.basename(folderPath),
+        this.currentBatch = config.folders.map(folder => ({
+            folderPath: folder.path,
+            folderName: path.basename(folder.path),
             status: 'pending' as FolderStatus,
-            profileId: ProgressTracker.getFolderProfile(folderPath) ?? undefined
+            profileId: ProgressTracker.getFolderProfile(folder.path) ?? undefined
         }));
         this.onStatusChange?.(this.currentBatch);
 
         try {
-            if (config.operation === 'fire') {
-                await this.fireAllVideos(config);
-            } else if (config.operation === 'collect') {
-                await this.collectAllVideos();
-            } else if (config.operation === 'audio') {
-                await this.generateAudioForAll();
-            } else {
-                // DEFAULT FULL BATCH
-                // Phase 0: Generate PROMPTS for all folders (via Perplexity)
-                await this.generatePromptsForAll(config);
+            let profileIndex = 0;
 
-                // Phase 1: FIRE all videos
-                await this.fireAllVideos(config);
+            // Process folders ONE BY ONE: Prompt -> Fire Videos -> Audio
+            for (const folderConfig of config.folders) {
+                if (this.abortRequested) break;
 
-                // Phase 2: Generate AUDIO
-                await this.generateAudioForAll();
+                const folderPath = folderConfig.path;
 
-                // Phase 3: COLLECT videos
+                // 1. Generate PROMPT
+                profileIndex = await this.processFolderPrompts(folderConfig, config, profileIndex);
+
+                // 2. FIRE videos
+                profileIndex = await this.processFolderVideos(folderConfig, config, profileIndex);
+
+                // 3. Generate AUDIO
+                await this.processFolderAudio(folderPath, folderConfig.startPoint, config);
+
+                this.log(`Completed primary processing for folder: ${path.basename(folderPath)}`);
+            }
+
+            // Final Phase: COLLECT all videos that were fired
+            if (!this.abortRequested) {
                 await this.collectAllVideos();
             }
 
@@ -631,78 +625,72 @@ export class BatchProcessor {
     }
 
     /**
-     * Phase 0: Generate prompts via Perplexity for all folders
-     * Skips folders that already have the perplexity step completed
+     * Process Perplexity prompt generation for a single folder
      */
-    private async generatePromptsForAll(config: BatchConfig): Promise<void> {
-        if (this.abortRequested) return;
+    private async processFolderPrompts(
+        folderConfig: FolderConfig,
+        config: BatchConfig,
+        profileIndex: number
+    ): Promise<number> {
+        const folderPath = folderConfig.path;
+        const folderName = path.basename(folderPath);
+        const startPoint = folderConfig.startPoint;
+        const spConfig = START_POINT_CONFIGS[startPoint] || START_POINT_CONFIGS['start-fresh'];
 
-        this.log('PHASE 0: Generating prompts via Perplexity (if needed)...');
-        let profileIndex = 0;
+        if (spConfig.clearProgress) {
+            this.log(`${folderName}: Start Fresh - clearing progress`);
+            ProgressTracker.clearProgress(folderPath);
+        }
 
-        for (let i = 0; i < config.folders.length; i++) {
-            if (this.abortRequested) break;
+        if (spConfig.skipPerplexity) {
+            this.log(`${folderName}: Skipping Perplexity`);
+            return profileIndex;
+        }
 
-            const folderPath = config.folders[i];
-            const folderName = path.basename(folderPath);
+        if (startPoint !== 'start-fresh' && ProgressTracker.isStepComplete(folderPath, 'perplexity')) {
+            this.log(`${folderName}: Perplexity already done`);
+            return profileIndex;
+        }
 
-            // Check if Perplexity already done
-            if (ProgressTracker.isStepComplete(folderPath, 'perplexity')) {
-                this.log(`${folderName}: Perplexity prompt already generated, skipping`);
-                continue;
+        try {
+            const profileId = this.assignProfile(folderPath, config.selectedProfiles, profileIndex);
+            this.updateFolderStatus(folderPath, { status: 'pending' });
+
+            await this.browser.initialize({ profileId });
+
+            const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            const profileSettings = settings.profiles?.[profileId] || {};
+
+            const files = fs.readdirSync(folderPath)
+                .filter(f => /\.(pdf|txt|md|docx?|jpe?g|png)$/i.test(f))
+                .map(f => path.join(folderPath, f));
+
+            this.log(`${folderName}: Generating prompt (Profile: ${profileId})...`);
+            const result = await this.perplexityTester.testWorkflow({
+                chatUrl: profileSettings.perplexityChatUrl || settings.perplexityChatUrl,
+                files,
+                prompt: settings.promptText,
+                sourceFolder: folderPath,
+                headless: settings.headlessMode ?? false,
+                shouldDeleteConversation: settings.deleteConversation,
+                model: settings.perplexityModel,
+                profileId
+            });
+
+            if (result.success) {
+                ProgressTracker.markStepComplete(folderPath, 'perplexity');
+            } else {
+                throw new Error(`Perplexity failed: ${result.message}`);
             }
 
-            try {
-                // Assign profile
-                const profileId = this.assignProfile(folderPath, config.selectedProfiles, profileIndex);
-                profileIndex++;
-
-                this.updateFolderStatus(folderPath, {
-                    status: 'pending' // Still pending video generation, but doing prompt
-                });
-
-                this.log(`${folderName}: Generating prompt with Perplexity (Profile: ${profileId})...`);
-
-                // Initialize browser
-                await this.browser.initialize({ profileId });
-
-                // Load settings for additional config
-                const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
-                const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-                const profileSettings = settings.profiles?.[profileId] || {};
-
-                // Get files
-                const files = fs.readdirSync(folderPath)
-                    .filter(f => /\.(pdf|txt|md|docx?|jpe?g|png)$/i.test(f))
-                    .map(f => path.join(folderPath, f));
-
-                const result = await this.perplexityTester.testWorkflow({
-                    chatUrl: profileSettings.perplexityChatUrl || settings.perplexityChatUrl,
-                    files: files,
-                    prompt: settings.promptText,
-                    sourceFolder: folderPath,
-                    headless: config.visualStyle ? false : (settings.headlessMode ?? false), // visualStyle usually implies not headless? No, keeping default
-                    shouldDeleteConversation: settings.deleteConversation,
-                    model: settings.perplexityModel,
-                    profileId: profileId
-                });
-
-                if (result.success) {
-                    ProgressTracker.markStepComplete(folderPath, 'perplexity');
-                    this.log(`${folderName}: Perplexity prompt generated successfully`);
-                } else {
-                    this.log(`${folderName}: Perplexity failed - ${result.message}`);
-                    this.updateFolderStatus(folderPath, { status: 'error', error: `Perplexity failed: ${result.message}` });
-                }
-
-                // Add delay between Perplexity runs
-                await this.sleep(3000);
-
-            } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : String(error);
-                this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
-                this.log(`${folderName}: Error in Perplexity phase - ${errorMsg}`);
-            }
+            await this.sleep(3000);
+            return profileIndex + 1;
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
+            this.log(`${folderName}: Perplexity error - ${errorMsg}`);
+            return profileIndex + 1;
         }
     }
 }

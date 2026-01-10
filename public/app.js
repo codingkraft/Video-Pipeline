@@ -4,6 +4,7 @@ const socket = io();
 let selectedDocuments = [];
 let allFolders = []; // Store multiple folders
 let selectedLocalFolders = []; // Array of absolute paths of selected local folders
+let folderStartPoints = {}; // Map of folderPath -> selected startPoint key
 
 // Load common settings from server on page load
 async function loadCommonSettings() {
@@ -158,7 +159,7 @@ async function removeFolderAt(index) {
     saveSettings();
 }
 
-// Run pipeline for a specific folder
+// Run pipeline for a specific folder (uses batch/start endpoint for consistency)
 async function runPipelineForFolder(folderPath, dropdownId) {
     const dropdown = document.getElementById(dropdownId);
     if (!dropdown) {
@@ -166,6 +167,7 @@ async function runPipelineForFolder(folderPath, dropdownId) {
         return;
     }
     const startPoint = dropdown.value;
+    const profileId = document.getElementById('activeProfile').value || 'profile1';
 
     // UI Feedback
     const btn = dropdown.nextElementSibling;
@@ -176,25 +178,29 @@ async function runPipelineForFolder(folderPath, dropdownId) {
     }
 
     try {
-        const response = await fetch('/api/run-pipeline-step', {
+        // Use batch/start endpoint with single folder
+        const response = await fetch('/api/batch/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                folderPath,
-                profileId: 'default', // Default profile for single runs
-                startPoint
+                folders: [{ path: folderPath, startPoint }],
+                selectedProfiles: [profileId]
             })
         });
 
         const data = await response.json();
 
         if (data.success) {
-            // Log to batch log if available, otherwise console
+            // Log to batch log if available
             if (typeof addBatchLog === 'function') {
                 addBatchLog(`Started ${startPoint} for ${folderPath.split('\\').pop()}`);
             }
-            // Button stays disabled until process completes or page reloads? 
-            // Better to re-enable after a few seconds so user can click again if needed (or if they want to cancel/status)
+            // Show batch status container
+            const batchStatusContainer = document.getElementById('batchStatusContainer');
+            if (batchStatusContainer) batchStatusContainer.style.display = 'block';
+            const batchLogContainer = document.getElementById('batchLogContainer');
+            if (batchLogContainer) batchLogContainer.style.display = 'block';
+
             setTimeout(() => {
                 if (btn) {
                     btn.textContent = originalText;
@@ -202,7 +208,7 @@ async function runPipelineForFolder(folderPath, dropdownId) {
                 }
             }, 3000);
         } else {
-            alert(`Error: ${data.message}`);
+            alert(`Error: ${data.error || data.message}`);
             if (btn) {
                 btn.textContent = originalText;
                 btn.disabled = false;
@@ -321,66 +327,7 @@ async function addSelectedSubdirectories() {
     saveSettings();
 }
 
-// Run pipeline for specific folder from selected start point
-async function runPipelineForFolder(folderPath, dropdownId) {
-    const dropdown = document.getElementById(dropdownId);
-    if (!dropdown) {
-        alert('Could not find pipeline dropdown');
-        return;
-    }
 
-    const startPoint = dropdown.value;
-    const activeProfile = document.getElementById('activeProfile').value;
-
-    // Show progress section
-    document.getElementById('progressSection').style.display = 'block';
-    document.getElementById('progressLog').innerHTML = '';
-
-    addLogEntry(`🚀 Starting pipeline for: ${folderPath}`);
-    addLogEntry(`📍 Start point: ${startPoint}`);
-    addLogEntry(`👤 Profile: ${activeProfile}`);
-    updateStatus('testing');
-
-    try {
-        // Call the appropriate pipeline endpoint based on start point
-        let endpoint = '/api/generate-video';
-        let body = {
-            sourceFolder: folderPath,
-            profileId: activeProfile,
-            startPoint: startPoint
-        };
-
-        // Different endpoints for different steps
-        if (startPoint === 'fire-videos' || startPoint === 'generate-videos') {
-            endpoint = '/api/batch/fire';
-            body = { folders: [folderPath], profileIds: [activeProfile] };
-        } else if (startPoint === 'collect-videos' || startPoint === 'download-videos') {
-            endpoint = '/api/batch/collect';
-            body = { folders: [folderPath] };
-        } else if (startPoint === 'generate-narration' || startPoint === 'generate-audio') {
-            endpoint = '/api/generate-audio';
-            body = { sourceFolder: folderPath, profileId: activeProfile, startPoint: startPoint };
-        }
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            addLogEntry(`✅ Pipeline started successfully`);
-        } else {
-            addLogEntry(`❌ Error: ${result.message || 'Unknown error'}`);
-        }
-
-    } catch (error) {
-        addLogEntry(`❌ Error: ${error.message}`);
-        updateStatus('error');
-    }
-}
 
 // Load and display files from a local folder (creates collapsible sections)
 async function loadFilesFromFolder(folderPath, folderIndex) {
@@ -458,48 +405,12 @@ async function loadFilesFromFolder(folderPath, folderIndex) {
                 progressHtml = '<span style="color: var(--text-muted); font-size: 0.85em;">No progress yet - ready to start</span>';
             }
 
-            // Build dropdown options based on completed steps
-            let dropdownOptions = '<option value="start-fresh">🚀 Start Fresh (Full Pipeline)</option>';
-            let lastOption = 'start-fresh';
-
-            if (completedSteps.includes('perplexity')) {
-                dropdownOptions += '<option value="skip-to-notebooklm">📓 Skip to NotebookLM</option>';
-                lastOption = 'skip-to-notebooklm';
-            }
-
-            if (completedSteps.includes('notebooklm_notebook_created')) {
-                dropdownOptions += '<option value="continue-from-notebook">📂 Continue from Notebook</option>';
-                lastOption = 'continue-from-notebook';
-            }
-
-            if (completedSteps.includes('notebooklm_sources_uploaded')) {
-                dropdownOptions += '<option value="fire-videos">🎬 Fire Videos (Start Generation)</option>';
-                lastOption = 'fire-videos';
-            }
-
-            if (completedSteps.includes('notebooklm_video_1_started') ||
-                completedSteps.includes('notebooklm_video_2_started')) {
-                dropdownOptions += '<option value="generate-narration">🎙️ Generate Narration</option>';
-                lastOption = 'generate-narration';
-            }
-
-            if (completedSteps.includes('perplexity_narration')) {
-                dropdownOptions += '<option value="generate-audio">🔊 Generate Audio</option>';
-                lastOption = 'generate-audio';
-            }
-
-            if (completedSteps.includes('audio_generated') ||
-                completedSteps.includes('notebooklm_video_1_started')) {
-                dropdownOptions += '<option value="collect-videos">📥 Collect/Download Videos</option>';
-                lastOption = 'collect-videos';
-            }
-
-            if (completedSteps.includes('notebooklm_video_1_downloaded') &&
-                completedSteps.includes('notebooklm_video_2_downloaded') &&
-                completedSteps.includes('audio_generated')) {
-                dropdownOptions += '<option value="complete">✅ Complete - All Done</option>';
-                lastOption = 'complete';
-            }
+            // Build dropdown options based on server-provided available start points
+            const availableStartPoints = progressData.availableStartPoints || [
+                { key: 'start-fresh', label: '🚀 Start Fresh (Full Pipeline)' }
+            ];
+            const dropdownOptions = getStartPointOptionsHTML(availableStartPoints);
+            const lastOption = availableStartPoints[availableStartPoints.length - 1].key;
 
             const dropdownId = `pipelineStartPoint_${folderIndex}`;
             pipelineDiv.innerHTML = `
@@ -508,7 +419,7 @@ async function loadFilesFromFolder(folderPath, folderIndex) {
                     ${progressHtml}
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <select id="${dropdownId}" style="flex: 1; min-width: 200px; padding: 8px; border-radius: 4px; border: 1px solid var(--primary); background: var(--bg); color: var(--text); font-size: 0.9em;">
+                    <select id="${dropdownId}" data-folder="${folderPath}" onchange="syncDropdowns(this)" class="pipeline-start-point" style="flex: 1; min-width: 200px; padding: 8px; border-radius: 4px; border: 1px solid var(--primary); background: var(--bg); color: var(--text); font-size: 0.9em;">
                         ${dropdownOptions}
                     </select>
                     <button onclick="runPipelineForFolder('${folderPath.replace(/\\/g, '\\\\')}', '${dropdownId}')" class="btn btn-primary btn-small" style="white-space: nowrap;">
@@ -518,10 +429,17 @@ async function loadFilesFromFolder(folderPath, folderIndex) {
             `;
             folderContent.appendChild(pipelineDiv);
 
-            // Set dropdown to last option after render
+            // Set dropdown to last option after render (or sync with stored choice)
             setTimeout(() => {
                 const dropdown = document.getElementById(dropdownId);
-                if (dropdown) dropdown.value = lastOption;
+                if (dropdown) {
+                    if (folderStartPoints[folderPath]) {
+                        dropdown.value = folderStartPoints[folderPath];
+                    } else {
+                        dropdown.value = lastOption;
+                        folderStartPoints[folderPath] = lastOption;
+                    }
+                }
             }, 50);
 
             // Show warning if perplexity output already exists
@@ -1158,11 +1076,11 @@ async function testPerplexity() {
     if (startPointDropdown) {
         const startPoint = startPointDropdown.value;
 
-        // Route based on selected starting point
-        if (startPoint === 'skip-to-notebooklm') {
+        // Route based on standardized starting point keys from ProgressTracker.ts
+        if (startPoint === 'create-notebook') {
             await skipToNotebookLM();
             return;
-        } else if (startPoint === 'continue-from-notebook') {
+        } else if (startPoint === 'fire-video-1' || startPoint === 'fire-video-2') {
             await continueFromNotebook();
             return;
         } else if (startPoint === 'start-fresh') {
@@ -1803,7 +1721,17 @@ async function loadBatchProfiles() {
     }
 }
 
-// Update batch folder list display
+// Helper to generate start point options consistently
+function getStartPointOptionsHTML(availablePoints) {
+    if (!availablePoints || availablePoints.length === 0) {
+        return '<option value="start-fresh">Start Fresh</option>';
+    }
+    return availablePoints.map(point =>
+        `<option value="${point.key}">${point.label}</option>`
+    ).join('');
+}
+
+// Update batch folder list display with start point dropdowns
 function updateBatchFolderList() {
     const container = document.getElementById('batchFolderList');
     if (!container) return;
@@ -1814,15 +1742,78 @@ function updateBatchFolderList() {
         container.innerHTML = selectedLocalFolders.map((folder, index) => {
             const folderName = folder.split('\\').pop() || folder;
             return `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
-                    <span>📁 ${folderName}</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border); gap: 0.5rem;">
+                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">📁 ${folderName}</span>
+                    <select id="startPoint_${index}" onchange="syncDropdowns(this)" class="batch-start-point" data-folder="${folder}" style="padding: 0.25rem; font-size: 0.8rem; min-width: 140px;">
+                        <option value="">⏳ Loading options...</option>
+                        <option value="start-fresh">Start Fresh</option>
+                    </select>
                     <button onclick="removeBatchFolder(${index})" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">✕</button>
                 </div>
             `;
         }).join('');
+
+        // Fetch available start points for each folder
+        loadFolderStartPoints();
     }
 
     updateBatchButtons();
+}
+
+// Load available start points for each folder based on progress
+async function loadFolderStartPoints() {
+    try {
+        const response = await fetch('/api/folder-start-points', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folders: selectedLocalFolders })
+        });
+
+        const data = await response.json();
+        if (data.success && data.startPoints) {
+            // Update each dropdown with available options
+            for (const [folderPath, availablePoints] of Object.entries(data.startPoints)) {
+                const dropdown = document.querySelector(`select[data-folder="${folderPath.replace(/\\/g, '\\\\')}"]`);
+                if (dropdown && availablePoints.length > 0) {
+                    dropdown.innerHTML = getStartPointOptionsHTML(availablePoints);
+                    // Use stored choice if available, otherwise use the last (most advanced) option
+                    if (folderStartPoints[folderPath]) {
+                        dropdown.value = folderStartPoints[folderPath];
+                    } else {
+                        const lastKey = availablePoints[availablePoints.length - 1].key;
+                        dropdown.value = lastKey;
+                        folderStartPoints[folderPath] = lastKey;
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load folder start points:', error);
+    }
+}
+
+// Sync dropdown values between different sections for the SAME folder
+function syncDropdowns(changedEl) {
+    const folderPath = changedEl.dataset.folder;
+    if (!folderPath) return;
+
+    const newValue = changedEl.value;
+    folderStartPoints[folderPath] = newValue; // Save to global state
+    console.log(`Syncing dropdowns for ${folderPath} to ${newValue}`);
+
+    // Find all other dropdowns for the same folder
+    const selectors = [
+        `select.pipeline-start-point`,
+        `select.batch-start-point`
+    ];
+
+    selectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(dropdown => {
+            if (dropdown !== changedEl && dropdown.dataset.folder === folderPath) {
+                dropdown.value = newValue;
+            }
+        });
+    });
 }
 
 // Remove a folder from batch list
@@ -1853,10 +1844,9 @@ function updateBatchButtons() {
 
 // Start full batch processing
 async function startBatchProcessing() {
-    const folders = selectedLocalFolders;
     const selectedProfiles = getSelectedBatchProfiles();
 
-    if (folders.length === 0) {
+    if (selectedLocalFolders.length === 0) {
         alert('Please add at least one folder');
         return;
     }
@@ -1865,6 +1855,13 @@ async function startBatchProcessing() {
         alert('Please select at least one profile');
         return;
     }
+
+    // Collect folders with their start points
+    const folders = selectedLocalFolders.map((folderPath, index) => {
+        const dropdown = document.getElementById(`startPoint_${index}`);
+        const startPoint = dropdown ? dropdown.value : 'start-fresh';
+        return { path: folderPath, startPoint };
+    });
 
     try {
         document.getElementById('startBatchBtn').disabled = true;
