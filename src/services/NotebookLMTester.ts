@@ -811,9 +811,10 @@ export class NotebookLMTester {
      * Download the completed video from a notebook.
      * @param notebookUrl URL of the notebook with the completed video
      * @param outputPath Path where the video should be saved
+     * @param videoIndex 1-based index of the video to download (default 1)
      * @returns true if download was successful
      */
-    public async downloadVideo(notebookUrl: string, outputPath: string): Promise<boolean> {
+    public async downloadVideo(notebookUrl: string, outputPath: string, videoIndex: number = 1): Promise<boolean> {
         try {
             const page = await this.browser.getPage('notebooklm-test', notebookUrl);
             await this.browser.randomDelay(2000, 3000);
@@ -831,40 +832,57 @@ export class NotebookLMTester {
                 downloadPath: outputDir
             });
 
-            // Try to find and click the download button
-            const downloadClicked = await page.evaluate(() => {
-                // Try various download button selectors
-                const selectors = [
-                    'button[aria-label*="Download"]',
-                    'button[aria-label*="download"]',
-                    'a[download]',
-                    '[class*="download-button"]',
-                    'button:has(mat-icon[fonticon="download"])',
-                    // Menu button that might open download options
-                    'button[aria-label*="More options"]'
-                ];
+            // Try to find and click the download button via the "More" menu on the artifact card
+            const downloadClicked = await page.evaluate(async (index) => {
+                // 1. Find all "Video Overview" buttons (the rounded rectangle artifacts)
+                // They have aria-description="Video Overview"
+                const videoArtifacts = Array.from(document.querySelectorAll('button[aria-description="Video Overview"]'));
 
-                for (const selector of selectors) {
-                    const btn = document.querySelector(selector) as HTMLElement;
-                    if (btn) {
-                        btn.click();
-                        return true;
-                    }
+                if (videoArtifacts.length === 0) {
+                    console.log('No "Video Overview" artifacts found.');
+                    return false;
                 }
 
-                // Try finding by text content
-                const buttons = Array.from(document.querySelectorAll('button, a'));
-                const downloadBtn = buttons.find(b =>
-                    b.textContent?.toLowerCase().includes('download')
+                // Get target artifact based on index (1-based)
+                const targetArtifact = videoArtifacts[index - 1] as HTMLElement;
+
+                if (!targetArtifact) {
+                    console.log(`Video artifact at index ${index} not found. Found ${videoArtifacts.length} total.`);
+                    return false;
+                }
+
+                // 2. Find the "More" button (3 dots) INSIDE this artifact button
+                const moreButton = targetArtifact.querySelector('button[aria-label="More"]') as HTMLElement;
+
+                if (!moreButton) {
+                    console.log('More button (3 dots) not found inside the video artifact.');
+                    return false;
+                }
+
+                // 3. Click the "More" button to open the menu
+                moreButton.click();
+
+                // Wait a bit for the menu to open (simulated wait in browser context)
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // 4. Find the "Download" menu item
+                const menuItems = Array.from(document.querySelectorAll('.mat-mdc-menu-item'));
+                const downloadItem = menuItems.find(item =>
+                    item.textContent?.trim().includes('Download')
                 ) as HTMLElement;
 
-                if (downloadBtn) {
-                    downloadBtn.click();
+                if (downloadItem) {
+                    downloadItem.click();
                     return true;
                 }
 
+                console.log('"Download" option not found in the menu.');
                 return false;
-            });
+            }, videoIndex);
+
+            if (!downloadClicked) {
+                console.log('Failed to initiate download via More menu, attempting generic fallback...');
+            }
 
             if (!downloadClicked) {
                 console.log('Download button not found, trying alternative methods...');
@@ -883,7 +901,7 @@ export class NotebookLMTester {
                 if (videoUrl) {
                     console.log(`Found video URL: ${videoUrl}`);
                     // Navigate directly to trigger download
-                    await page.goto(videoUrl);
+                    await page.goto(videoUrl as string);
                     await this.browser.randomDelay(5000, 10000);
                     return true;
                 }
@@ -891,21 +909,44 @@ export class NotebookLMTester {
                 return false;
             }
 
+            // Snapshot files before download
+            const existingFiles = new Set(fs.readdirSync(outputDir));
+
             console.log('Download initiated, waiting for file...');
 
-            // Wait for download to complete
-            await this.browser.randomDelay(10000, 20000);
+            // Wait for download to complete - polling for new file
+            let newFile: string | undefined;
+            const maxWaitTime = 60000; // 60s max wait for download
+            const pollInterval = 2000;
+            const startTime = Date.now();
 
-            // Check if file was downloaded (look for any video file in output dir)
-            const files = fs.readdirSync(outputDir);
-            const videoFile = files.find(f =>
-                f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mov')
-            );
+            while (Date.now() - startTime < maxWaitTime) {
+                await this.browser.randomDelay(pollInterval, pollInterval + 500);
 
-            if (videoFile) {
+                const currentFiles = fs.readdirSync(outputDir);
+                const candidates = currentFiles.filter(f => !existingFiles.has(f) && (f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mov')));
+
+                if (candidates.length > 0) {
+                    // Found a new file!
+                    // Wait until it stops growing (simple check) or just assume done if not .crdownload (Chrome)
+                    const candidate = candidates[0];
+                    if (!candidate.endsWith('.crdownload') && !candidate.endsWith('.tmp')) {
+                        // Double check file size stability? For now, just take it if it's a valid extension
+                        newFile = candidate;
+                        break;
+                    }
+                }
+            }
+
+            if (newFile) {
                 // Rename to expected output path
-                const downloadedPath = path.join(outputDir, videoFile);
+                const downloadedPath = path.join(outputDir, newFile);
+
                 if (downloadedPath !== outputPath && fs.existsSync(downloadedPath)) {
+                    // Overwrite if exists
+                    if (fs.existsSync(outputPath)) {
+                        try { fs.unlinkSync(outputPath); } catch (e) { }
+                    }
                     fs.renameSync(downloadedPath, outputPath);
                 }
                 console.log(`Video saved to: ${outputPath}`);
@@ -920,6 +961,7 @@ export class NotebookLMTester {
             return false;
         }
     }
+
 
     public async close(): Promise<void> {
         await this.browser.closePage('notebooklm-test');

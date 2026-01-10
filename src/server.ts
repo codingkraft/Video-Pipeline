@@ -1211,6 +1211,61 @@ app.post('/api/batch/pending', (req: Request, res: Response) => {
     }
 });
 
+// API: Create timeline from video/audio with scene and silence detection
+// Supports multiple videos and audios - each on its own track
+app.post('/api/create-timeline', async (req: Request, res: Response) => {
+    try {
+        const { TimelineProcessor } = await import('./processing/TimelineProcessor');
+        const {
+            videoPaths,      // Array of video file paths
+            audioPaths,      // Array of audio file paths
+            outputDir,
+            exportFormat = 'edl',
+            sceneThreshold,
+            silenceDuration,
+            silenceThreshold,
+            reducedPauseDuration,
+            projectName,
+            frameRate
+        } = req.body;
+
+        if (!outputDir) {
+            return res.status(400).json({ error: 'outputDir is required' });
+        }
+
+        const videoArr = Array.isArray(videoPaths) ? videoPaths : (videoPaths ? [videoPaths] : []);
+        const audioArr = Array.isArray(audioPaths) ? audioPaths : (audioPaths ? [audioPaths] : []);
+
+        if (videoArr.length === 0 && audioArr.length === 0) {
+            return res.status(400).json({ error: 'At least one video or audio path is required' });
+        }
+
+        console.log(`Creating timeline: ${videoArr.length} videos, ${audioArr.length} audios, format=${exportFormat}`);
+
+        const processor = new TimelineProcessor();
+        const result = await processor.createTimeline({
+            videoPaths: videoArr,
+            audioPaths: audioArr,
+            outputDir,
+            exportFormat,
+            sceneThreshold: sceneThreshold || undefined,
+            silenceDuration: silenceDuration || undefined,
+            silenceThreshold: silenceThreshold || undefined,
+            reducedPauseDuration: reducedPauseDuration || undefined,
+            projectName: projectName || undefined,
+            frameRate: frameRate || undefined
+        });
+
+        res.json(result);
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Timeline creation failed: ' + (error as Error).message
+        });
+    }
+});
+
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('Client connected');

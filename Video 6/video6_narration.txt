@@ -1,0 +1,35 @@
+[Slide 1 - Video 6]
+
+You're building a game and need to remember the player's **username**, **score**, and **level**. Print them once? They're gone. You need to **STORE** that data so you can use it throughout your code. That's what variables do—they're Python's memory system.
+
+[Slide 2 - Video 6]
+
+Your friend Alex hardcodes their name in three places: welcome message, player setup, scoring system. You want to reuse the code for **YOUR game**—just change the name. You manually hunt down and change 'Alex' to 'Jordan' everywhere... but you miss one. Now your game says **'Welcome to Jordan's Game'** but **'High scores managed by Alex.'** Broken. With variables, you store the name once at the top and use it everywhere. Change it once, everything updates. Code reuse becomes clean.
+
+[Slide 3 - Video 6]
+
+Think of variables like your **phone contacts**. You save '**Mom**' once with her number, email, and birthday. Later, you don't retype her entire information—you just tap '**Mom**' and the phone remembers everything. Variables work the same way. You store something once, use the name repeatedly, and Python remembers what's inside.
+
+[Slide 4 - Video 6]
+
+Creating a variable is simple. Pick a name—like **favorite_snack**—use the equals sign, then provide the value. This is called **assignment**. You're telling Python: 'Hey, whenever I say favorite_snack, I mean Kale Chips.' We're definitely lying to ourselves, but Python trusts us.
+
+[Slide 5 - Video 6]
+
+Let's be real. We update **favorite_snack** to 'Double Cheeseburger' because honesty matters. Now when we print favorite_snack three times, Python looks in the variable and gives us the burger each time. We stored it once, used it three times. Much better than typing it repeatedly.
+
+[Slide 6 - Video 6]
+
+Variables can store different kinds of data, just like different **pockets in a backpack**. You throw your phone in the front pocket, laptop in the main compartment, water bottle on the side, and that mystery sandwich in the hidden compartment. Each pocket doesn't care what it holds—text and numbers—it just keeps whatever you put in. Variables work exactly the same way.
+
+[Slide 7 - Video 6]
+
+Important: the equals sign isn't saying **'level IS 5'** like a math fact. It's a command. It grabs the value on the right and shoves it into the variable on the left. It's aggressive. Python goes: **'Take 5. Put it in level. Now.'**
+
+[Slide 8 - Video 6]
+
+Here's the key difference. Printing a value directly is like a **Snapchat message**. It appears once, and poof, it's gone. Variables are like saving it to your **Camera Roll**. You store the link, and now you can share it with Friend 1, Friend 2, Friend 3, or anywhere else in your program. The value stays saved and ready to use.
+
+[Slide 9 - Video 6]
+
+Variables are **named storage containers**. Pick a name, use equals to shove the value in, then use that name anytime to access what's stored. Whether it's a funny meme, your true snack preferences, or your WiFi password, variables help your code remember what matters.

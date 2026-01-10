@@ -2,6 +2,7 @@ import { ProgressTracker, PIPELINE_STEPS, START_POINTS, StartPointKey, START_POI
 import { NotebookLMTester, NotebookLMTestConfig } from './NotebookLMTester';
 import { PerplexityTester } from './PerplexityTester';
 import { GoogleStudioTester } from './GoogleStudioTester';
+import { NotebookLMRemoverTester } from './NotebookLMRemoverTester';
 import { CaptiveBrowser } from '../browser/CaptiveBrowser';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -49,6 +50,7 @@ export interface FolderBatchStatus {
     elapsedMs?: number;
     error?: string;
     notebookUrl?: string;
+    startPoint?: string;
 }
 
 /**
@@ -79,6 +81,7 @@ export class BatchProcessor {
     private notebookLMTester: NotebookLMTester;
     private googleStudioTester: GoogleStudioTester;
     private perplexityTester: PerplexityTester;
+    private logoRemoverTester: NotebookLMRemoverTester;
     private browser: CaptiveBrowser;
     private delays: DelaySettings;
     private currentBatch: FolderBatchStatus[] = [];
@@ -93,6 +96,7 @@ export class BatchProcessor {
         this.notebookLMTester = new NotebookLMTester();
         this.googleStudioTester = new GoogleStudioTester();
         this.perplexityTester = new PerplexityTester();
+        this.logoRemoverTester = new NotebookLMRemoverTester();
         this.browser = CaptiveBrowser.getInstance();
         this.delays = this.loadDelaySettings();
     }
@@ -265,38 +269,46 @@ export class BatchProcessor {
      * Load pending folders from ProgressTracker (for resume after restart)
      * Now checks for both video_1 and video_2
      */
+    /**
+     * Load pending folders from ProgressTracker (for resume after restart)
+     * Returns unique folders that have ANY video started but not downloaded.
+     */
     private loadPendingFoldersFromProgress(providedFolders?: string[]): FolderBatchStatus[] {
         const foldersToCheck = providedFolders || this.currentBatch.map(f => f.folderPath);
+        // Use Set to ensure uniqueness of folder paths to check
+        const uniquePaths = [...new Set(foldersToCheck)];
         const pending: FolderBatchStatus[] = [];
 
-        for (const folderPath of foldersToCheck) {
+        for (const folderPath of uniquePaths) {
             const progress = ProgressTracker.getProgress(folderPath);
             if (!progress) continue;
 
-            // Check both video_1 and video_2
-            for (let videoNum = 1; videoNum <= 2; videoNum++) {
-                const videoStartedStep = `notebooklm_video_${videoNum}_started`;
-                const videoDownloadedStep = `notebooklm_video_${videoNum}_downloaded`;
+            const isV1Pending = progress.steps['notebooklm_video_1_started']?.completed &&
+                !progress.steps['notebooklm_video_1_downloaded']?.completed;
+            const isV2Pending = progress.steps['notebooklm_video_2_started']?.completed &&
+                !progress.steps['notebooklm_video_2_downloaded']?.completed;
 
-                const videoStarted = progress.steps[videoStartedStep]?.completed;
-                const videoDownloaded = progress.steps[videoDownloadedStep]?.completed;
+            if (isV1Pending || isV2Pending) {
+                // Check if we already have this folder in currentBatch
+                const existing = this.currentBatch.find(f => f.folderPath === folderPath);
 
-                if (videoStarted && !videoDownloaded) {
-                    const notebookUrl = progress.steps[videoStartedStep]?.notebookUrl;
-                    const videoStartedAt = progress.steps[videoStartedStep]?.videoStartedAt;
-                    const profileId = progress.profileId;
+                if (existing) {
+                    pending.push(existing);
+                } else {
+                    // Create new status entry
+                    // Try to find a valid notebook URL from any completed step
+                    const notebookUrl = progress.steps.notebooklm_notebook_created?.notebookUrl ||
+                        progress.steps.notebooklm_video_1_started?.notebookUrl ||
+                        progress.steps.notebooklm_video_2_started?.notebookUrl;
 
-                    if (notebookUrl) {
-                        pending.push({
-                            folderPath,
-                            folderName: `${path.basename(folderPath)} (Video ${videoNum})`,
-                            status: 'video_generating',
-                            profileId,
-                            notebookUrl,
-                            videoStartedAt,
-                            error: `video_${videoNum}` // Store which video this is
-                        });
-                    }
+                    pending.push({
+                        folderPath,
+                        folderName: path.basename(folderPath),
+                        status: 'video_generating',
+                        profileId: progress.profileId,
+                        notebookUrl,
+                        videoStartedAt: progress.lastUpdated // Approximate
+                    });
                 }
             }
         }
@@ -311,12 +323,24 @@ export class BatchProcessor {
     public async collectAllVideos(providedFolders?: string[]): Promise<FolderBatchStatus[]> {
         this.log('Starting PHASE 2: Collect completed videos');
 
-        // Load pending folders from ProgressTracker (supports resume after restart)
+        // Force reset download status for folders that requested collection
+        // This ensures they are picked up by the filter and the loop
+        const foldersToReset = providedFolders || this.currentBatch.map(f => f.folderPath);
+        for (const folderPath of foldersToReset) {
+            const status = this.currentBatch.find(f => f.folderPath === folderPath);
+            if (status?.startPoint === 'collect-videos') {
+                // Clear download steps so the filter and loop treat them as pending
+                ProgressTracker.updateStep(folderPath, 'notebooklm_video_1_downloaded', { completed: false });
+                ProgressTracker.updateStep(folderPath, 'notebooklm_video_2_downloaded', { completed: false });
+                this.log(`Forced re-download enabled for ${path.basename(folderPath)}`);
+            }
+        }
+
+        // Load pending folders (unique entries)
         let pendingFolders = this.loadPendingFoldersFromProgress(providedFolders);
 
-        // Merge with currentBatch if it exists
+        // Merge updated pending objects into currentBatch
         if (this.currentBatch.length > 0) {
-            // Update currentBatch with loaded folders
             for (const pending of pendingFolders) {
                 const existing = this.currentBatch.find(f => f.folderPath === pending.folderPath);
                 if (existing) {
@@ -326,14 +350,30 @@ export class BatchProcessor {
                 }
             }
         } else {
-            // No currentBatch, use loaded folders
             this.currentBatch = pendingFolders;
         }
 
-        // Re-filter to get actual pending folders
-        pendingFolders = this.currentBatch.filter(
-            f => f.status === 'video_generating' && !ProgressTracker.isStepComplete(f.folderPath, 'notebooklm_video_downloaded')
-        );
+        // Re-filter to get active pending folders (refresh from source of truth)
+        // We filter out folders where ALL started videos are downloaded
+        pendingFolders = this.currentBatch.filter(f => {
+            const progress = ProgressTracker.getProgress(f.folderPath);
+            if (!progress) return false;
+
+            // Check if "Collect Videos" mode is forced for this folder
+            const isCollectForce = f.startPoint === 'collect-videos';
+            // We can collect if we have a notebook URL (created or from manual/previous steps)
+            const hasNotebook = !!(progress.steps['notebooklm_notebook_created']?.notebookUrl || f.notebookUrl || progress.steps['notebooklm_video_1_started']?.notebookUrl);
+
+            // V1 Pending: Started OR (Force Mode & Notebook exists) AND Not Downloaded
+            const isV1Pending = (progress.steps['notebooklm_video_1_started']?.completed || (isCollectForce && hasNotebook)) &&
+                !progress.steps['notebooklm_video_1_downloaded']?.completed;
+
+            // V2 Pending: Same logic
+            const isV2Pending = (progress.steps['notebooklm_video_2_started']?.completed || (isCollectForce && hasNotebook)) &&
+                !progress.steps['notebooklm_video_2_downloaded']?.completed;
+
+            return isV1Pending || isV2Pending;
+        });
 
         if (pendingFolders.length === 0) {
             this.log('No pending videos to collect');
@@ -346,75 +386,118 @@ export class BatchProcessor {
         const startTime = Date.now();
 
         while (pendingFolders.length > 0 && !this.abortRequested) {
-            // Check if we've exceeded max wait time
+            // Check max wait time
             if (Date.now() - startTime > this.delays.maxWaitForVideoMs) {
                 this.log('Max wait time exceeded, stopping collect phase');
                 break;
             }
 
+            let anyStillGenerating = false; // Track if we need to wait
+
+            // Iterate over a copy to safe-delete
             for (const folder of [...pendingFolders]) {
                 if (this.abortRequested) break;
 
-                // Extract video number from folder.error field (hacky but works)
-                const videoNum = folder.error?.replace('video_', '') || '1';
                 const folderName = path.basename(folder.folderPath);
-                this.log(`Checking ${folderName} (Video ${videoNum}) for completion...`);
+                const progress = ProgressTracker.getProgress(folder.folderPath);
+                if (!progress) continue;
 
-                try {
-                    // Initialize browser with the folder's profile
-                    const profileId = folder.profileId || ProgressTracker.getFolderProfile(folder.folderPath);
-                    if (profileId) {
-                        await this.browser.initialize({ profileId });
-                    }
+                let folderStillPending = false;
+                let anyDownloading = false;
+                let anyError = false;
 
-                    // Check video status
-                    const status = await this.notebookLMTester.checkVideoStatus(folder.notebookUrl!);
+                // Check BOTH videos
+                for (let videoNum = 1; videoNum <= 2; videoNum++) {
+                    const startedKey = `notebooklm_video_${videoNum}_started` as any;
+                    const downloadedKey = `notebooklm_video_${videoNum}_downloaded` as any;
 
-                    if (status === 'ready') {
-                        this.log(`${folderName} (Video ${videoNum}): Video ready, downloading...`);
-                        this.updateFolderStatus(folder.folderPath, { status: 'downloading' });
+                    const isStarted = progress.steps[startedKey]?.completed;
+                    const isDownloaded = progress.steps[downloadedKey]?.completed;
 
-                        // Download video with unique filename
-                        const outputPath = path.join(folder.folderPath, 'output', `notebooklm_video_${videoNum}.mp4`);
-                        const success = await this.notebookLMTester.downloadVideo(folder.notebookUrl!, outputPath);
+                    // Allow check if specifically started OR if in "Collect" mode with a valid notebook
+                    const isCollectForce = folder.startPoint === 'collect-videos' &&
+                        !!(progress.steps['notebooklm_notebook_created']?.notebookUrl || folder.notebookUrl);
 
-                        if (success) {
-                            const downloadedStepName = `notebooklm_video_${videoNum}_downloaded`;
-                            ProgressTracker.markStepComplete(folder.folderPath, downloadedStepName, {
-                                videoFilePath: outputPath
-                            });
-                            this.updateFolderStatus(folder.folderPath, { status: 'complete' });
-                            this.log(`${folderName} (Video ${videoNum}): Downloaded successfully`);
+                    if ((isStarted || isCollectForce) && !isDownloaded) {
+                        try {
+                            // Get URL for this specific video if possible, else fallback to folder/notebook URL
+                            const notebookUrl = progress.steps[startedKey]?.notebookUrl ||
+                                folder.notebookUrl ||
+                                progress.steps.notebooklm_notebook_created?.notebookUrl;
 
-                            // Remove from pending
-                            const idx = pendingFolders.indexOf(folder);
-                            if (idx > -1) pendingFolders.splice(idx, 1);
-                        } else {
-                            this.log(`${folderName} (Video ${videoNum}): Download failed, will retry`);
+                            if (!notebookUrl) {
+                                this.log(`${folderName} (Video ${videoNum}): No Notebook URL found, cannot check status`);
+                                anyError = true;
+                                folderStillPending = true;
+                                continue;
+                            }
+
+                            // Initialize browser
+                            const profileId = folder.profileId || ProgressTracker.getFolderProfile(folder.folderPath);
+                            if (profileId) await this.browser.initialize({ profileId });
+
+                            // Check status
+                            const status = await this.notebookLMTester.checkVideoStatus(notebookUrl);
+
+                            if (status === 'ready') {
+                                this.log(`${folderName} (Video ${videoNum}): Ready, downloading...`);
+                                anyDownloading = true;
+
+                                // Update UI temporarily
+                                this.updateFolderStatus(folder.folderPath, { status: 'downloading' });
+
+                                // direct videoNum usage
+                                const outputPath = path.join(folder.folderPath, 'output', `notebooklm_video_${videoNum}.mp4`);
+                                const success = await this.notebookLMTester.downloadVideo(notebookUrl, outputPath, videoNum);
+
+                                if (success) {
+                                    ProgressTracker.markStepComplete(folder.folderPath, downloadedKey, {
+                                        videoFilePath: outputPath
+                                    });
+                                    this.log(`${folderName} (Video ${videoNum}): Downloaded`);
+                                } else {
+                                    this.log(`${folderName} (Video ${videoNum}): Download failed, will retry`);
+                                    folderStillPending = true;
+                                }
+                            } else if (status === 'error') {
+                                this.log(`${folderName} (Video ${videoNum}): Generation failed`);
+                                anyError = true;
+                                folderStillPending = true;
+                            } else {
+                                // Generating - this is the only case where we need to wait
+                                const startedAt = progress.steps[startedKey]?.videoStartedAt;
+                                const elapsed = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 60000) : 0;
+                                this.log(`${folderName} (Video ${videoNum}): Still generating... (${elapsed}m)`);
+                                folderStillPending = true;
+                                anyStillGenerating = true; // This triggers the wait
+                            }
+                        } catch (e) {
+                            this.log(`${folderName} (Video ${videoNum}): Error - ${e}`);
+                            anyError = true;
+                            folderStillPending = true;
                         }
-                    } else if (status === 'error') {
-                        this.updateFolderStatus(folder.folderPath, {
-                            status: 'error',
-                            error: `Video ${videoNum} generation failed`
-                        });
-                        const idx = pendingFolders.indexOf(folder);
-                        if (idx > -1) pendingFolders.splice(idx, 1);
-                    } else {
-                        // Still generating
-                        const elapsed = folder.videoStartedAt
-                            ? Math.round((Date.now() - new Date(folder.videoStartedAt).getTime()) / 60000)
-                            : 0;
-                        this.log(`${folderName} (Video ${videoNum}): Still generating (${elapsed} min elapsed)`);
                     }
+                }
 
-                } catch (error) {
-                    const errorMsg = error instanceof Error ? error.message : String(error);
-                    this.log(`${folderName} (Video ${videoNum}): Error checking status - ${errorMsg}`);
+                // Update folder status based on overall state
+                if (anyError) {
+                    this.updateFolderStatus(folder.folderPath, { status: 'error' });
+                } else if (anyDownloading) {
+                    // Status already explicitly updated during download
+                } else if (!folderStillPending) {
+                    // All done!
+                    this.updateFolderStatus(folder.folderPath, { status: 'complete' });
+                    // Remove from pendingFolders
+                    const idx = pendingFolders.indexOf(folder);
+                    if (idx > -1) pendingFolders.splice(idx, 1);
+                } else {
+                    // Still pending
+                    this.updateFolderStatus(folder.folderPath, { status: 'video_generating' });
                 }
             }
 
-            // Wait before next check round
-            if (pendingFolders.length > 0 && !this.abortRequested) {
+            // Only wait if something is actually generating (not if downloads complete/fail)
+            if (anyStillGenerating && pendingFolders.length > 0 && !this.abortRequested) {
                 const waitMs = this.delays.videoCheckIntervalMs;
                 this.log(`Waiting ${waitMs / 1000}s before next status check...`);
                 await this.sleep(waitMs);
@@ -423,6 +506,7 @@ export class BatchProcessor {
 
         return this.currentBatch;
     }
+
 
     /**
      * Process audio generation for a single folder
@@ -467,64 +551,81 @@ export class BatchProcessor {
             const shouldGenerateNarration = spConfig.forceRegenerateNarration || (!hasNarration && !spConfig.skipNarrationGeneration);
 
             if (shouldGenerateNarration) {
-                this.log(`${folderName}: Generating narration via Perplexity...`);
                 const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
                 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
-                const videoResponsePath = path.join(folderPath, 'output', 'perplexity_video_response.txt');
-                const legacyVR1 = path.join(folderPath, 'perplexity_response.txt');
-                const legacyVR2 = path.join(folderPath, 'output', 'perplexity_response.txt');
-
+                // Find narration input file in source folder
                 let contextFile = '';
-                if (fs.existsSync(videoResponsePath)) contextFile = videoResponsePath;
-                else if (fs.existsSync(legacyVR1)) contextFile = legacyVR1;
-                else if (fs.existsSync(legacyVR2)) contextFile = legacyVR2;
+                try {
+                    const filesInFolder = fs.readdirSync(folderPath);
+                    const narrationFile = filesInFolder.find(f =>
+                        f.toLowerCase().includes('narration') && f.toLowerCase().endsWith('.txt')
+                    );
 
-                if (contextFile) {
-                    // Get profile-specific audio narration URL
-                    const audioNarrationUrl = settings.profiles?.[profileId]?.audioNarrationPerplexityUrl || settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/';
-
-                    const genResult = await this.perplexityTester.testWorkflow({
-                        chatUrl: audioNarrationUrl,
-                        files: [contextFile],
-                        prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
-                        sourceFolder: folderPath,
-                        headless: settings.headlessMode,
-                        shouldDeleteConversation: settings.deleteConversation,
-                        model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
-                        profileId: profileId,
-                        outputFilename: 'perplexity_audio_response'
-                    });
-
-                    if (genResult.success) {
-                        hasNarration = true;
-                        // Mark the audio narration step as complete
-                        ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
-                        await this.sleep(2000);
+                    if (narrationFile) {
+                        contextFile = path.join(folderPath, narrationFile);
+                        this.log(`${folderName}: Found narration input file: ${narrationFile}`);
                     } else {
-                        throw new Error(`Narration failed: ${genResult.message}`);
+                        throw new Error(`No narration input file found in folder. Expected a .txt file with "narration" in the filename.`);
                     }
-                }
-            }
-
-            if (hasNarration) {
-                const { AudioGenerator } = await import('./AudioGenerator');
-                const audioGen = new AudioGenerator();
-                let finalNarrationPath = narrationPath;
-                if (!fs.existsSync(finalNarrationPath)) {
-                    finalNarrationPath = fs.existsSync(legacyPath1) ? legacyPath1 : legacyPath2;
+                } catch (error) {
+                    // Re-throw the error to stop execution
+                    throw new Error(`Failed to find narration input file: ${(error as Error).message}`);
                 }
 
-                await audioGen.generateAudio({
+                // Get profile-specific audio narration URL
+                const audioNarrationUrl = settings.profiles?.[profileId]?.audioNarrationPerplexityUrl || settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/';
+
+                const genResult = await this.perplexityTester.testWorkflow({
+                    chatUrl: audioNarrationUrl,
+                    files: [contextFile],
+                    prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
                     sourceFolder: folderPath,
+                    headless: settings.headlessMode,
+                    shouldDeleteConversation: settings.deleteConversation,
+                    model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
                     profileId: profileId,
-                    narrationFilePath: finalNarrationPath
+                    outputFilename: 'perplexity_audio_response'
                 });
 
-                ProgressTracker.markStepComplete(folderPath, 'audio_generated');
-                this.updateFolderStatus(folderPath, { status: 'complete' });
-                this.log(`${folderName}: Audio generation complete`);
+                if (genResult.success) {
+                    hasNarration = true;
+                    // Mark the audio narration step as complete
+                    ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
+                    await this.sleep(2000);
+                } else {
+                    throw new Error(`Narration generation failed: ${genResult.message}`);
+                }
             }
+
+            if (!hasNarration) {
+                throw new Error(`No narration file found. Cannot proceed with audio generation.`);
+            }
+
+            // Generate audio from narration
+            const { AudioGenerator } = await import('./AudioGenerator');
+            const audioGen = new AudioGenerator();
+            let finalNarrationPath = narrationPath;
+            if (!fs.existsSync(finalNarrationPath)) {
+                finalNarrationPath = fs.existsSync(legacyPath1) ? legacyPath1 : legacyPath2;
+            }
+
+            // Read settings for Google Studio configuration
+            const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+
+            await audioGen.generateAudio({
+                sourceFolder: folderPath,
+                profileId: profileId,
+                narrationFilePath: finalNarrationPath,
+                googleStudioModel: settings.googleStudioModel,
+                googleStudioVoice: settings.googleStudioVoice,
+                googleStudioStyleInstructions: settings.googleStudioStyleInstructions
+            });
+
+            ProgressTracker.markStepComplete(folderPath, 'audio_generated');
+            this.updateFolderStatus(folderPath, { status: 'complete' });
+            this.log(`${folderName}: Audio generation complete`);
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
@@ -549,7 +650,8 @@ export class BatchProcessor {
             folderPath: folder.path,
             folderName: path.basename(folder.path),
             status: 'pending' as FolderStatus,
-            profileId: ProgressTracker.getFolderProfile(folder.path) ?? undefined
+            profileId: ProgressTracker.getFolderProfile(folder.path) ?? undefined,
+            startPoint: folder.startPoint
         }));
         this.onStatusChange?.(this.currentBatch);
 
@@ -577,6 +679,16 @@ export class BatchProcessor {
             // Final Phase: COLLECT all videos that were fired
             if (!this.abortRequested) {
                 await this.collectAllVideos();
+
+                // Final Phase part 2: Remove Logos
+                if (!this.abortRequested) {
+                    await this.removeLogosForAll();
+                }
+
+                // Final Phase part 3: Create Timelines
+                if (!this.abortRequested) {
+                    await this.createTimelinesForAll();
+                }
             }
 
         } finally {
@@ -691,6 +803,213 @@ export class BatchProcessor {
             this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
             this.log(`${folderName}: Perplexity error - ${errorMsg}`);
             return profileIndex + 1;
+        }
+    }
+
+
+    /**
+     * PHASE 3: Remove logos from all collected videos
+     */
+    public async removeLogosForAll(): Promise<void> {
+        this.log('Starting PHASE 3: Remove logos');
+
+        for (const folderStatus of this.currentBatch) {
+            if (this.abortRequested) break;
+
+            // Re-constitute minimal config for the method
+            const folderConfig: FolderConfig = {
+                path: folderStatus.folderPath,
+                startPoint: (folderStatus.startPoint as any) || 'start-fresh'
+            };
+
+            await this.processFolderLogoRemoval(folderConfig, {
+                folders: [],
+                selectedProfiles: [],
+                // We don't really need full batch config here for this specific method
+                notebookLmChatSettings: ''
+            });
+        }
+    }
+
+    /**
+     * PHASE 4: Create Timelines for all folders
+     */
+    public async createTimelinesForAll(): Promise<void> {
+        this.log('Starting PHASE 4: Create Timelines');
+
+        // Dynamic import to avoid circular dependencies
+        const { TimelineProcessor } = await import('../processing/TimelineProcessor');
+        const timelineProcessor = new TimelineProcessor();
+
+        for (const folderStatus of this.currentBatch) {
+            if (this.abortRequested) break;
+
+            const folderPath = folderStatus.folderPath;
+            const folderName = path.basename(folderPath);
+            const outputDir = path.join(folderPath, 'output');
+            const timelineOutputDir = path.join(outputDir, 'timeline');
+
+            // 1. Identify Videos (prefer clean versions)
+            const videoPaths: string[] = [];
+
+            // Check Video 1
+            const v1Clean = path.join(outputDir, 'notebooklm_video_1_clean.mp4');
+            const v1Raw = path.join(outputDir, 'notebooklm_video_1.mp4');
+            if (fs.existsSync(v1Clean)) videoPaths.push(v1Clean);
+            else if (fs.existsSync(v1Raw)) videoPaths.push(v1Raw);
+
+            // Check Video 2
+            const v2Clean = path.join(outputDir, 'notebooklm_video_2_clean.mp4');
+            const v2Raw = path.join(outputDir, 'notebooklm_video_2.mp4');
+            if (fs.existsSync(v2Clean)) videoPaths.push(v2Clean);
+            else if (fs.existsSync(v2Raw)) videoPaths.push(v2Raw);
+
+            if (videoPaths.length === 0) {
+                this.log(`${folderName}: No videos found for timeline, skipping`);
+                continue;
+            }
+
+            // 2. Identify Audio
+            const audioPaths: string[] = [];
+            const audioDir = path.join(outputDir, 'audio');
+
+            if (fs.existsSync(audioDir)) {
+                // Look for narration_take_1.wav and narration_take_2.wav
+                const a1 = path.join(audioDir, 'narration_take_1.wav');
+                const a2 = path.join(audioDir, 'narration_take_2.wav');
+
+                if (fs.existsSync(a1)) audioPaths.push(a1);
+                if (fs.existsSync(a2)) audioPaths.push(a2);
+            }
+
+            if (audioPaths.length === 0) {
+                this.log(`${folderName}: No audio found for timeline (continuing with video only)`);
+            }
+
+            // 3. Create Timeline
+            this.log(`${folderName}: Creating timeline with ${videoPaths.length} videos and ${audioPaths.length} audios...`);
+
+            try {
+                const result = await timelineProcessor.createTimeline({
+                    videoPaths,
+                    audioPaths,
+                    outputDir: timelineOutputDir,
+                    exportFormat: 'edl',
+                    sceneThreshold: 0.1, // Optimized for slideshows
+                    reducedPauseDuration: 1,
+                    projectName: folderName
+                });
+
+                if (result.success) {
+                    this.log(`${folderName}: Timeline created successfully at ${result.timelinePath}`);
+                    // Optional: Update progress/status if we tracked timeline step
+                } else {
+                    this.log(`${folderName}: Timeline creation failed: ${result.message}`);
+                }
+            } catch (error) {
+                this.log(`${folderName}: Timeline creation error: ${(error as Error).message}`);
+            }
+        }
+    }
+
+    /**
+     * Process logo removal for a folder
+     */
+    private async processFolderLogoRemoval(
+        folderConfig: FolderConfig,
+        config: BatchConfig
+    ): Promise<void> {
+        const folderPath = folderConfig.path;
+        const folderName = path.basename(folderPath);
+        const startPoint = folderConfig.startPoint;
+        const spConfig = START_POINT_CONFIGS[startPoint] || START_POINT_CONFIGS['start-fresh'];
+
+        if (spConfig.skipLogoRemoval) {
+            this.log(`${folderName}: Logo removal skipped by configuration`);
+            return;
+        }
+
+        // Initialize browser for logo removal (once per folder)
+        const profileId = ProgressTracker.getFolderProfile(folderPath);
+        if (profileId) {
+            await this.browser.initialize({ profileId });
+        }
+
+        // Check both video 1 and video 2
+        for (let i = 1; i <= 2; i++) {
+            if (this.abortRequested) break;
+
+            const stepName = `notebooklm_video_${i}_logo_removed` as const;
+
+            // Force removal if start point is 'remove-logo'
+            const shouldForce = startPoint === 'remove-logo';
+
+            if (!shouldForce && ProgressTracker.isStepComplete(folderPath, stepName)) {
+                this.log(`${folderName}: Logo removal for video ${i} already complete`);
+                continue;
+            }
+
+            // Check if downloaded video exists
+            const progress = ProgressTracker.getProgress(folderPath);
+            const downloadStepName = `notebooklm_video_${i}_downloaded` as const;
+            const downloadedPath = progress?.steps[downloadStepName]?.videoFilePath
+                || (progress?.steps[downloadStepName] as any)?.videoPath; // Handle legacy prop safely
+
+            let targetPath = downloadedPath;
+
+            if (!downloadedPath) {
+                this.log(`${folderName}: Video ${i} skipped (No download path recorded in progress.json). Run 'Collect Videos' first?`);
+                continue;
+            }
+
+            if (!fs.existsSync(downloadedPath)) {
+                // FALLBACK: Try to find a candidate file if the user renamed it
+                const outputDir = path.dirname(downloadedPath);
+                if (fs.existsSync(outputDir)) {
+                    this.log(`${folderName}: Video ${i} file missing at ${path.basename(downloadedPath)}. Searching for candidate...`);
+
+                    const candidates = fs.readdirSync(outputDir).filter(f =>
+                        f.toLowerCase().endsWith('.mp4') &&
+                        !f.toLowerCase().includes('clean') && // Not a clean version
+                        f !== path.basename(progress?.steps[`notebooklm_video_${i === 1 ? 2 : 1}_downloaded`]?.videoFilePath || 'xxx') // Not the other video
+                    );
+
+                    // If we found candidates, verify they aren't the *other* video logic specifically
+                    // actually checking strict filename against other video is safer
+                    const otherVideoStep = `notebooklm_video_${i === 1 ? 2 : 1}_downloaded` as const;
+                    const otherVideoPath = progress?.steps[otherVideoStep]?.videoFilePath;
+                    const otherVideoName = otherVideoPath ? path.basename(otherVideoPath) : null;
+
+                    const validCandidates = candidates.filter(f => f !== otherVideoName);
+
+                    if (validCandidates.length === 1) {
+                        targetPath = path.join(outputDir, validCandidates[0]);
+                        this.log(`${folderName}: Found candidate file for Video ${i}: ${validCandidates[0]}`);
+                    } else {
+                        // Ambiguous or none
+                        this.log(`${folderName}: Video ${i} skipped (File not found and no single unique candidate found). Candidates: ${validCandidates.join(', ')}`);
+                        continue;
+                    }
+                } else {
+                    this.log(`${folderName}: Video ${i} skipped (File not found at: ${downloadedPath})`);
+                    continue;
+                }
+            }
+
+            this.log(`${folderName}: Removing logo from video ${i} (${path.basename(targetPath)})...`);
+
+            const result = await this.logoRemoverTester.removeLogo(targetPath);
+
+            if (result.success && result.cleanVideoPath) {
+                ProgressTracker.updateStep(folderPath, stepName, {
+                    completed: true,
+                    cleanVideoPath: result.cleanVideoPath
+                });
+                this.log(`${folderName}: Logo removal for video ${i} successful`);
+            } else {
+                this.log(`${folderName}: Logo removal for video ${i} failed: ${result.message}`);
+                this.updateFolderStatus(folderPath, { error: `Logo removal failed for video ${i}` });
+            }
         }
     }
 }

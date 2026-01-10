@@ -13,13 +13,13 @@ export const PIPELINE_STEPS = [
     'notebooklm_video_2_started',     // FIRE: Second video generation started
     // While videos generate, do audio:
     'perplexity_narration',           // Generate narration text
-    'audio_slides_parsed',            // Parse slides from narration
     'audio_generated',                // Generate audio files
     // COLLECT: Download videos after audio is done
     'notebooklm_video_1_downloaded',  // First video downloaded
     'notebooklm_video_2_downloaded',  // Second video downloaded
-    // Post-processing:
-    'logo_removed',                   // [FUTURE] Logo removed from videos
+    // POST-PROCESSING:
+    'notebooklm_video_1_logo_removed', // Logo removed from first video
+    'notebooklm_video_2_logo_removed', // Logo removed from second video
     'video_processed'                 // [FUTURE] Final video processing complete
 ] as const;
 
@@ -37,7 +37,7 @@ export const START_POINTS = [
     { key: 'audio-prompt', label: 'Audio Prompt', resumeFrom: 'perplexity_narration', description: 'Skip to audio narration generation' },
     { key: 'generate-audio', label: 'Generate Audio', resumeFrom: 'audio_generated', description: 'Skip to TTS' },
     { key: 'collect-videos', label: 'Collect Videos', resumeFrom: 'notebooklm_video_1_downloaded', description: 'Skip to video download' },
-    { key: 'remove-logo', label: 'Remove Logo', resumeFrom: 'logo_removed', description: '[FUTURE] Remove branding' },
+    { key: 'remove-logo', label: 'Remove Logo', resumeFrom: 'notebooklm_video_1_logo_removed', description: 'Remove branding from downloaded videos' },
     { key: 'process-video', label: 'Process Video', resumeFrom: 'video_processed', description: '[FUTURE] Final processing' },
 ] as const;
 
@@ -141,6 +141,7 @@ export interface StepProgress {
     audioFiles?: string[];    // List of generated audio files
     videoStartedAt?: string;  // ISO timestamp when video generation was started
     videoFilePath?: string;   // Path to downloaded video file
+    cleanVideoPath?: string;  // Path to video with logo removed
     error?: string;
 }
 

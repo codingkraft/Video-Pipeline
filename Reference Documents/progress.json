@@ -1,0 +1,62 @@
+{
+  "folderPath": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6",
+  "steps": {
+    "perplexity": {
+      "outputFile": "perplexity_audio_response.txt",
+      "steeringPrompt": "You're building a game and need to remember the player's **username**, **score**, and **level**. Print them once? They're gone. You need to **store** that data so you can use it throughout your code. That's what variables do—they're Python's memory system. [file:27]\n\n[PAUSE]\n\nYour friend Alex hardcodes their name in three places: welcome message, player setup, scoring system. You want to reuse the code for **your game**—just change the name. You manually hunt down and change Alex to Jordan everywhere... but you miss one. Now your game says \"Welcome to Jordan's Game\" but \"High scores managed by Alex.\" Broken. With variables, you store the name once at the top and use it everywhere. Change it once, everything updates. Code reuse becomes clean. [file:27]\n\n[PAUSE]\n\nThink of variables like your **phone contacts**. You save Mom once with her number, email, and birthday. Later, you don't retype her entire information—you just tap Mom and the phone remembers everything. Variables work the same way. You store something once, use the name repeatedly, and Python remembers what's inside. [file:27]\n\n[PAUSE]\n\nCreating a variable is simple. Pick a name—like **favorite underscore snack**—use the equals sign, then provide the value. This is called **assignment**. You're telling Python: \"Hey, whenever I say favorite underscore snack, I mean Kale Chips.\" We're definitely lying to ourselves, but Python trusts us. [file:27]\n\n[PAUSE]\n\nLet's be real. We update **favorite underscore snack** to Double Cheeseburger because honesty matters. Now when we print favorite underscore snack three times, Python looks in the variable and gives us the burger each time. We stored it once, used it three times. Much better than typing it repeatedly. [file:27]\n\n[PAUSE]\n\nVariables can store different kinds of data, just like different **pockets in a backpack**. You throw your phone in the front pocket, laptop in the main compartment, water bottle on the side, and that mystery sandwich in the hidden compartment. Each pocket doesn't care what it holds—text and numbers—it just keeps whatever you put in. Variables work exactly the same way. [file:27]\n\n[PAUSE]\n\nImportant: the equals sign isn't saying **level is 5** like a math fact. It's a command. It grabs the value on the right and shoves it into the variable on the left. It's aggressive. Python goes: \"Take 5. Put it in level. Now.\" [file:27]\n\n[PAUSE]\n\nHere's the key difference. Printing a value directly is like a **Snapchat message**. It appears once, and poof, it's gone. Variables are like saving it to your **Camera Roll**. You store the link, and now you can share it with Friend 1, Friend 2, Friend 3, or anywhere else in your program. The value stays saved and ready to use. [file:27]\n\n[PAUSE]\n\nVariables are **named storage containers**. Pick a name, use equals to shove the value in, then use that name anytime to access what's stored. Whether it's a funny meme, your true snack preferences, or your WiFi password, variables help your code remember what matters. [file:27]",
+      "completed": true,
+      "timestamp": "2026-01-10T11:38:49.262Z"
+    },
+    "notebooklm_notebook_created": {
+      "notebookUrl": "https://notebooklm.google.com/notebook/be96aaf5-e5e9-4129-9f3a-a25e84d5eeb2",
+      "completed": true,
+      "timestamp": "2026-01-10T09:03:05.121Z"
+    },
+    "notebooklm_sources_uploaded": {
+      "sourceCount": 8,
+      "completed": true,
+      "timestamp": "2026-01-10T09:45:29.660Z"
+    },
+    "notebooklm_video_1_started": {
+      "completed": true,
+      "videoStartedAt": "2026-01-10T09:46:56.843Z",
+      "notebookUrl": "https://notebooklm.google.com/notebook/be96aaf5-e5e9-4129-9f3a-a25e84d5eeb2",
+      "timestamp": "2026-01-10T09:46:56.843Z"
+    },
+    "notebooklm_video_2_started": {
+      "completed": true,
+      "videoStartedAt": "2026-01-10T09:59:45.473Z",
+      "notebookUrl": "https://notebooklm.google.com/notebook/be96aaf5-e5e9-4129-9f3a-a25e84d5eeb2",
+      "timestamp": "2026-01-10T09:59:45.474Z"
+    },
+    "perplexity_narration": {
+      "completed": true,
+      "timestamp": "2026-01-10T11:39:00.404Z"
+    },
+    "audio_generated": {
+      "audioFiles": [
+        "narration_take_1.wav",
+        "narration_take_2.wav"
+      ],
+      "completed": true,
+      "timestamp": "2026-01-10T12:01:42.821Z"
+    },
+    "notebooklm_video_2_downloaded": {
+      "videoFilePath": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6\\output\\notebooklm_video_2.mp4",
+      "completed": true,
+      "timestamp": "2026-01-10T13:55:23.990Z"
+    },
+    "notebooklm_video_1_downloaded": {
+      "videoFilePath": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6\\output\\notebooklm_video_1.mp4",
+      "completed": true,
+      "timestamp": "2026-01-10T13:54:37.263Z"
+    },
+    "notebooklm_video_2_logo_removed": {
+      "completed": true,
+      "cleanVideoPath": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6\\output\\notebooklm_video_2_clean.mp4",
+      "timestamp": "2026-01-10T16:10:28.624Z"
+    }
+  },
+  "lastUpdated": "2026-01-10T16:10:28.624Z",
+  "profileId": "profile2"
+}
