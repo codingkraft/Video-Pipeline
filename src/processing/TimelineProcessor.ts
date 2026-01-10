@@ -262,7 +262,8 @@ export class TimelineProcessor {
 
             for (let i = 0; i < silences.length; i++) {
                 // Audio segment from currentStart to silence start
-                if (silences[i].startTime > currentStart + 0.1) {
+                // Require at least 0.5s duration to avoid noise/ghost clips
+                if (silences[i].startTime > currentStart + 0.5) {
                     clips.push({
                         index: clips.length + 1,
                         startTime: currentStart,
@@ -274,8 +275,8 @@ export class TimelineProcessor {
                 currentStart = silences[i].endTime;
             }
 
-            // Add final segment if there's content after last silence
-            if (currentStart < totalDuration - 0.1) {
+            // Add final segment if there's content (> 0.5s) after last silence
+            if (currentStart < totalDuration - 0.5) {
                 clips.push({
                     index: clips.length + 1,
                     startTime: currentStart,
@@ -383,15 +384,24 @@ export class TimelineProcessor {
             const isLastClip = i === clips.length - 1;
 
             await new Promise<void>((resolve, reject) => {
-                const cmd = ffmpeg(audioPath)
-                    .setStartTime(clip.startTime)
-                    .setDuration(clip.duration);
+                // Use atrim filter for PRECISE audio cutting (much more reliable than -ss)
+                const cmd = ffmpeg(audioPath);
+
+                // Build filter chain: atrim for precise cut, then optional apad for silence
+                const filters: string[] = [];
+
+                // atrim: precise audio trimming by timestamp
+                filters.push(`atrim=start=${clip.startTime}:duration=${clip.duration}`);
+
+                // asetpts: reset timestamps after trim (required for proper output)
+                filters.push('asetpts=PTS-STARTPTS');
 
                 // Add padding silence at the end if not the last clip
                 if (!isLastClip && reducedPauseDuration > 0) {
-                    // Use apad filter to add silence
-                    cmd.audioFilters(`apad=pad_dur=${reducedPauseDuration}`);
+                    filters.push(`apad=pad_dur=${reducedPauseDuration}`);
                 }
+
+                cmd.audioFilters(filters.join(','));
 
                 cmd.output(outputPath)
                     .on('end', () => {
@@ -477,6 +487,7 @@ export class TimelineProcessor {
      */
     private exportAsXML(timeline: TimelineExport, outputPath: string): void {
         const fps = timeline.frameRate;
+        const totalDurationFrames = Math.round(timeline.totalDuration * fps) || 3600;
 
         // Helper to convert seconds to frame count
         const toFrames = (seconds: number): number => Math.round(seconds * fps);
@@ -496,7 +507,9 @@ export class TimelineProcessor {
             const filePath = clip.clipPath || clip.sourcePath;
             if (!mediaRefs.has(filePath)) {
                 mediaRefs.set(filePath, resourceId);
-                xml += `        <asset id="r${resourceId}" name="${clip.name}" src="file://${filePath.replace(/\\/g, '/')}" hasVideo="${clip.type === 'video' ? '1' : '0'}" hasAudio="1"/>\n`;
+                // Ensure proper 3-slash file URI for Windows
+                const normalizedPath = filePath.replace(/\\/g, '/');
+                xml += `        <asset id="r${resourceId}" name="${clip.name}" src="file:///${normalizedPath}" hasVideo="${clip.type === 'video' ? '1' : '0'}" hasAudio="1"/>\n`;
                 resourceId++;
             }
         }
@@ -509,14 +522,51 @@ export class TimelineProcessor {
                     <spine>
 `;
 
-        // Add video clips to spine
+        // Use a GAP as the primary storyline canvas
+        xml += `                        <gap name="Master" offset="0s" duration="${totalDurationFrames}/${fps}s" start="0s">\n`;
+
+        // Track cursors for sequential placement per track (in Frames)
+        const trackCursors = new Map<number, number>();
+
+        // Add Video clips as connected clips
         for (const clip of timeline.videoClips) {
             const refId = mediaRefs.get(clip.clipPath || clip.sourcePath);
-            const startFrame = toFrames(clip.startTime);
             const durationFrames = toFrames(clip.duration);
-            xml += `                        <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${clip.name}" duration="${durationFrames}/${fps}s" start="0s"/>\n`;
+
+            // Calculate sequential offset for this track
+            const currentCursorFrames = trackCursors.get(clip.track) || 0;
+            const startFrame = currentCursorFrames;
+
+            // Update cursor
+            trackCursors.set(clip.track, currentCursorFrames + durationFrames);
+
+            // V1 -> lane 1. V2 -> lane 2.
+            const lane = clip.track || 1;
+            xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${clip.name}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}"/>\n`;
         }
 
+        // Add Audio clips as connected clips
+        const audioTracks = [...new Set(timeline.audioClips.map(c => c.track))].sort();
+
+        for (const clip of timeline.audioClips) {
+            const refId = mediaRefs.get(clip.clipPath || clip.sourcePath);
+            const durationFrames = toFrames(clip.duration);
+
+            // Calculate sequential offset for this track
+            const currentCursorFrames = trackCursors.get(clip.track) || 0;
+            const startFrame = currentCursorFrames;
+
+            // Update cursor
+            trackCursors.set(clip.track, currentCursorFrames + durationFrames);
+
+            // Map track to negative lane: A1 -> -1, A2 -> -2
+            const trackIndex = audioTracks.indexOf(clip.track);
+            const lane = -1 * (trackIndex + 1);
+
+            xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${clip.name}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}" role="dialogue"/>\n`;
+        }
+
+        xml += `                        </gap>\n`;
         xml += `                    </spine>
                 </sequence>
             </project>
@@ -544,17 +594,23 @@ export class TimelineProcessor {
         format: 'edl' | 'xml' | 'json',
         outputPath: string
     ): void {
-        switch (format) {
-            case 'edl':
-                this.exportAsEDL(timeline, outputPath);
-                break;
-            case 'xml':
-                this.exportAsXML(timeline, outputPath);
-                break;
-            case 'json':
-                this.exportAsJSON(timeline, outputPath);
-                break;
-        }
+        const baseDir = path.dirname(outputPath);
+
+        // ALWAYS export all formats for convenience
+
+        // 1. EDL
+        const edlPath = path.join(baseDir, 'timeline.edl');
+        this.exportAsEDL(timeline, edlPath);
+
+        // 2. XML (Final Cut Pro / Resolve)
+        const xmlPath = path.join(baseDir, 'timeline.fcpxml');
+        this.exportAsXML(timeline, xmlPath);
+
+        // 3. JSON
+        const jsonPath = path.join(baseDir, 'timeline.json');
+        this.exportAsJSON(timeline, jsonPath);
+
+        console.log('Exported timeline in all formats (EDL, XML, JSON)');
     }
 
     /**
@@ -713,8 +769,8 @@ export class TimelineProcessor {
             const timelinePath = path.join(outputDir, `timeline${ext}`);
             this.exportTimeline(timeline, exportFormat, timelinePath);
 
-            const videoSummary = videoPaths.length > 0 ? `${videoPaths.length} video(s) → ${totalVideoClips} clips` : '';
-            const audioSummary = audioPaths.length > 0 ? `${audioPaths.length} audio(s) → ${totalAudioClips} clips` : '';
+            const videoSummary = videoPaths.length > 0 ? `${videoPaths.length} video(s) -> ${totalVideoClips} clips` : '';
+            const audioSummary = audioPaths.length > 0 ? `${audioPaths.length} audio(s) -> ${totalAudioClips} clips` : '';
             const summary = [videoSummary, audioSummary].filter(s => s).join(', ');
 
             return {

@@ -894,7 +894,7 @@ export class BatchProcessor {
                     videoPaths,
                     audioPaths,
                     outputDir: timelineOutputDir,
-                    exportFormat: 'edl',
+                    exportFormat: 'xml',
                     sceneThreshold: 0.1, // Optimized for slideshows
                     reducedPauseDuration: 1,
                     projectName: folderName
