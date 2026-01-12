@@ -1,3 +1,6 @@
+[Title Slide]
+In Python, data disappears as soon as it's printed—unless you store it. Variables are Python's memory system: named containers that hold information so you can reuse it throughout your code. Let's explore how storage solves real problems, makes code cleaner, and keeps your game's secrets safe.
+
 [Slide 1 - Video 6]
 
 You're building a game and need to remember the player's **username**, **score**, and **level**. Print them once? They're gone. You need to **STORE** that data so you can use it throughout your code. That's what variables do—they're Python's memory system.

@@ -102,7 +102,7 @@ export class NotebookLMTester {
                 // Get all supported files from source folder
                 if (fs.existsSync(config.sourceFolder)) {
                     filesToUpload = fs.readdirSync(config.sourceFolder)
-                        .filter(f => /\.(pdf|txt|md|docx?|jpe?g|png|gif|webp|bmp)$/i.test(f))
+                        .filter(f => !f.startsWith('~') && /\.(pdf|txt|md|docx?|jpe?g|png|gif|webp|bmp)$/i.test(f))
                         .map(f => path.join(config.sourceFolder, f));
                     steps.push(`✓ Found ${filesToUpload.length} files in source folder`);
                 }

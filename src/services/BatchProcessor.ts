@@ -775,7 +775,7 @@ export class BatchProcessor {
             const profileSettings = settings.profiles?.[profileId] || {};
 
             const files = fs.readdirSync(folderPath)
-                .filter(f => /\.(pdf|txt|md|docx?|jpe?g|png)$/i.test(f))
+                .filter(f => !f.startsWith('~') && /\.(pdf|txt|md|docx?|jpe?g|png)$/i.test(f))
                 .map(f => path.join(folderPath, f));
 
             this.log(`${folderName}: Generating prompt (Profile: ${profileId})...`);
