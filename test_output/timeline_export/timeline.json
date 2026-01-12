@@ -1,0 +1,41 @@
+{
+  "projectName": "Test_Premiere_Export",
+  "frameRate": 30,
+  "totalDuration": 10,
+  "videoClips": [
+    {
+      "index": 1,
+      "name": "Clip_001",
+      "type": "video",
+      "sourcePath": "C:\\Users\\Nitin\\Videos\\sample_video.mp4",
+      "imagePath": "C:\\Users\\Nitin\\Pictures\\sample_image.jpg",
+      "startTime": 0,
+      "endTime": 5,
+      "duration": 5,
+      "track": 1
+    },
+    {
+      "index": 2,
+      "name": "Clip_002",
+      "type": "video",
+      "sourcePath": "C:\\Users\\Nitin\\Videos\\sample_video.mp4",
+      "imagePath": "C:\\Users\\Nitin\\Pictures\\sample_image.jpg",
+      "startTime": 10,
+      "endTime": 15,
+      "duration": 5,
+      "track": 1
+    }
+  ],
+  "audioClips": [
+    {
+      "index": 1,
+      "name": "Audio_001",
+      "type": "audio",
+      "sourcePath": "C:\\Users\\Nitin\\Music\\sample_audio.mp3",
+      "startTime": 0,
+      "endTime": 10,
+      "duration": 10,
+      "track": 1
+    }
+  ]
+}

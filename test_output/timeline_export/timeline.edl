@@ -1,0 +1,14 @@
+TITLE: Test_Premiere_Export
+FCM: NON-DROP FRAME
+
+001  AX       V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: Clip_001
+* SOURCE FILE: C:\Users\Nitin\Videos\sample_video.mp4
+
+002  AX       V     C        00:00:10:00 00:00:15:00 00:00:05:00 00:00:10:00
+* FROM CLIP NAME: Clip_002
+* SOURCE FILE: C:\Users\Nitin\Videos\sample_video.mp4
+
+003  AX       A     C        00:00:00:00 00:00:10:00 00:00:00:00 00:00:10:00
+* FROM CLIP NAME: Audio_001
+* SOURCE FILE: C:\Users\Nitin\Music\sample_audio.mp3

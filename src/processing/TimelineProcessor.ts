@@ -525,7 +525,7 @@ export class TimelineProcessor {
     }
 
     /**
-     * Export timeline in Final Cut Pro XML format
+     * Export timeline in Final Cut Pro XML format (FCPXML 1.9 for DaVinci Resolve)
      */
     private exportAsXML(timeline: TimelineExport, outputPath: string): void {
         const fps = timeline.frameRate;
@@ -533,6 +533,20 @@ export class TimelineProcessor {
 
         // Helper to convert seconds to frame count
         const toFrames = (seconds: number): number => Math.round(seconds * fps);
+
+        // Escape XML special characters
+        const escapeXml = (str: string): string => {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        };
+
+        // For still images, we give them a very long intrinsic duration (e.g., 1 hour)
+        // This allows the user to extend them freely in the NLE
+        const stillImageDurationFrames = fps * 3600; // 1 hour in frames
 
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fcpxml>
@@ -551,26 +565,28 @@ export class TimelineProcessor {
             if (!mediaRefs.has(filePath)) {
                 mediaRefs.set(filePath, resourceId);
                 const normalizedPath = filePath.replace(/\\/g, '/');
-                xml += `        <asset id="r${resourceId}" name="${clip.name}" src="file:///${normalizedPath}" hasVideo="${clip.type === 'video' ? '1' : '0'}" hasAudio="1"/>\n`;
+                const durationFrames = toFrames(clip.duration);
+                xml += `        <asset id="r${resourceId}" name="${escapeXml(clip.name)}" src="file:///${normalizedPath}" duration="${durationFrames}/${fps}s" hasVideo="${clip.type === 'video' ? '1' : '0'}" hasAudio="1" format="r1"/>\n`;
                 resourceId++;
             }
         }
 
-        // Add Image resources
+        // Add Image resources with LONG duration to allow extension
         for (const clip of timeline.videoClips) {
             if (clip.imagePath && !mediaRefs.has(clip.imagePath)) {
                 mediaRefs.set(clip.imagePath, resourceId);
                 const normalizedPath = clip.imagePath.replace(/\\/g, '/');
-                xml += `        <asset id="r${resourceId}" name="${clip.name}_img" src="file:///${normalizedPath}" hasVideo="1" hasAudio="0"/>\n`;
+                // Still images get a very long duration so they can be extended
+                xml += `        <asset id="r${resourceId}" name="${escapeXml(clip.name)}_img" src="file:///${normalizedPath}" duration="${stillImageDurationFrames}/${fps}s" hasVideo="1" hasAudio="0" format="r1"/>\n`;
                 resourceId++;
             }
         }
 
         xml += `    </resources>
     <library>
-        <event name="${timeline.projectName}">
-            <project name="${timeline.projectName}">
-                <sequence format="r1">
+        <event name="${escapeXml(timeline.projectName)}">
+            <project name="${escapeXml(timeline.projectName)}">
+                <sequence format="r1" duration="${totalDurationFrames}/${fps}s">
                     <spine>
 `;
 
@@ -590,19 +606,19 @@ export class TimelineProcessor {
             trackCursors.set(clip.track, currentCursorFrames + durationFrames);
 
             const lane = clip.track || 1;
-            xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${clip.name}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}"/>\n`;
+            xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${escapeXml(clip.name)}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}" format="r1"/>\n`;
 
             // Add corresponding Image clip on a higher lane (e.g., lane + 10)
+            // Images use start="0s" but their asset has long duration, so extending is possible
             if (clip.imagePath && mediaRefs.has(clip.imagePath)) {
                 const imgRefId = mediaRefs.get(clip.imagePath);
-                // Images are placed effectively "above" the video, e.g. lane 11 for video on lane 1
                 const imgLane = lane + 10;
-                xml += `                            <asset-clip ref="r${imgRefId}" offset="${startFrame}/${fps}s" name="${clip.name}_img" duration="${durationFrames}/${fps}s" start="0s" lane="${imgLane}" role="video.still"/>\n`;
+                xml += `                            <asset-clip ref="r${imgRefId}" offset="${startFrame}/${fps}s" name="${escapeXml(clip.name)}_img" duration="${durationFrames}/${fps}s" start="0s" lane="${imgLane}" format="r1"/>\n`;
             }
         }
 
         // Add Audio clips as connected clips
-        const audioTracks = [...new Set(timeline.audioClips.map(c => c.track))].sort();
+        const audioTrackNumbers = [...new Set(timeline.audioClips.map(c => c.track))].sort();
 
         for (const clip of timeline.audioClips) {
             const refId = mediaRefs.get(clip.clipPath || clip.sourcePath);
@@ -612,10 +628,10 @@ export class TimelineProcessor {
             const startFrame = currentCursorFrames;
             trackCursors.set(clip.track, currentCursorFrames + durationFrames);
 
-            const trackIndex = audioTracks.indexOf(clip.track);
+            const trackIndex = audioTrackNumbers.indexOf(clip.track);
             const lane = -1 * (trackIndex + 1);
 
-            xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${clip.name}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}" role="dialogue"/>\n`;
+            xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${escapeXml(clip.name)}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}" role="dialogue" format="r1"/>\n`;
         }
 
         xml += `                        </gap>\n`;
@@ -627,7 +643,304 @@ export class TimelineProcessor {
 </fcpxml>`;
 
         fs.writeFileSync(outputPath, xml, 'utf-8');
-        console.log(`Exported XML timeline: ${outputPath}`);
+        console.log(`Exported FCPXML timeline: ${outputPath}`);
+    }
+
+    /**
+     * Export timeline in Adobe Premiere Pro XML format (FCP 7 XML / xmeml)
+     */
+    private exportAsPremiereXML(timeline: TimelineExport, outputPath: string): void {
+        const fps = timeline.frameRate;
+        const totalDurationFrames = Math.round(timeline.totalDuration * fps) || 3600; // Default to 2 min if 0
+
+        // Helper to convert seconds to frame count
+        const toFrames = (seconds: number): number => Math.round(seconds * fps);
+
+        // Escape XML special characters
+        const escapeXml = (str: string): string => {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        };
+
+        // Convert path to file:// URL format for Premiere
+        const toFileUrl = (filePath: string): string => {
+            // Standard file:/// URI for Windows is most compatible
+            const normalized = filePath.replace(/\\/g, '/');
+            return `file:///${normalized}`;
+        };
+
+        // Still images get 1 hour in Premiere too
+        const stillImageDurationFrames = fps * 3600;
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="4">
+    <sequence id="sequence-1">
+        <uuid>${Date.now()}</uuid>
+        <updatebehavior>add</updatebehavior>
+        <name>${escapeXml(timeline.projectName)}</name>
+        <duration>${totalDurationFrames}</duration>
+        <rate>
+            <timebase>${fps}</timebase>
+            <ntsc>FALSE</ntsc>
+        </rate>
+        <timecode>
+            <rate>
+                <timebase>${fps}</timebase>
+                <ntsc>FALSE</ntsc>
+            </rate>
+            <string>00:00:00:00</string>
+            <frame>0</frame>
+            <displayformat>NDF</displayformat>
+        </timecode>
+        <in>-1</in>
+        <out>-1</out>
+        <media>
+            <video>
+                <format>
+                    <samplecharacteristics>
+                        <rate>
+                            <timebase>${fps}</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <width>1920</width>
+                        <height>1080</height>
+                        <anamorphic>FALSE</anamorphic>
+                        <pixelaspectratio>square</pixelaspectratio>
+                        <fielddominance>none</fielddominance>
+                    </samplecharacteristics>
+                </format>
+`;
+
+        // Group clips by track
+        const videoTracks = new Map<number, TimelineClip[]>();
+        for (const clip of timeline.videoClips) {
+            const track = clip.track || 1;
+            if (!videoTracks.has(track)) videoTracks.set(track, []);
+            videoTracks.get(track)?.push(clip);
+        }
+
+        // Track file IDs to avoid duplicates
+        const fileIds = new Map<string, string>();
+        let fileCounter = 1;
+
+        const getFileId = (filePath: string): string => {
+            if (!fileIds.has(filePath)) {
+                fileIds.set(filePath, `file-${fileCounter++}`);
+            }
+            return fileIds.get(filePath)!;
+        };
+
+        // Add Video Tracks
+        for (const [trackIndex, clips] of videoTracks.entries()) {
+            xml += `                <track>\n`;
+
+            let currentTimelineFrame = 0;
+
+            for (const clip of clips) {
+                const clipDurationFrames = toFrames(clip.duration);
+                const filePath = clip.clipPath || clip.sourcePath;
+                const fileId = getFileId(filePath);
+                const clipId = `clipitem-${escapeXml(clip.name)}`;
+
+                xml += `                    <clipitem id="${clipId}">
+                        <masterclipid>masterclip-${fileId}</masterclipid>
+                        <name>${escapeXml(clip.name)}</name>
+                        <enabled>TRUE</enabled>
+                        <duration>${clipDurationFrames}</duration>
+                        <rate>
+                            <timebase>${fps}</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <start>${currentTimelineFrame}</start>
+                        <end>${currentTimelineFrame + clipDurationFrames}</end>
+                        <in>0</in>
+                        <out>${clipDurationFrames}</out>
+                        <file id="${fileId}">
+                            <name>${escapeXml(path.basename(filePath))}</name>
+                            <pathurl>${toFileUrl(filePath)}</pathurl>
+                            <rate>
+                                <timebase>${fps}</timebase>
+                                <ntsc>FALSE</ntsc>
+                            </rate>
+                            <duration>${clipDurationFrames}</duration>
+                            <timecode>
+                                <rate>
+                                    <timebase>${fps}</timebase>
+                                    <ntsc>FALSE</ntsc>
+                                </rate>
+                                <string>00:00:00:00</string>
+                                <frame>0</frame>
+                                <displayformat>NDF</displayformat>
+                            </timecode>
+                            <media>
+                                <video>
+                                    <samplecharacteristics>
+                                        <rate>
+                                            <timebase>${fps}</timebase>
+                                            <ntsc>FALSE</ntsc>
+                                        </rate>
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <anamorphic>FALSE</anamorphic>
+                                        <pixelaspectratio>square</pixelaspectratio>
+                                        <fielddominance>none</fielddominance>
+                                    </samplecharacteristics>
+                                </video>
+                                <audio>
+                                    <samplecharacteristics>
+                                        <depth>16</depth>
+                                        <samplerate>48000</samplerate>
+                                    </samplecharacteristics>
+                                    <channelcount>2</channelcount>
+                                </audio>
+                            </media>
+                        </file>
+                    </clipitem>\n`;
+
+                currentTimelineFrame += clipDurationFrames;
+            }
+            xml += `                </track>\n`;
+        }
+
+        // Add Image Track (V2 or next available track)
+        const imageClips = timeline.videoClips.filter(c => c.imagePath && fs.existsSync(c.imagePath));
+        if (imageClips.length > 0) {
+            xml += `                <track>\n`;
+
+            let currentTimelineFrame = 0;
+
+            for (const clip of imageClips) {
+                const clipDurationFrames = toFrames(clip.duration);
+                const imagePath = clip.imagePath!;
+                const fileId = getFileId(imagePath);
+                const clipId = `clipitem-img-${escapeXml(clip.name)}`;
+
+                // For still images, we set a long duration on the file to allow extension
+                xml += `                    <clipitem id="${clipId}">
+                        <masterclipid>masterclip-${fileId}</masterclipid>
+                        <name>${escapeXml(clip.name)}_img</name>
+                        <enabled>TRUE</enabled>
+                        <duration>${clipDurationFrames}</duration>
+                        <rate>
+                            <timebase>${fps}</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <start>${currentTimelineFrame}</start>
+                        <end>${currentTimelineFrame + clipDurationFrames}</end>
+                        <in>0</in>
+                        <out>${clipDurationFrames}</out>
+                        <file id="${fileId}">
+                            <name>${escapeXml(path.basename(imagePath))}</name>
+                            <pathurl>${toFileUrl(imagePath)}</pathurl>
+                            <rate>
+                                <timebase>${fps}</timebase>
+                                <ntsc>FALSE</ntsc>
+                            </rate>
+                            <duration>${stillImageDurationFrames}</duration>
+                            <media>
+                                <video>
+                                    <samplecharacteristics>
+                                        <rate>
+                                            <timebase>${fps}</timebase>
+                                            <ntsc>FALSE</ntsc>
+                                        </rate>
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <anamorphic>FALSE</anamorphic>
+                                        <pixelaspectratio>square</pixelaspectratio>
+                                        <fielddominance>none</fielddominance>
+                                    </samplecharacteristics>
+                                </video>
+                            </media>
+                        </file>
+                    </clipitem>\n`;
+
+                currentTimelineFrame += clipDurationFrames;
+            }
+            xml += `                </track>\n`;
+        }
+
+        xml += `            </video>
+            <audio>
+                <numOutputChannels>2</numOutputChannels>
+                <format>
+                    <samplecharacteristics>
+                        <depth>16</depth>
+                        <samplerate>48000</samplerate>
+                    </samplecharacteristics>
+                </format>
+`;
+
+        // Group audio clips by track
+        const audioTracks = new Map<number, TimelineClip[]>();
+        for (const clip of timeline.audioClips) {
+            const track = clip.track || 1;
+            if (!audioTracks.has(track)) audioTracks.set(track, []);
+            audioTracks.get(track)?.push(clip);
+        }
+
+        // Add Audio Tracks
+        for (const [trackIndex, clips] of audioTracks.entries()) {
+            xml += `                <track>\n`;
+
+            let currentTimelineFrame = 0;
+
+            for (const clip of clips) {
+                const clipDurationFrames = toFrames(clip.duration);
+                const filePath = clip.clipPath || clip.sourcePath;
+                const fileId = getFileId(filePath);
+                const clipId = `clipitem-audio-${escapeXml(clip.name)}`;
+
+                xml += `                    <clipitem id="${clipId}">
+                        <masterclipid>masterclip-${fileId}</masterclipid>
+                        <name>${escapeXml(clip.name)}</name>
+                        <enabled>TRUE</enabled>
+                        <duration>${clipDurationFrames}</duration>
+                        <rate>
+                            <timebase>${fps}</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <start>${currentTimelineFrame}</start>
+                        <end>${currentTimelineFrame + clipDurationFrames}</end>
+                        <in>0</in>
+                        <out>${clipDurationFrames}</out>
+                        <file id="${fileId}">
+                            <name>${escapeXml(path.basename(filePath))}</name>
+                            <pathurl>${toFileUrl(filePath)}</pathurl>
+                            <rate>
+                                <timebase>${fps}</timebase>
+                                <ntsc>FALSE</ntsc>
+                            </rate>
+                            <duration>${clipDurationFrames}</duration>
+                            <media>
+                                <audio>
+                                    <samplecharacteristics>
+                                        <depth>16</depth>
+                                        <samplerate>48000</samplerate>
+                                    </samplecharacteristics>
+                                    <channelcount>2</channelcount>
+                                </audio>
+                            </media>
+                        </file>
+                    </clipitem>\n`;
+
+                currentTimelineFrame += clipDurationFrames;
+            }
+            xml += `                </track>\n`;
+        }
+
+        xml += `            </audio>
+        </media>
+    </sequence>
+</xmeml>`;
+
+        fs.writeFileSync(outputPath, xml, 'utf-8');
+        console.log(`Exported Premiere XML timeline: ${outputPath}`);
     }
 
     /**
@@ -654,15 +967,19 @@ export class TimelineProcessor {
         const edlPath = path.join(baseDir, 'timeline.edl');
         this.exportAsEDL(timeline, edlPath);
 
-        // 2. XML (Final Cut Pro / Resolve)
+        // 2. XML (Final Cut Pro X)
         const xmlPath = path.join(baseDir, 'timeline.fcpxml');
         this.exportAsXML(timeline, xmlPath);
 
-        // 3. JSON
+        // 3. Premiere XML (FCP 7 XML)
+        const premierePath = path.join(baseDir, 'timeline_premiere.xml');
+        this.exportAsPremiereXML(timeline, premierePath);
+
+        // 4. JSON
         const jsonPath = path.join(baseDir, 'timeline.json');
         this.exportAsJSON(timeline, jsonPath);
 
-        console.log('Exported timeline in all formats (EDL, XML, JSON)');
+        console.log('Exported timeline in all formats (EDL, FCPXML, Premiere XML, JSON)');
     }
 
     /**

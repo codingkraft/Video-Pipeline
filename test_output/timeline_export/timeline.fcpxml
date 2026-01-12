@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.9">
+    <resources>
+        <format id="r1" name="FFVideoFormat1080p30" frameDuration="1/30s" width="1920" height="1080"/>
+        <asset id="r2" name="Clip_001" src="file:///C:/Users/Nitin/Videos/sample_video.mp4" hasVideo="1" hasAudio="1"/>
+        <asset id="r3" name="Audio_001" src="file:///C:/Users/Nitin/Music/sample_audio.mp3" hasVideo="0" hasAudio="1"/>
+        <asset id="r4" name="Clip_001_img" src="file:///C:/Users/Nitin/Pictures/sample_image.jpg" hasVideo="1" hasAudio="0"/>
+    </resources>
+    <library>
+        <event name="Test_Premiere_Export">
+            <project name="Test_Premiere_Export">
+                <sequence format="r1">
+                    <spine>
+                        <gap name="Master" offset="0s" duration="300/30s" start="0s">
+                            <asset-clip ref="r2" offset="0/30s" name="Clip_001" duration="150/30s" start="0s" lane="1"/>
+                            <asset-clip ref="r4" offset="0/30s" name="Clip_001_img" duration="150/30s" start="0s" lane="11" role="video.still"/>
+                            <asset-clip ref="r2" offset="150/30s" name="Clip_002" duration="150/30s" start="0s" lane="1"/>
+                            <asset-clip ref="r4" offset="150/30s" name="Clip_002_img" duration="150/30s" start="0s" lane="11" role="video.still"/>
+                            <asset-clip ref="r3" offset="300/30s" name="Audio_001" duration="300/30s" start="0s" lane="-1" role="dialogue"/>
+                        </gap>
+                    </spine>
+                </sequence>
+            </project>
+        </event>
+    </library>
+</fcpxml>
