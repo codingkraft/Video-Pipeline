@@ -49,6 +49,7 @@ export interface TimelineClip {
     type: 'video' | 'audio';
     sourcePath: string;
     clipPath?: string;
+    imagePath?: string;
     startTime: number;
     endTime: number;
     duration: number;
@@ -309,6 +310,47 @@ export class TimelineProcessor {
     }
 
     /**
+     * Extract a representative image (thumbnail) for each clip
+     */
+    public async extractClipImages(
+        videoPath: string,
+        clips: ClipInfo[],
+        outputDir: string
+    ): Promise<string[]> {
+        const outputPaths: string[] = [];
+        const baseName = path.basename(videoPath, path.extname(videoPath));
+
+        for (const clip of clips) {
+            const outputPath = path.join(outputDir, `${baseName}_clip_${String(clip.index).padStart(3, '0')}.jpg`);
+
+            // Capture frame at start time + small offset (e.g. 0.5s) to avoid black frames at cut points
+            // But ensure we don't go past end time
+            const timestamp = Math.min(clip.startTime + 0.5, clip.endTime - 0.1);
+
+            console.log(`Extracting image for clip ${clip.index} at ${timestamp.toFixed(2)}s`);
+
+            await new Promise<void>((resolve, reject) => {
+                ffmpeg(videoPath)
+                    .seekInput(timestamp)
+                    .frames(1)
+                    .outputOptions(['-q:v', '2']) // High quality JPEG
+                    .output(outputPath)
+                    .on('end', () => {
+                        outputPaths.push(outputPath);
+                        resolve();
+                    })
+                    .on('error', (err) => {
+                        console.error(`Failed to extract image for clip ${clip.index}: ${err.message}`);
+                        // Don't fail the whole process, just log
+                        resolve();
+                    })
+                    .run();
+            });
+        }
+        return outputPaths;
+    }
+
+    /**
      * Cut video into clips at the specified boundaries
      */
     public async cutVideoClips(
@@ -503,13 +545,23 @@ export class TimelineProcessor {
         let resourceId = 2;
         const mediaRefs: Map<string, number> = new Map();
 
+        // Add Video & Audio resources
         for (const clip of [...timeline.videoClips, ...timeline.audioClips]) {
             const filePath = clip.clipPath || clip.sourcePath;
             if (!mediaRefs.has(filePath)) {
                 mediaRefs.set(filePath, resourceId);
-                // Ensure proper 3-slash file URI for Windows
                 const normalizedPath = filePath.replace(/\\/g, '/');
                 xml += `        <asset id="r${resourceId}" name="${clip.name}" src="file:///${normalizedPath}" hasVideo="${clip.type === 'video' ? '1' : '0'}" hasAudio="1"/>\n`;
+                resourceId++;
+            }
+        }
+
+        // Add Image resources
+        for (const clip of timeline.videoClips) {
+            if (clip.imagePath && !mediaRefs.has(clip.imagePath)) {
+                mediaRefs.set(clip.imagePath, resourceId);
+                const normalizedPath = clip.imagePath.replace(/\\/g, '/');
+                xml += `        <asset id="r${resourceId}" name="${clip.name}_img" src="file:///${normalizedPath}" hasVideo="1" hasAudio="0"/>\n`;
                 resourceId++;
             }
         }
@@ -533,16 +585,20 @@ export class TimelineProcessor {
             const refId = mediaRefs.get(clip.clipPath || clip.sourcePath);
             const durationFrames = toFrames(clip.duration);
 
-            // Calculate sequential offset for this track
             const currentCursorFrames = trackCursors.get(clip.track) || 0;
             const startFrame = currentCursorFrames;
-
-            // Update cursor
             trackCursors.set(clip.track, currentCursorFrames + durationFrames);
 
-            // V1 -> lane 1. V2 -> lane 2.
             const lane = clip.track || 1;
             xml += `                            <asset-clip ref="r${refId}" offset="${startFrame}/${fps}s" name="${clip.name}" duration="${durationFrames}/${fps}s" start="0s" lane="${lane}"/>\n`;
+
+            // Add corresponding Image clip on a higher lane (e.g., lane + 10)
+            if (clip.imagePath && mediaRefs.has(clip.imagePath)) {
+                const imgRefId = mediaRefs.get(clip.imagePath);
+                // Images are placed effectively "above" the video, e.g. lane 11 for video on lane 1
+                const imgLane = lane + 10;
+                xml += `                            <asset-clip ref="r${imgRefId}" offset="${startFrame}/${fps}s" name="${clip.name}_img" duration="${durationFrames}/${fps}s" start="0s" lane="${imgLane}" role="video.still"/>\n`;
+            }
         }
 
         // Add Audio clips as connected clips
@@ -552,14 +608,10 @@ export class TimelineProcessor {
             const refId = mediaRefs.get(clip.clipPath || clip.sourcePath);
             const durationFrames = toFrames(clip.duration);
 
-            // Calculate sequential offset for this track
             const currentCursorFrames = trackCursors.get(clip.track) || 0;
             const startFrame = currentCursorFrames;
-
-            // Update cursor
             trackCursors.set(clip.track, currentCursorFrames + durationFrames);
 
-            // Map track to negative lane: A1 -> -1, A2 -> -2
             const trackIndex = audioTracks.indexOf(clip.track);
             const lane = -1 * (trackIndex + 1);
 
@@ -688,6 +740,14 @@ export class TimelineProcessor {
                     }
 
                     await this.cutVideoClips(videoPath, sceneResult.clips, path.dirname(videoOutputDir));
+
+                    // NEW: Extract images for each clip
+                    const imagesDir = path.join(outputDir, 'images');
+                    if (!fs.existsSync(imagesDir)) {
+                        fs.mkdirSync(imagesDir, { recursive: true });
+                    }
+                    await this.extractClipImages(videoPath, sceneResult.clips, imagesDir);
+
                     videoClipsDir = videoClipsDir || path.join(outputDir, 'video_clips');
 
                     // Build timeline clips for this video
@@ -698,6 +758,7 @@ export class TimelineProcessor {
                         type: 'video' as const,
                         sourcePath: videoPath,
                         clipPath: clip.outputPath,
+                        imagePath: path.join(imagesDir, `${baseName}_clip_${String(clip.index).padStart(3, '0')}.jpg`),
                         startTime: clip.startTime,
                         endTime: clip.endTime,
                         duration: clip.duration,

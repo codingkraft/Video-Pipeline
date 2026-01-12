@@ -87,219 +87,155 @@ export class PerplexityTester {
 
             // Step 2: Select Search mode
             // HTML: <button role="radio" value="search" aria-checked="true|false">
-            try {
-                steps.push('⏳ Checking Search mode...');
-
-                const searchButton = await page.$('button[value="search"][role="radio"]');
-                if (searchButton) {
-                    const isChecked = await page.evaluate(el => el.getAttribute('aria-checked'), searchButton);
-                    if (isChecked === 'true') {
-                        steps.push('✓ Search mode already selected');
-                    } else {
-                        await searchButton.click();
-                        await this.browser.randomDelay(500, 1000);
-                        steps.push('✓ Selected Search mode');
+            await this.browser.performAction(
+                'Select Search Mode',
+                async () => {
+                    const searchButton = await page.$('button[value="search"][role="radio"]');
+                    if (searchButton) {
+                        const isChecked = await page.evaluate(el => el.getAttribute('aria-checked'), searchButton);
+                        if (isChecked !== 'true') {
+                            await searchButton.click();
+                        }
                     }
-                } else {
-                    // Not a critical failure - may be on different UI
-                    steps.push('⚠ Search mode button not found (may be different UI)');
-                }
-                await this.browser.randomDelay(500, 1000);
-            } catch (error) {
-                steps.push(`⚠ Mode selection: ${(error as Error).message}`);
-            }
+                },
+                async () => {
+                    const searchButton = await page.$('button[value="search"][role="radio"]');
+                    if (!searchButton) return true; // UI changed? Assume success
+                    const isChecked = await page.evaluate(el => el.getAttribute('aria-checked'), searchButton);
+                    return isChecked === 'true';
+                },
+                { maxRetries: 3 }
+            );
+            steps.push('✓ Search mode checked/selected');
 
             // Step 2.5: Select Model (if configured and not default)
             if (config.model && config.model !== 'Best') {
-                try {
-                    steps.push(`⏳ Selecting model: ${config.model}...`);
-
-                    // 1. Find and click the model trigger (button with CPU icon)
-                    const triggerClicked = await page.evaluate(() => {
-                        // Find all buttons containing the CPU icon
-                        const buttons = Array.from(document.querySelectorAll('button'));
-                        const cpuButtons = buttons.filter(b => {
-                            const useElement = b.querySelector('svg use');
-                            if (useElement) {
-                                const href = useElement.getAttribute('xlink:href') || useElement.getAttribute('href');
-                                return href && href.includes('pplx-icon-cpu');
+                const successModel = await this.browser.performAction(
+                    `Select Model: ${config.model}`,
+                    async () => {
+                        // 1. Find and click the model trigger (button with CPU icon)
+                        const triggerClicked = await page.evaluate(() => {
+                            const buttons = Array.from(document.querySelectorAll('button'));
+                            const cpuButtons = buttons.filter(b => {
+                                const useElement = b.querySelector('svg use');
+                                if (useElement) {
+                                    const href = useElement.getAttribute('xlink:href') || useElement.getAttribute('href');
+                                    return href && href.includes('pplx-icon-cpu');
+                                }
+                                return false;
+                            });
+                            if (cpuButtons.length > 0) {
+                                cpuButtons[cpuButtons.length - 1].click();
+                                return true;
                             }
                             return false;
                         });
 
-                        // Use the LAST button with CPU icon on the page
-                        if (cpuButtons.length > 0) {
-                            const targetBtn = cpuButtons[cpuButtons.length - 1];
-                            targetBtn.click();
-                            return true;
-                        }
-                        return false;
-                    });
+                        if (!triggerClicked) throw new Error('Model trigger button not found');
 
-                    if (triggerClicked) {
                         await this.browser.randomDelay(1000, 1500);
 
-                        // 2. Select the specific model from the menu
+                        // 2. Select model from menu
                         const modelSelected = await page.evaluate((modelName) => {
                             const items = Array.from(document.querySelectorAll('div[role="menuitem"]'));
                             const targetItem = items.find(item => item.textContent?.includes(modelName));
-
                             if (targetItem) {
                                 (targetItem as HTMLElement).click();
                                 return true;
                             }
                             return false;
-                        }, config.model);
+                        }, config.model || '');
 
-                        if (modelSelected) {
-                            steps.push(`✓ Model selected: ${config.model}`);
-                        } else {
-                            steps.push(`⚠ Could not find model "${config.model}" in menu`);
-                            // Try to close menu by clicking body (soft fail)
-                            await page.evaluate(() => document.body.click());
-                        }
-                    } else {
-                        steps.push('⚠ Could not find model selector button');
-                    }
-                    await this.browser.randomDelay(1000, 1500);
-                } catch (err) {
-                    steps.push(`⚠ Model selection failed: ${(err as Error).message}`);
-                }
+                        if (!modelSelected) throw new Error(`Model ${config.model} not found in menu`);
+                    },
+                    async () => {
+                        // Validation could be checking if menu closed or icon updated, but simplified for now
+                        const menu = await page.$('div[role="menu"]');
+                        return !menu; // Assume success if menu closed
+                    },
+                    { maxRetries: 3 }
+                );
+
+                if (successModel) steps.push(`✓ Model selected: ${config.model}`);
+                else steps.push(`⚠ Model selection failed (using default)`);
             }
 
-            // (Old hardcoded Step 3 removed - replaced by Step 2.5 generic model selection)
-
             // Step 4: Attach files
-            // HTML: <input data-testid="file-upload-input" type="file" ...>
             if (filesToUpload && filesToUpload.length > 0) {
-                try {
-                    steps.push(`⏳ Uploading ${filesToUpload.length} file(s)...`);
+                const successUpload = await this.browser.performAction(
+                    'Upload Files',
+                    async () => {
+                        const fileInput = await page.$('input[data-testid="file-upload-input"]');
+                        if (!fileInput) throw new Error('File upload input not found');
 
-                    const fileInput = await page.$('input[data-testid="file-upload-input"]');
-
-                    if (fileInput) {
                         const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
-
-                        // Clear file input value before uploading (fixes repeat run issues)
+                        // Clear first
                         await page.evaluate((el) => { (el as HTMLInputElement).value = ''; }, fileInput);
-
                         await inputElement.uploadFile(...filesToUpload);
-                        steps.push(`✓ Attached ${filesToUpload.length} file(s)`);
-
-                    }
-                    if (filesToUpload.length > 0) {
-                        steps.push('⏳ Waiting for files to upload...');
-
-                        // Wait for file loading spinner to appear and then disappear
+                    },
+                    async () => {
+                        // Wait for spinner to appear AND then disappear
                         try {
-                            // Wait for spinner to appear (indicates upload started)
-                            await page.waitForSelector('[data-testid="file-loading-icon"]', { timeout: 5000 });
-                            steps.push('📤 Upload in progress...');
-
-                            // Wait for spinner to disappear (indicates upload complete)
+                            await page.waitForSelector('[data-testid="file-loading-icon"]', { timeout: 3000 });
                             await page.waitForSelector('[data-testid="file-loading-icon"]', { hidden: true, timeout: 30000 });
-                            steps.push('✓ Files uploaded');
+                            return true;
                         } catch (e) {
-                            // Fallback to delay if spinner detection fails
-                            steps.push('⚠ Could not detect upload spinner, using fallback delay');
-                            await this.browser.randomDelay(3000, 5000);
-                            steps.push('✓ Files uploaded (fallback)');
+                            // If spinner never appeared, maybe upload failed or was too fast?
+                            // Let's assume failure if we can't confirm success via UI state
+                            return false;
                         }
-
-                        await this.browser.randomDelay(2000, 3000);
-                    } else {
-                        throw new Error('File upload input not found');
                     }
-                } catch (error) {
-                    throw new Error(`File attachment failed: ${(error as Error).message}`);
-                }
+                );
+
+                if (!successUpload) throw new Error('File upload validation failed');
+                steps.push(`✓ Attached ${filesToUpload.length} file(s)`);
             }
 
             // Step 5: Enter prompt
-            // Method 3: Clipboard Paste (Most reliable for rich text editors)
-            // 1. Copy to clipboard using Puppeteer
-            // 2. Focus input
-            // 3. Paste (Ctrl+V)
-            try {
-                steps.push('⏳ Entering prompt...');
+            const successPrompt = await this.browser.performAction(
+                'Enter Prompt',
+                async () => {
+                    await page.click('#ask-input');
+                    // Clean
+                    await page.keyboard.down('Control');
+                    await page.keyboard.press('KeyA');
+                    await page.keyboard.up('Control');
+                    await page.keyboard.press('Backspace');
 
-                // Focus and clear first
-                await page.click('#ask-input');
-                await this.browser.randomDelay(200, 400);
+                    await this.browser.randomDelay(200, 400);
 
-                await page.keyboard.down('Control');
-                await page.keyboard.press('KeyA');
-                await page.keyboard.up('Control');
-                await page.keyboard.press('Backspace');
+                    // Copy & Paste technique
+                    await page.evaluate((text) => {
+                        const input = document.createElement('textarea');
+                        input.value = text;
+                        document.body.appendChild(input);
+                        input.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(input);
+                    }, config.prompt);
 
-                await this.browser.randomDelay(200, 400);
-
-                // Copy text to clipboard (using explicit browser permissions if needed, but usually works in Puppeteer)
-                await page.evaluate((text) => {
-                    const input = document.createElement('textarea');
-                    input.value = text;
-                    document.body.appendChild(input);
-                    input.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(input);
-                }, config.prompt);
-
-                // Focus again before pasting
-                await page.click('#ask-input');
-                await this.browser.randomDelay(200, 400);
-
-                // Paste
-                await page.keyboard.down('Control');
-                await page.keyboard.press('KeyV');
-                await page.keyboard.up('Control');
-
-                steps.push(`✓ Pasted prompt via Clipboard`);
-
-                await this.browser.randomDelay(2000, 3000);
-
-                // VERIFY text is present before continuing
-                let hasText = await page.evaluate(() => {
-                    const el = document.querySelector('#ask-input');
-                    return el && el.textContent && el.textContent.trim().length > 0;
-                });
-
-                if (!hasText) {
-                    steps.push('⚠ Text verification failed - retrying paste...');
-                    // Retry paste once
                     await page.click('#ask-input');
                     await page.keyboard.down('Control');
                     await page.keyboard.press('KeyV');
                     await page.keyboard.up('Control');
-
-                    await this.browser.randomDelay(1000, 2000);
-
-                    hasText = await page.evaluate(() => {
+                },
+                async () => {
+                    const text = await page.evaluate(() => {
                         const el = document.querySelector('#ask-input');
-                        return el && el.textContent && el.textContent.trim().length > 0;
+                        return el ? el.textContent : '';
                     });
+                    return !!(text && text.trim().length > 0);
                 }
+            );
 
-                if (hasText) {
-                    steps.push('✓ Verified prompt text is present');
-                } else {
-                    throw new Error('Failed to set prompt text after retry');
-                }
+            if (!successPrompt) throw new Error('Failed to enter prompt text');
+            steps.push(`✓ Pasted prompt via Clipboard`);
 
-                // Important: Wait for UI to process the text and enable the submit button
-                await this.browser.randomDelay(2000, 3000);
-
-            } catch (error) {
-                throw new Error(`Prompt entry failed: ${(error as Error).message}`);
-            }
-
-            // Step 6: Submit - ONLY use button click, never Enter key
-            try {
-                steps.push('⏳ Submitting query...');
-
-                // Wait for button to become enabled (up to 5 seconds)
-                let submitted = false;
-                for (let i = 0; i < 5; i++) {
-                    submitted = await page.evaluate(() => {
+            // Step 6: Submit
+            const successSubmit = await this.browser.performAction(
+                'Submit Query',
+                async () => {
+                    const submitted = await page.evaluate(() => {
                         const submitBtn = document.querySelector('button[aria-label="Submit"]') as HTMLButtonElement;
                         if (submitBtn && !submitBtn.disabled) {
                             submitBtn.click();
@@ -307,21 +243,19 @@ export class PerplexityTester {
                         }
                         return false;
                     });
+                    if (!submitted) throw new Error('Submit button disabled or missing');
+                },
+                async () => {
+                    // Check if stop button appears or response starts
+                    const isGenerating = await page.$('button[aria-label="Stop generating response"]');
+                    const prose = await page.$('[class*="prose"]');
+                    return !!isGenerating || !!prose;
+                },
+                { maxRetries: 5, retryDelay: 2000 }
+            );
 
-                    if (submitted) break;
-                    await this.browser.randomDelay(1000, 1500);
-                }
-
-                if (submitted) {
-                    steps.push('✓ Submitted via button');
-                } else {
-                    throw new Error('Submit button stuck disabled or not found');
-                }
-
-                await this.browser.randomDelay(3000, 5000);
-            } catch (error) {
-                throw new Error(`Submit failed: ${(error as Error).message}`);
-            }
+            if (!successSubmit) throw new Error('Failed to submit query');
+            steps.push('✓ Submitted via button');
 
             // Step 7: Wait for response
             steps.push('⏳ Waiting for Perplexity response (max 2 mins)...');

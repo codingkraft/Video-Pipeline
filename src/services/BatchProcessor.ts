@@ -24,7 +24,7 @@ export type FolderStatus =
  */
 export interface FolderConfig {
     path: string;
-    startPoint: 'start-fresh' | 'create-notebook' | 'fire-video-1' | 'fire-video-2' | 'audio-prompt' | 'generate-audio' | 'collect-videos' | 'remove-logo' | 'process-video';
+    startPoint: StartPointKey;
 }
 
 /**
@@ -226,6 +226,7 @@ export class BatchProcessor {
                     profileId,
                     existingNotebookUrl,
                     skipSourcesUpload: spConfig.skipSourcesUpload,
+                    forceSourceUpload: startPoint === 'update-sources' && videoNum === 1,
                     skipNotebookCreation: spConfig.skipNotebookCreation
                 };
 
@@ -895,7 +896,7 @@ export class BatchProcessor {
                     audioPaths,
                     outputDir: timelineOutputDir,
                     exportFormat: 'xml',
-                    sceneThreshold: 0.1, // Optimized for slideshows
+                    sceneThreshold: 0.02, // Optimized for slideshows
                     reducedPauseDuration: 1,
                     projectName: folderName
                 });

@@ -16,6 +16,7 @@ export interface NotebookLMTestConfig {
     visualStyle?: string;         // Visual style description
     profileId?: string;           // Browser profile to use
     skipSourcesUpload?: boolean;  // Whether to skip source upload
+    forceSourceUpload?: boolean;  // Whether to force source upload even if already done
     skipNotebookCreation?: boolean; // Whether to skip notebook creation (must use existing)
 }
 
@@ -152,7 +153,7 @@ export class NotebookLMTester {
 
                 if (config.skipSourcesUpload) {
                     steps.push(`✓ skipSourcesUpload is true (skipping upload)`);
-                } else if (alreadyUploaded) {
+                } else if (alreadyUploaded && !config.forceSourceUpload) {
                     steps.push(`✓ Sources already uploaded (skipping upload)`);
                 } else {
                     steps.push(`⏳ Uploading ${filesToUpload.length} source files...`);
@@ -206,187 +207,138 @@ export class NotebookLMTester {
         try {
             steps.push(`⏳ Creating notebook named: "${folderName}"...`);
 
-            // Step 1: Click the "Create new" or "New notebook" button
-            const createButtonSelectors = [
-                '.create-new-action-button-icon-container',  // Actual NotebookLM button
-                'mat-icon.create-new-action-button-icon',    // The mat-icon inside
-                'button[aria-label*="Create"]',
-                'button[aria-label*="New"]',
-                '[data-testid="create-notebook"]'
-            ];
+            // ACTION 1: Click "New Notebook"
+            const successCreate = await this.browser.performAction(
+                'Click "New Notebook" button',
+                async () => {
+                    const createButtonSelectors = [
+                        '.create-new-action-button-icon-container',
+                        'mat-icon.create-new-action-button-icon',
+                        'button[aria-label*="Create"]',
+                        'button[aria-label*="New"]',
+                        '[data-testid="create-notebook"]'
+                    ];
 
-            let createClicked = false;
-            for (const selector of createButtonSelectors) {
-                try {
-                    const btn = await page.$(selector);
-                    if (btn) {
-                        await btn.click();
-                        createClicked = true;
-                        steps.push(`✓ Clicked create button`);
-                        break;
+                    for (const selector of createButtonSelectors) {
+                        const btn = await page.$(selector);
+                        if (btn) {
+                            await btn.click();
+                            return;
+                        }
                     }
-                } catch {
-                    continue;
-                }
-            }
 
-            if (!createClicked) {
-                // Try clicking via evaluate for more flexibility
-                createClicked = await page.evaluate(() => {
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const createBtn = buttons.find(b => {
-                        const text = b.textContent?.toLowerCase() || '';
-                        const label = b.getAttribute('aria-label')?.toLowerCase() || '';
-                        return text.includes('new') || text.includes('create') ||
-                            label.includes('new') || label.includes('create');
+                    // Fallback to evaluate
+                    const clicked = await page.evaluate(() => {
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const createBtn = buttons.find(b => {
+                            const text = b.textContent?.toLowerCase() || '';
+                            const label = b.getAttribute('aria-label')?.toLowerCase() || '';
+                            return text.includes('new') || text.includes('create') ||
+                                label.includes('new') || label.includes('create');
+                        });
+                        if (createBtn) {
+                            createBtn.click();
+                            return true;
+                        }
+                        return false;
                     });
-                    if (createBtn) {
-                        createBtn.click();
-                        return true;
+                    if (!clicked) throw new Error('Create button not found');
+                },
+                async () => {
+                    // Validation: Check if title input or modal appeared
+                    const titleInput = await page.$('input.title-input, input[aria-label*="title"], input[placeholder*="Untitled"]');
+                    return !!titleInput;
+                },
+                { maxRetries: 3 }
+            );
+
+            if (!successCreate) {
+                steps.push('❌ Failed to click "New Notebook" button');
+                throw new Error('Failed to initiate notebook creation');
+            }
+            steps.push('✓ Clicked create button');
+
+            // ACTION 2: Enter Notebook Name
+            const successTitle = await this.browser.performAction(
+                'Enter Notebook Name',
+                async () => {
+                    const titleInputSelectors = [
+                        'input.title-input',
+                        'input.title-input.mat-title-large',
+                        'input[aria-label*="title"]',
+                        'input[placeholder*="Untitled"]'
+                    ];
+
+                    let inputFound = false;
+                    for (const selector of titleInputSelectors) {
+                        const input = await page.$(selector);
+                        if (input) {
+                            inputFound = true;
+                            await input.click({ clickCount: 3 });
+                            await this.browser.randomDelay(200, 400);
+                            await page.keyboard.press('Backspace');
+                            await page.keyboard.type(folderName);
+                            break;
+                        }
                     }
-                    return false;
-                });
-            }
 
-            if (!createClicked) {
-                steps.push('⚠ Create button not found');
-                return undefined;
-            }
-
-            await this.browser.randomDelay(2000, 3000);
-
-            // Step 2: Enter the notebook name (folder name)
-            // Look for an input field for notebook title
-            const titleInputSelectors = [
-                'input.title-input',                    // Actual NotebookLM title input
-                'input.title-input.mat-title-large',    // More specific
-                'input[aria-label*="title"]',
-                'input[aria-label*="name"]',
-                'input[placeholder*="Untitled"]',
-                'input[type="text"]'
-            ];
-
-            let titleEntered = false;
-            for (const selector of titleInputSelectors) {
-                try {
-                    const input = await page.$(selector);
-                    if (input) {
-                        // First click closes the modal
-                        await input.click();
-                        await this.browser.randomDelay(500, 800);
-
-                        // Second click makes the input editable
-                        await input.click({ clickCount: 3 });
-                        await this.browser.randomDelay(200, 400);
-
-                        // Clear any existing content
-                        await page.keyboard.press('Backspace');
-                        await this.browser.randomDelay(200, 400);
-
-                        // Type folder name
-                        await page.keyboard.type(folderName);
-                        titleEntered = true;
-                        steps.push(`✓ Entered notebook name: "${folderName}"`);
-                        break;
+                    if (!inputFound) {
+                        // Fallback evaluate
+                        await page.evaluate((name) => {
+                            const editables = document.querySelectorAll('[contenteditable="true"]');
+                            if (editables.length > 0) {
+                                const el = editables[0] as HTMLElement;
+                                el.focus();
+                                el.textContent = name;
+                            }
+                        }, folderName);
                     }
-                } catch {
-                    continue;
-                }
-            }
+                },
+                async () => {
+                    // Validation: Check if input value matches
+                    const val = await page.evaluate(() => {
+                        const input = document.querySelector('input.title-input') as HTMLInputElement;
+                        return input ? input.value : document.querySelector('[contenteditable]')?.textContent;
+                    });
+                    return val === folderName;
+                },
+                { maxRetries: 3 }
+            );
 
-            if (!titleEntered) {
-                // Try via evaluate for contenteditable elements
-                titleEntered = await page.evaluate((name) => {
-                    const editables = document.querySelectorAll('[contenteditable="true"]');
-                    if (editables.length > 0) {
-                        const el = editables[0] as HTMLElement;
-                        el.focus();
-                        el.textContent = name;
-                        return true;
-                    }
-                    return false;
-                }, folderName);
-
-                if (titleEntered) {
-                    steps.push(`✓ Entered notebook name via contenteditable`);
-                }
-            }
-
-            await this.browser.randomDelay(1000, 2000);
-
-            // Step 3: Click Create/Save/Confirm button if present
-            //THis will actually hit the submit button on the chat, but 
-            //nothing would happen as the text there would be empty
-            const confirmSelectors = [
-                'button[type="submit"]',
-                'button:has-text("Create")',
-                'button:has-text("Save")',
-                'button:has-text("Done")',
-                'button[aria-label*="Create"]',
-                'button[aria-label*="Save"]'
-            ];
-
-            for (const selector of confirmSelectors) {
-                try {
-                    const btn = await page.$(selector);
-                    if (btn) {
-                        await btn.click();
-                        steps.push(`✓ Clicked confirm button`);
-                        break;
-                    }
-                } catch {
-                    continue;
-                }
-            }
-
-            await this.browser.randomDelay(3000, 5000);
-
-            // Step 4: Wait for the notebook to load and capture URL
-            // The URL should change to include the notebook ID
-            let notebookUrl: string | undefined;
-            const maxWait = 30000; // 30 seconds
-            const startTime = Date.now();
-
-            while (Date.now() - startTime < maxWait) {
-                const currentUrl = page.url();
-                if (currentUrl.includes('notebook') && currentUrl !== NOTEBOOKLM_URL) {
-                    notebookUrl = currentUrl;
-                    break;
-                }
-                await this.browser.randomDelay(1000, 1500);
-            }
-
-            if (notebookUrl) {
-                steps.push(`✓ Notebook URL captured: ${notebookUrl}`);
-                return notebookUrl;
+            if (!successTitle) {
+                // Warning only, as default title might persist but flow can continue
+                steps.push('⚠ Failed to set custom notebook name (continuing with default)');
             } else {
-                steps.push('⚠ Could not capture notebook URL - may need to click on notebook');
+                steps.push(`✓ Entered notebook name: "${folderName}"`);
+            }
 
-                // Try to find and click on the newly created notebook by name
-                const notebookClicked = await page.evaluate((name) => {
-                    const elements = Array.from(document.querySelectorAll('*'));
-                    const notebookEl = elements.find(el =>
-                        el.textContent?.trim() === name ||
-                        el.textContent?.includes(name)
-                    );
-                    if (notebookEl && notebookEl instanceof HTMLElement) {
-                        notebookEl.click();
+            // ACTION 3: Capture URL (Wait for notebook creation)
+            // This is effectively waiting for the URL to update, which confirms creation
+            let notebookUrl: string | undefined;
+            const successUrl = await this.browser.performAction(
+                'Capture Notebook URL',
+                async () => {
+                    // No specific action, just waiting logic wraps here or we just wait
+                    await this.browser.randomDelay(1000, 2000);
+                },
+                async () => {
+                    const url = page.url();
+                    if (url.includes('notebook') && url !== 'https://notebooklm.google.com/') {
+                        notebookUrl = url;
                         return true;
                     }
                     return false;
-                }, folderName);
+                },
+                { maxRetries: 10, retryDelay: 2000 } // Extended wait essentially
+            );
 
-                if (notebookClicked) {
-                    await this.browser.randomDelay(3000, 5000);
-                    notebookUrl = page.url();
-                    if (notebookUrl.includes('notebook')) {
-                        steps.push(`✓ Clicked on notebook and captured URL: ${notebookUrl}`);
-                        return notebookUrl;
-                    }
-                }
+            if (!successUrl || !notebookUrl) {
+                steps.push('❌ Failed to capture new notebook URL');
+                throw new Error('Notebook creation failed or timed out');
             }
 
-            return undefined;
+            steps.push(`✓ Notebook URL captured: ${notebookUrl}`);
+            return notebookUrl;
 
         } catch (error) {
             steps.push(`⚠ Create notebook error: ${(error as Error).message}`);
@@ -399,37 +351,39 @@ export class NotebookLMTester {
      */
     private async uploadSources(page: Page, files: string[], steps: string[]): Promise<void> {
         try {
-            // First, check if the "Add sources" modal is already open and close it
-            const modalOpen = await page.$('.mat-mdc-dialog-container, mat-dialog-container');
-            if (modalOpen) {
-                steps.push(`⚠ Add sources modal is already open, closing it first...`);
-
-                // Try to click the close button within the modal
-                const closeButton = await modalOpen.$('button[aria-label="Close"], button.close-button');
-                if (closeButton) {
-                    await closeButton.click();
-                    await this.browser.randomDelay(500, 800);
-                    steps.push(`✓ Closed existing modal`);
-                } else {
-                    // Fallback: click outside the modal
-                    await page.click('body');
-                    await this.browser.randomDelay(500, 800);
-                    steps.push(`✓ Closed modal by clicking outside`);
+            // ACTION 1: Ensure "Add Sources" modal is ready (cleaning up old ones first if needed)
+            await this.browser.performAction(
+                'Clean up existing modals',
+                async () => {
+                    const modalOpen = await page.$('.mat-mdc-dialog-container, mat-dialog-container');
+                    if (modalOpen) {
+                        await page.click('body'); // Click outside to close
+                    }
+                },
+                async () => {
+                    const modal = await page.$('.mat-mdc-dialog-container, mat-dialog-container');
+                    return !modal;
                 }
-            }
+            );
 
-            // Check if sources already exist and delete them to avoid duplicates
-            const existingSources = await page.$$('.source-item-more-button');
+            // ACTION 1.5: Delete existing sources if any
+            await this.browser.performAction(
+                'Delete Existing Sources',
+                async () => {
+                    // Loop until no more source menu buttons exist
+                    // We trust the validation step to fail eventually if we get stuck, but we'll add a safety break
+                    let attempts = 0;
+                    const MAX_SOURCE_DELETIONS = 50;
 
-            if (existingSources.length > 0) {
-                steps.push(`⚠ Found ${existingSources.length} existing sources, deleting to avoid duplicates...`);
-
-                // Delete each source by clicking its menu button, then delete button
-                for (let i = 0; i < existingSources.length; i++) {
-                    try {
-                        // Find all menu buttons again (DOM updates after each deletion)
+                    while (attempts < MAX_SOURCE_DELETIONS) {
+                        // Find all menu buttons (DOM updates after each deletion)
                         const menuButtons = await page.$$('.source-item-more-button');
-                        if (menuButtons.length === 0) break;
+                        if (menuButtons.length === 0) {
+                            console.log('[NotebookLM] No more sources to delete');
+                            break;
+                        }
+
+                        console.log(`[NotebookLM] Deleting source ${attempts + 1}...`);
 
                         // Click the first menu button (more_vert icon)
                         await menuButtons[0].click();
@@ -445,122 +399,122 @@ export class NotebookLMTester {
                             const confirmButton = await page.$('button[type="submit"].submit, button.submit');
                             if (confirmButton) {
                                 await confirmButton.click();
-                                await this.browser.randomDelay(800, 1200);
-                                steps.push(`✓ Deleted source ${i + 1}/${existingSources.length}`);
+                                await this.browser.randomDelay(1000, 2000); // Wait for list to update
                             } else {
-                                steps.push(`⚠ Could not find confirmation button for source ${i + 1}`);
+                                console.warn('[NotebookLM] Could not find confirmation button');
+                                await page.keyboard.press('Escape'); // Close menu/modal if stuck
                             }
                         } else {
-                            steps.push(`⚠ Could not find delete button for source ${i + 1}`);
-                            // Press Escape to close menu
-                            await page.keyboard.press('Escape');
-                            await this.browser.randomDelay(300, 500);
+                            console.warn('[NotebookLM] Could not find delete option in menu');
+                            await page.keyboard.press('Escape'); // Close menu
                         }
-                    } catch (e) {
-                        steps.push(`⚠ Error deleting source ${i + 1}: ${(e as Error).message}`);
+
+                        attempts++;
                     }
-                }
-
-                steps.push(`✓ Finished deleting existing sources`);
-                await this.browser.randomDelay(1000, 2000);
-            }
-
-            // Open the add sources modal
-            const addSourcesButton = await page.$('button[aria-label*="Add source"]');
-            if (addSourcesButton) {
-                await addSourcesButton.click();
-                steps.push(`✓ Clicked Add sources button`);
-                await this.browser.randomDelay(1000, 2000);
-
-                // Wait for modal to appear
-                await page.waitForSelector('.mat-mdc-dialog-container, mat-dialog-container', { timeout: 5000 });
-                steps.push(`✓ Add sources modal opened`);
-            } else {
-                steps.push(`⚠ Could not find Add sources button`);
-                throw new Error('Add sources button not found');
-            }
-
-            // We need to trigger the file input to be added to DOM first
-            // Click upload button, but use setInput method to set files without native dialog
-            const uploadButton = await page.$('button[xapscottyuploadertrigger]');
-            if (!uploadButton) {
-                steps.push(`⚠ Could not find Upload files button`);
-                throw new Error('Upload files button not found');
-            }
-
-            // Use page.evaluate to set up a listener before clicking
-            // This will capture the file input as soon as it's added
-            await page.evaluate(() => {
-                // Override the click on file input to prevent native dialog
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        mutation.addedNodes.forEach((node) => {
-                            if (node instanceof HTMLInputElement && node.type === 'file') {
-                                // Prevent the native dialog from opening by removing click behavior
-                                node.style.display = 'block';
-                                node.style.opacity = '1';
-                                (window as any).__fileInput = node;
-                            }
-                        });
+                },
+                async () => {
+                    // Validation: No source menu buttons should remain
+                    const count = await page.evaluate(() => {
+                        return document.querySelectorAll('.source-item-more-button').length;
                     });
-                });
-                observer.observe(document.body, { childList: true, subtree: true });
-                (window as any).__inputObserver = observer;
-            });
+                    return count === 0;
+                },
+                { maxRetries: 3 }
+            );
 
-            // Use waitForFileChooser to intercept the file dialog
-            // This prevents the native dialog from appearing
-            const [fileChooser] = await Promise.all([
-                page.waitForFileChooser(),
-                uploadButton.click()
-            ]);
-            steps.push(`✓ Clicked Upload files button`);
+            // ACTION 2: Open "Add Source" Modal
+            const successOpen = await this.browser.performAction(
+                'Open "Add Source" modal',
+                async () => {
+                    const addSourcesButton = await page.$('button[aria-label*="Add source"]');
+                    if (addSourcesButton) {
+                        await addSourcesButton.click();
+                    } else {
+                        throw new Error('Add source button not found');
+                    }
+                },
+                async () => {
+                    const modal = await page.$('.mat-mdc-dialog-container, mat-dialog-container');
+                    return !!modal;
+                },
+                { maxRetries: 3 }
+            );
 
-            steps.push(`✓ Intercepted file chooser`);
+            if (!successOpen) throw new Error('Failed to open Add Source modal');
+            steps.push(`✓ Add sources modal opened`);
 
-            // Accept the files without showing native dialog
-            await fileChooser.accept(files);
+            // ACTION 3: Upload Files
+            const successUpload = await this.browser.performAction(
+                'Upload Files',
+                async () => {
+                    // Set up observer for file input
+                    await page.evaluate(() => {
+                        const observer = new MutationObserver((mutations) => {
+                            mutations.forEach((mutation) => {
+                                mutation.addedNodes.forEach((node) => {
+                                    if (node instanceof HTMLInputElement && node.type === 'file') {
+                                        node.style.display = 'block';
+                                        node.style.opacity = '1';
+                                        (window as any).__fileInput = node;
+                                    }
+                                });
+                            });
+                        });
+                        observer.observe(document.body, { childList: true, subtree: true });
+                    });
+
+                    const uploadButton = await page.$('button[xapscottyuploadertrigger]');
+                    if (!uploadButton) throw new Error('Upload button not found');
+
+                    const [fileChooser] = await Promise.all([
+                        page.waitForFileChooser(),
+                        uploadButton.click()
+                    ]);
+                    await fileChooser.accept(files);
+                },
+                async () => {
+                    // Validation: Check if sources are listed in the background or processing
+                    // This is hard to validate instantly, so we might just assume success if no error
+                    return true;
+                },
+                { maxRetries: 2 }
+            );
+
+            if (!successUpload) throw new Error('Failed to upload files');
             steps.push(`✓ Uploaded ${files.length} files`);
 
-            // Wait for upload to process
-            await this.browser.randomDelay(3000, 5000);
+            // ACTION 4: Wait for Processing
+            const successProcess = await this.browser.performAction(
+                'Wait for Source Processing',
+                async () => {
+                    await this.browser.randomDelay(2000, 4000); // Wait loop handled by validator essentially
+                },
+                async () => {
+                    const isProcessing = await page.evaluate(() => {
+                        const loadingIndicators = document.querySelectorAll(
+                            'mat-progress-spinner.loading-spinner, .loading-spinner-container'
+                        );
+                        return loadingIndicators.length > 0;
+                    });
+                    return !isProcessing;
+                },
+                { maxRetries: 20, retryDelay: 3000 } // Extended poll
+            );
 
-            // Wait for processing indicators to disappear
-            let processingCount = 0;
-            const maxWait = 120000; // 2 minutes
-            const startTime = Date.now();
+            if (!successProcess) steps.push('⚠ Timed out waiting for file processing (continuing anyway)');
+            else steps.push('✓ Files processed');
 
-            while (Date.now() - startTime < maxWait) {
-                const isProcessing = await page.evaluate(() => {
-                    // Look for NotebookLM loading/processing indicators
-                    const loadingIndicators = document.querySelectorAll(
-                        'mat-progress-spinner.loading-spinner, .loading-spinner-container'
-                    );
-                    return loadingIndicators.length > 0;
-                });
-
-                if (!isProcessing) {
-                    break;
+            // ACTION 5: Close Modal
+            await this.browser.performAction(
+                'Close Add Source Modal',
+                async () => {
+                    await page.click('body');
+                },
+                async () => {
+                    const modal = await page.$('.mat-mdc-dialog-container, mat-dialog-container');
+                    return !modal;
                 }
-
-                processingCount++;
-                if (processingCount % 10 === 0) {
-                    steps.push(`⏳ Still processing files...`);
-                }
-
-                await this.browser.randomDelay(1000, 2000);
-            }
-
-            steps.push(`✓ Files processed`);
-
-            // Close the Add sources modal by clicking outside
-            try {
-                await page.click('body');
-                await this.browser.randomDelay(1000, 2000);
-                steps.push(`✓ Closed Add sources modal`);
-            } catch (e) {
-                steps.push(`⚠ Could not close modal: ${(e as Error).message}`);
-            }
+            );
 
         } catch (error) {
             steps.push(`❌ Upload error: ${(error as Error).message}`);

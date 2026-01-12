@@ -189,6 +189,64 @@ export class CaptiveBrowser {
         return this.browser;
     }
 
+    /**
+     * Perform a browser action with robust retry logic and validation.
+     * 
+     * @param actionName Friendly name for the action (for logging)
+     * @param action Async function to perform the action (e.g. clicking a button)
+     * @param validation Optional async function to verify success (e.g. waiting for a modal). 
+     *                   Should return true if successful, false otherwise.
+     *                   If omitted, the action is assumed successful if it doesn't throw.
+     * @param options Retry configuration
+     */
+    public async performAction(
+        actionName: string,
+        action: () => Promise<void>,
+        validation?: () => Promise<boolean>,
+        options: { maxRetries?: number; retryDelay?: number; timeout?: number } = {}
+    ): Promise<boolean> {
+        const maxRetries = options.maxRetries ?? 3;
+        const retryDelay = options.retryDelay ?? 2000;
+
+        console.log(`[Action] Attempting: ${actionName}`);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Perform the action
+                await action();
+
+                // If no validation provided, we assume success if no error thrown
+                if (!validation) {
+                    console.log(`[Action] ${actionName} completed (no validation needed)`);
+                    return true;
+                }
+
+                // Verify success
+                // Give it a moment for UI to update before validating
+                await this.randomDelay(500, 1000);
+
+                const isValid = await validation();
+                if (isValid) {
+                    console.log(`[Action] ${actionName} verified success on attempt ${attempt}`);
+                    return true;
+                } else {
+                    console.warn(`[Action] ${actionName} validation failed on attempt ${attempt}`);
+                }
+            } catch (error) {
+                console.warn(`[Action] ${actionName} error on attempt ${attempt}: ${(error as Error).message}`);
+            }
+
+            // If we are here, action failed or validation failed
+            if (attempt < maxRetries) {
+                console.log(`[Action] Retrying ${actionName} in ${retryDelay}ms...`);
+                await this.randomDelay(retryDelay, retryDelay + 1000);
+            }
+        }
+
+        console.error(`[Action] ${actionName} failed after ${maxRetries} attempts`);
+        return false;
+    }
+
     public getCurrentProfileId(): string {
         return this.currentProfileId;
     }

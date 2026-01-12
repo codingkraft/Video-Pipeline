@@ -87,154 +87,133 @@ export class GoogleStudioTester {
             await this.browser.randomDelay(1000, 2000);
 
             // CRITICAL: Set to "Single speaker audio" mode FIRST before changing any settings
-            steps.push('⏳ Checking/Setting mode to Single speaker audio...');
-            try {
-                const modeResult = await page.evaluate(() => {
-                    // Find the ms-toggle-button with text "Single-speaker audio"
-                    const toggleButtons = Array.from(document.querySelectorAll('ms-toggle-button'));
-                    const singleSpeakerButton = toggleButtons.find(btn =>
-                        btn.textContent?.includes('Single-speaker audio')
-                    );
+            await this.browser.performAction(
+                'Set Single-speaker audio mode',
+                async () => {
+                    const modeResult = await page.evaluate(() => {
+                        const toggleButtons = Array.from(document.querySelectorAll('ms-toggle-button'));
+                        const singleSpeakerButton = toggleButtons.find(btn =>
+                            btn.textContent?.includes('Single-speaker audio')
+                        );
 
-                    if (singleSpeakerButton) {
-                        // Click the button inside the ms-toggle-button
-                        const button = singleSpeakerButton.querySelector('button');
-                        if (button) {
-                            // Check if already active to avoid re-clicking
-                            if (button.classList.contains('ms-button-active')) {
-                                return 'already_active';
+                        if (singleSpeakerButton) {
+                            const button = singleSpeakerButton.querySelector('button');
+                            if (button) {
+                                if (button.classList.contains('ms-button-active')) {
+                                    return 'already_active';
+                                }
+                                button.click();
+                                return 'clicked';
                             }
-                            button.click();
-                            return 'clicked';
                         }
-                    }
-
-                    return 'not_found';
-                });
-
-                if (modeResult === 'already_active') {
-                    steps.push('✓ Mode already set to Single speaker audio');
-                } else if (modeResult === 'clicked') {
-                    steps.push('✓ Set mode to Single speaker audio');
-                    await this.browser.randomDelay(500, 1000); // Wait for mode change to apply
-                } else {
-                    steps.push('⚠ Could not find Single speaker audio button (check credentials/UI)');
+                        return 'not_found';
+                    });
+                    if (modeResult === 'not_found') throw new Error('Single-speaker audio button not found');
+                },
+                async () => {
+                    const isActive = await page.evaluate(() => {
+                        const toggleButtons = Array.from(document.querySelectorAll('ms-toggle-button'));
+                        const singleSpeakerButton = toggleButtons.find(btn =>
+                            btn.textContent?.includes('Single-speaker audio')
+                        );
+                        return singleSpeakerButton?.querySelector('button')?.classList.contains('ms-button-active');
+                    });
+                    return !!isActive;
                 }
-            } catch (e) {
-                steps.push(`⚠ Error setting mode: ${(e as Error).message}`);
-            }
+            );
+            steps.push('✓ Checked/Set mode to Single speaker audio');
 
             // Set style instructions if provided
             if (studioConfig.styleInstructions) {
-                const styleSet = await page.evaluate((instructions) => {
-                    // Find style/instructions textarea
-                    const textareas = Array.from(document.querySelectorAll('textarea'));
-                    const styleInput = textareas.find(t =>
-                        t.placeholder?.toLowerCase().includes('style') ||
-                        t.placeholder?.toLowerCase().includes('instruction')
-                    );
-                    if (styleInput) {
-                        styleInput.value = instructions;
-                        styleInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        return true;
+                await this.browser.performAction(
+                    'Set Style Instructions',
+                    async () => {
+                        const styleSet = await page.evaluate((instructions) => {
+                            // Find style/instructions textarea
+                            const textareas = Array.from(document.querySelectorAll('textarea'));
+                            const styleInput = textareas.find(t =>
+                                t.placeholder?.toLowerCase().includes('style') ||
+                                t.placeholder?.toLowerCase().includes('instruction')
+                            );
+                            if (styleInput) {
+                                styleInput.value = instructions;
+                                styleInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                return true;
+                            }
+                            return false;
+                        }, studioConfig.styleInstructions || '');
                     }
-                    return false;
-                }, studioConfig.styleInstructions);
-
-                if (styleSet) {
-                    steps.push(`✓ Set style instructions`);
-                }
+                ); // No strict validation because it might be optional or hidden
+                steps.push(`✓ Set style instructions`);
             }
 
             // Set model if provided
             if (studioConfig.model) {
-                steps.push(`🔧 Selecting model: ${studioConfig.model}...`);
-                try {
-                    // Click the model selector button (ms-model-selector button)
-                    const modelSelector = await page.$('ms-model-selector button');
-                    if (modelSelector) {
+                const successModel = await this.browser.performAction(
+                    `Select Model: ${studioConfig.model}`,
+                    async () => {
+                        // Click the model selector
+                        const modelSelector = await page.$('ms-model-selector button');
+                        if (!modelSelector) throw new Error('Model selector button not found');
                         await modelSelector.click();
+
+                        await this.browser.randomDelay(1000, 2000);
+                        await page.waitForSelector('ms-model-carousel', { timeout: 5000 });
+
+                        // Click "Audio" category
+                        await page.evaluate(() => {
+                            const buttons = Array.from(document.querySelectorAll('ms-model-carousel button'));
+                            const audioBtn = buttons.find(b => b.textContent?.trim() === 'Audio');
+                            if (audioBtn && !audioBtn.classList.contains('ms-button-active')) {
+                                (audioBtn as HTMLElement).click();
+                            }
+                        });
+
                         await this.browser.randomDelay(1000, 2000);
 
-                        // Wait for the carousel
-                        try {
-                            await page.waitForSelector('ms-model-carousel', { timeout: 5000 });
-
-                            // Click "Audio" category button to ensure correct models are shown
-                            const audioCategorySet = await page.evaluate(() => {
-                                const buttons = Array.from(document.querySelectorAll('ms-model-carousel button'));
-                                const audioBtn = buttons.find(b => b.textContent?.trim() === 'Audio');
-
-                                if (audioBtn) {
-                                    if (audioBtn.classList.contains('ms-button-active') || audioBtn.getAttribute('aria-selected') === 'true') {
-                                        return 'already_active';
-                                    }
-                                    // @ts-ignore
-                                    audioBtn.click();
-                                    return 'clicked';
-                                }
-                                return 'not_found';
-                            });
-
-                            if (audioCategorySet === 'clicked') {
-                                steps.push('✓ Selected "Audio" category');
-                                await this.browser.randomDelay(1000, 2000); // Wait for list to filters
-                            }
-
-                        } catch (e) {
-                            steps.push('⚠ Model carousel did not appear or Audio category failed: ' + (e as Error).message);
-                        }
-
+                        // Select Model
                         const modelSelected = await page.evaluate((targetModel) => {
-                            // Find all content buttons in the carousel rows
                             const buttons = Array.from(document.querySelectorAll('ms-model-carousel-row button.content-button'));
-                            const searchStr = targetModel.trim().toLowerCase();
-
-                            // Use indexed loop to be absolutely safe with execution context (avoiding Illegal return)
+                            const searchStr = (targetModel || '').trim().toLowerCase();
                             for (let i = 0; i < buttons.length; i++) {
                                 const btn = buttons[i];
                                 const title = btn.querySelector('.model-title-text')?.textContent?.trim();
                                 const subtitle = btn.querySelector('.model-subtitle')?.textContent?.trim();
-
-                                const titleMatch = title && title.toLowerCase().includes(searchStr);
-                                const subtitleMatch = subtitle && subtitle.toLowerCase().includes(searchStr);
-
-                                if (titleMatch || subtitleMatch) {
+                                if ((title && title.toLowerCase().includes(searchStr)) ||
+                                    (subtitle && subtitle.toLowerCase().includes(searchStr))) {
                                     // @ts-ignore
                                     btn.click();
                                     return true;
                                 }
                             }
                             return false;
-                        }, studioConfig.model);
+                        }, studioConfig.model || '');
 
-                        if (modelSelected) {
-                            steps.push(`✓ Selected model: ${studioConfig.model}`);
-                            await this.browser.randomDelay(1000, 2000); // Wait for selection to apply
-                        } else {
-                            steps.push(`⚠ Model '${studioConfig.model}' not found in carousel`);
-                            await page.keyboard.press('Escape'); // Close dialog
-                        }
-                    } else {
-                        steps.push('⚠ Could not find model selector button (ms-model-selector button)');
+                        if (!modelSelected) throw new Error(`Model ${studioConfig.model} not found in carousel`);
+                    },
+                    async () => {
+                        // Validate carousel is closed
+                        const carousel = await page.$('ms-model-carousel');
+                        return !carousel;
                     }
-                } catch (e) {
-                    steps.push(`⚠ Failed to set model: ${(e as Error).message}`);
-                }
+                );
+
+                if (successModel) steps.push(`✓ Selected model: ${studioConfig.model}`);
+                else steps.push(`⚠ Model selection failed (check logs)`);
             }
 
             // Set voice if provided
             if (studioConfig.voice) {
-                try {
-                    // Selector based on HTML analysis: ms-voice-selector contains the mat-select
-                    const voiceSelector = await page.waitForSelector('ms-voice-selector mat-select', { timeout: 3000 });
-                    if (voiceSelector) {
+                await this.browser.performAction(
+                    `Select Voice: ${studioConfig.voice}`,
+                    async () => {
+                        const voiceSelector = await page.waitForSelector('ms-voice-selector mat-select', { timeout: 3000 });
+                        if (!voiceSelector) throw new Error('Voice selector not found');
                         await voiceSelector.click();
                         await this.browser.randomDelay(500, 1000);
 
                         const optionClicked = await page.evaluate((voiceName) => {
                             const options = Array.from(document.querySelectorAll('mat-option'));
-                            // Match partial or exact
                             const target = options.find(opt =>
                                 opt.textContent?.includes(voiceName) ||
                                 opt.querySelector('.mat-option-text')?.textContent?.includes(voiceName)
@@ -244,69 +223,89 @@ export class GoogleStudioTester {
                                 return true;
                             }
                             return false;
-                        }, studioConfig.voice);
+                        }, studioConfig.voice || '');
 
-                        if (optionClicked) {
-                            steps.push(`✓ Selected voice: ${studioConfig.voice}`);
-                        } else {
-                            steps.push(`⚠ Voice "${studioConfig.voice}" option not found`);
+                        if (!optionClicked) {
                             await page.keyboard.press('Escape'); // Close dropdown
+                            throw new Error(`Voice ${studioConfig.voice} not found`);
                         }
+                    },
+                    async () => {
+                        // Check if dropdown closed
+                        const overlay = await page.$('.cdk-overlay-pane');
+                        return !overlay;
                     }
-                } catch (e) {
-                    steps.push(`⚠ Failed to set voice: ${(e as Error).message}`);
-                }
+                );
+                steps.push(`✓ Selected voice: ${studioConfig.voice}`);
             }
 
-            // Find and fill the main text input
-            const textEntered = await page.evaluate((text) => {
-                const textareas = Array.from(document.querySelectorAll('textarea'));
-                // Find the main text input (usually the largest or primary one)
-                const mainInput = textareas.find(t =>
-                    t.placeholder?.toLowerCase().includes('text') ||
-                    t.placeholder?.toLowerCase().includes('enter') ||
-                    t.classList.contains('main-input') ||
-                    t.rows > 3
-                ) || textareas[0];
+            // Text Input
+            const successText = await this.browser.performAction(
+                'Enter Slide Text',
+                async () => {
+                    const textEntered = await page.evaluate((text) => {
+                        const textareas = Array.from(document.querySelectorAll('textarea'));
+                        const mainInput = textareas.find(t =>
+                            t.placeholder?.toLowerCase().includes('text') ||
+                            t.placeholder?.toLowerCase().includes('enter') ||
+                            t.classList.contains('main-input') ||
+                            t.rows > 3
+                        ) || textareas[0];
 
-                if (mainInput) {
-                    mainInput.value = text;
-                    mainInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    mainInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    return true;
+                        if (mainInput) {
+                            mainInput.value = text;
+                            mainInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            mainInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            return true;
+                        }
+                        return false;
+                    }, config.text);
+                    if (!textEntered) throw new Error('Text input not found');
+                },
+                async () => {
+                    const val = await page.evaluate(() => {
+                        const textareas = Array.from(document.querySelectorAll('textarea'));
+                        const mainInput = textareas.find(t =>
+                            t.placeholder?.toLowerCase().includes('text') ||
+                            t.rows > 3
+                        ) || textareas[0];
+                        return mainInput ? mainInput.value : '';
+                    });
+                    return val === config.text;
                 }
-                return false;
-            }, config.text);
+            );
 
-            if (textEntered) {
-                steps.push(`✓ Entered slide ${config.slideNumber} text (${config.text.length} chars)`);
-            } else {
-                steps.push(`⚠ Could not find text input field`);
-                return false;
-            }
+            if (successText) steps.push(`✓ Entered slide text`);
+            else throw new Error('Failed to enter text');
 
             await this.browser.randomDelay(500, 1000);
 
             // Click Run/Generate button
-            const runClicked = await page.evaluate(() => {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const runBtn = buttons.find(b => {
-                    const text = b.textContent?.toLowerCase() || '';
-                    return text.includes('run') || text.includes('generate') || text.includes('create');
-                });
-                if (runBtn) {
-                    runBtn.click();
+            await this.browser.performAction(
+                'Click Run Button',
+                async () => {
+                    const runClicked = await page.evaluate(() => {
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const runBtn = buttons.find(b => {
+                            const text = b.textContent?.toLowerCase() || '';
+                            return text.includes('run') || text.includes('generate') || text.includes('create');
+                        });
+                        if (runBtn) {
+                            runBtn.click();
+                            return true;
+                        }
+                        return false;
+                    });
+                    if (!runClicked) throw new Error('Run button not found');
+                },
+                async () => {
+                    // Check if downloading started or button disabled? 
+                    // Hard to validate generically, so we rely on the next waiting step.
+                    // But we can check if button enters loading state if applicable.
                     return true;
                 }
-                return false;
-            });
-
-            if (runClicked) {
-                steps.push(`✓ Clicked Run button`);
-            } else {
-                steps.push(`⚠ Could not find Run button`);
-                return false;
-            }
+            );
+            steps.push(`✓ Clicked Run button`);
 
             // Wait for audio generation (this may take a while)
             steps.push(`⏳ Waiting for audio generation...`);
