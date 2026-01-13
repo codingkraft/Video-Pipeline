@@ -1,14 +1,14 @@
 {
-  "projectName": "Test_Premiere_Export",
+  "projectName": "MultiTrack_OTIO_Test",
   "frameRate": 30,
   "totalDuration": 10,
   "videoClips": [
     {
       "index": 1,
-      "name": "Clip_001",
+      "name": "V1_Clip",
       "type": "video",
       "sourcePath": "C:\\Users\\Nitin\\Videos\\sample_video.mp4",
-      "imagePath": "C:\\Users\\Nitin\\Pictures\\sample_image.jpg",
+      "imagePath": "F:\\Workspaces\\Video Creator\\test_output\\timeline_export\\dummy_image.jpg",
       "startTime": 0,
       "endTime": 5,
       "duration": 5,
@@ -16,26 +16,36 @@
     },
     {
       "index": 2,
-      "name": "Clip_002",
+      "name": "V2_Clip",
       "type": "video",
       "sourcePath": "C:\\Users\\Nitin\\Videos\\sample_video.mp4",
-      "imagePath": "C:\\Users\\Nitin\\Pictures\\sample_image.jpg",
-      "startTime": 10,
-      "endTime": 15,
+      "imagePath": "F:\\Workspaces\\Video Creator\\test_output\\timeline_export\\dummy_image.jpg",
+      "startTime": 0,
+      "endTime": 5,
       "duration": 5,
-      "track": 1
+      "track": 2
     }
   ],
   "audioClips": [
     {
       "index": 1,
-      "name": "Audio_001",
+      "name": "A1_Clip",
       "type": "audio",
       "sourcePath": "C:\\Users\\Nitin\\Music\\sample_audio.mp3",
       "startTime": 0,
       "endTime": 10,
       "duration": 10,
       "track": 1
+    },
+    {
+      "index": 2,
+      "name": "A2_Clip",
+      "type": "audio",
+      "sourcePath": "C:\\Users\\Nitin\\Music\\sample_audio.mp3",
+      "startTime": 0,
+      "endTime": 10,
+      "duration": 10,
+      "track": 2
     }
   ]
 }

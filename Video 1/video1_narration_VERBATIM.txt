@@ -1,0 +1,26 @@
+[Slide 1 - Video 1]
+Right now, Python is like a really capable assistant who refuses to do anything unless you ask in exactly the right way. The print() function is how you make it talk. Master this and you unlock the ability to see what your code is actually doing, which is surprisingly important when things go wrong—which they will.
+
+[Slide 2 - Video 1]
+This black screen is called the terminal. It looks intimidating, like you're hacking into the Matrix, but it's just your code's way of showing you results. You write code on the left, Python executes it, and results appear here on the right. Think of it as your code's text messages to you. Except your code has perfect grammar, never uses emojis, and gets straight to the point. Honestly, kind of refreshing.
+
+[Slide 3 - Video 1]
+This is print(). You give it a message in quotes, and it displays that message in the terminal. That's it. It's Python's most basic function and also one of the most useful, because later when your code isn't working, you'll use print() to figure out what the heck is happening. Professional developers do this constantly.
+
+[Slide 4 - Video 1]
+Each print() creates one line of output. Stack them up and you get multiple lines. Simple. This is how apps show you loading screens, progress updates, basically any text you've ever seen in a program. Someone, somewhere, used print() or something like it.
+
+[Slide 5 - Video 1]
+There's your output. Each command produced one line, in order, exactly as written. This is how you debug code—by printing stuff out to see what's happening at each step. It's like leaving breadcrumbs for yourself.
+
+[Slide 6 - Video 1]
+Text needs quotes. Without them, Python thinks you're referring to something else—like a variable name or command it should already know about. Quotes tell Python, 'Hey, this is literally just text to display. Print it exactly as written.' Think of quotes as quotation marks in writing—they show you're displaying exact words, not referring to something technical.
+
+[Slide 7 - Video 1]
+Single or double quotes—Python treats them identically. Pick one style and stick with it. Most programmers use double quotes because decades ago someone decided that was the standard, and now it's tradition. Programmers love tradition. And arguing endlessly about tradition. There are literal debates about tabs versus spaces that have lasted longer than some marriages. But I digress—use double quotes and move on with your life.
+
+[Slide 8 - Video 1]
+Beginner mistake number one: forgetting parentheses. print() needs those parentheses like you need oxygen. It's not negotiable. Forget them and Python immediately tells you what you did wrong. Which is nice of it, honestly.
+
+[Slide 9 - Video 1]
+Mistake number two: forgetting to close your quotes. Open with a quote? Close with a quote. It's like parentheses in math, or starting a sentence and never finishing— you know how annoying that is? Python feels the same way. Every opening quote needs a closing quote, no exceptions. Python will sit there waiting for that closing quote forever, like someone holding a door open for you when you're still 50 feet away. Awkward for everyone.

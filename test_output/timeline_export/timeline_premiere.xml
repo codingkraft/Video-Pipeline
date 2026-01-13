@@ -2,9 +2,9 @@
 <!DOCTYPE xmeml>
 <xmeml version="4">
     <sequence id="sequence-1">
-        <uuid>1768221012212</uuid>
+        <uuid>1768223281175</uuid>
         <updatebehavior>add</updatebehavior>
-        <name>Test_Premiere_Export</name>
+        <name>MultiTrack_OTIO_Test</name>
         <duration>300</duration>
         <rate>
             <timebase>30</timebase>
@@ -37,9 +37,9 @@
                     </samplecharacteristics>
                 </format>
                 <track>
-                    <clipitem id="clipitem-Clip_001">
+                    <clipitem id="clipitem-V1_Clip-v1">
                         <masterclipid>masterclip-file-1</masterclipid>
-                        <name>Clip_001</name>
+                        <name>V1_Clip</name>
                         <enabled>TRUE</enabled>
                         <duration>150</duration>
                         <rate>
@@ -52,21 +52,12 @@
                         <out>150</out>
                         <file id="file-1">
                             <name>sample_video.mp4</name>
-                            <pathurl>file://localhost/C:/Users/Nitin/Videos/sample_video.mp4</pathurl>
+                            <pathurl>file:///C:/Users/Nitin/Videos/sample_video.mp4</pathurl>
                             <rate>
                                 <timebase>30</timebase>
                                 <ntsc>FALSE</ntsc>
                             </rate>
                             <duration>150</duration>
-                            <timecode>
-                                <rate>
-                                    <timebase>30</timebase>
-                                    <ntsc>FALSE</ntsc>
-                                </rate>
-                                <string>00:00:00:00</string>
-                                <frame>0</frame>
-                                <displayformat>NDF</displayformat>
-                            </timecode>
                             <media>
                                 <video>
                                     <samplecharacteristics>
@@ -76,51 +67,34 @@
                                         </rate>
                                         <width>1920</width>
                                         <height>1080</height>
-                                        <anamorphic>FALSE</anamorphic>
-                                        <pixelaspectratio>square</pixelaspectratio>
-                                        <fielddominance>none</fielddominance>
                                     </samplecharacteristics>
                                 </video>
-                                <audio>
-                                    <samplecharacteristics>
-                                        <depth>16</depth>
-                                        <samplerate>48000</samplerate>
-                                    </samplecharacteristics>
-                                    <channelcount>2</channelcount>
-                                </audio>
                             </media>
                         </file>
                     </clipitem>
-                    <clipitem id="clipitem-Clip_002">
+                </track>
+                <track>
+                    <clipitem id="clipitem-V2_Clip-v2">
                         <masterclipid>masterclip-file-1</masterclipid>
-                        <name>Clip_002</name>
+                        <name>V2_Clip</name>
                         <enabled>TRUE</enabled>
                         <duration>150</duration>
                         <rate>
                             <timebase>30</timebase>
                             <ntsc>FALSE</ntsc>
                         </rate>
-                        <start>150</start>
-                        <end>300</end>
+                        <start>0</start>
+                        <end>150</end>
                         <in>0</in>
                         <out>150</out>
                         <file id="file-1">
                             <name>sample_video.mp4</name>
-                            <pathurl>file://localhost/C:/Users/Nitin/Videos/sample_video.mp4</pathurl>
+                            <pathurl>file:///C:/Users/Nitin/Videos/sample_video.mp4</pathurl>
                             <rate>
                                 <timebase>30</timebase>
                                 <ntsc>FALSE</ntsc>
                             </rate>
                             <duration>150</duration>
-                            <timecode>
-                                <rate>
-                                    <timebase>30</timebase>
-                                    <ntsc>FALSE</ntsc>
-                                </rate>
-                                <string>00:00:00:00</string>
-                                <frame>0</frame>
-                                <displayformat>NDF</displayformat>
-                            </timecode>
                             <media>
                                 <video>
                                     <samplecharacteristics>
@@ -130,18 +104,82 @@
                                         </rate>
                                         <width>1920</width>
                                         <height>1080</height>
-                                        <anamorphic>FALSE</anamorphic>
-                                        <pixelaspectratio>square</pixelaspectratio>
-                                        <fielddominance>none</fielddominance>
                                     </samplecharacteristics>
                                 </video>
-                                <audio>
+                            </media>
+                        </file>
+                    </clipitem>
+                </track>
+                <track>
+                    <clipitem id="clipitem-img-V1_Clip-v1">
+                        <masterclipid>masterclip-file-2</masterclipid>
+                        <name>V1_Clip_img</name>
+                        <enabled>TRUE</enabled>
+                        <duration>150</duration>
+                        <rate>
+                            <timebase>30</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <start>0</start>
+                        <end>150</end>
+                        <in>0</in>
+                        <out>150</out>
+                        <file id="file-2">
+                            <name>dummy_image.jpg</name>
+                            <pathurl>file:///F:/Workspaces/Video Creator/test_output/timeline_export/dummy_image.jpg</pathurl>
+                            <rate>
+                                <timebase>30</timebase>
+                                <ntsc>FALSE</ntsc>
+                            </rate>
+                            <duration>108000</duration>
+                            <media>
+                                <video>
                                     <samplecharacteristics>
-                                        <depth>16</depth>
-                                        <samplerate>48000</samplerate>
+                                        <rate>
+                                            <timebase>30</timebase>
+                                            <ntsc>FALSE</ntsc>
+                                        </rate>
+                                        <width>1920</width>
+                                        <height>1080</height>
                                     </samplecharacteristics>
-                                    <channelcount>2</channelcount>
-                                </audio>
+                                </video>
+                            </media>
+                        </file>
+                    </clipitem>
+                </track>
+                <track>
+                    <clipitem id="clipitem-img-V2_Clip-v2">
+                        <masterclipid>masterclip-file-2</masterclipid>
+                        <name>V2_Clip_img</name>
+                        <enabled>TRUE</enabled>
+                        <duration>150</duration>
+                        <rate>
+                            <timebase>30</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <start>0</start>
+                        <end>150</end>
+                        <in>0</in>
+                        <out>150</out>
+                        <file id="file-2">
+                            <name>dummy_image.jpg</name>
+                            <pathurl>file:///F:/Workspaces/Video Creator/test_output/timeline_export/dummy_image.jpg</pathurl>
+                            <rate>
+                                <timebase>30</timebase>
+                                <ntsc>FALSE</ntsc>
+                            </rate>
+                            <duration>108000</duration>
+                            <media>
+                                <video>
+                                    <samplecharacteristics>
+                                        <rate>
+                                            <timebase>30</timebase>
+                                            <ntsc>FALSE</ntsc>
+                                        </rate>
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                    </samplecharacteristics>
+                                </video>
                             </media>
                         </file>
                     </clipitem>
@@ -156,9 +194,9 @@
                     </samplecharacteristics>
                 </format>
                 <track>
-                    <clipitem id="clipitem-audio-Audio_001">
-                        <masterclipid>masterclip-file-2</masterclipid>
-                        <name>Audio_001</name>
+                    <clipitem id="clipitem-audio-A1_Clip-a1">
+                        <masterclipid>masterclip-file-3</masterclipid>
+                        <name>A1_Clip</name>
                         <enabled>TRUE</enabled>
                         <duration>300</duration>
                         <rate>
@@ -169,9 +207,43 @@
                         <end>300</end>
                         <in>0</in>
                         <out>300</out>
-                        <file id="file-2">
+                        <file id="file-3">
                             <name>sample_audio.mp3</name>
-                            <pathurl>file://localhost/C:/Users/Nitin/Music/sample_audio.mp3</pathurl>
+                            <pathurl>file:///C:/Users/Nitin/Music/sample_audio.mp3</pathurl>
+                            <rate>
+                                <timebase>30</timebase>
+                                <ntsc>FALSE</ntsc>
+                            </rate>
+                            <duration>300</duration>
+                            <media>
+                                <audio>
+                                    <samplecharacteristics>
+                                        <depth>16</depth>
+                                        <samplerate>48000</samplerate>
+                                    </samplecharacteristics>
+                                    <channelcount>2</channelcount>
+                                </audio>
+                            </media>
+                        </file>
+                    </clipitem>
+                </track>
+                <track>
+                    <clipitem id="clipitem-audio-A2_Clip-a2">
+                        <masterclipid>masterclip-file-3</masterclipid>
+                        <name>A2_Clip</name>
+                        <enabled>TRUE</enabled>
+                        <duration>300</duration>
+                        <rate>
+                            <timebase>30</timebase>
+                            <ntsc>FALSE</ntsc>
+                        </rate>
+                        <start>0</start>
+                        <end>300</end>
+                        <in>0</in>
+                        <out>300</out>
+                        <file id="file-3">
+                            <name>sample_audio.mp3</name>
+                            <pathurl>file:///C:/Users/Nitin/Music/sample_audio.mp3</pathurl>
                             <rate>
                                 <timebase>30</timebase>
                                 <ntsc>FALSE</ntsc>

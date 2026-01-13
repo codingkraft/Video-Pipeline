@@ -217,7 +217,17 @@ export class BatchProcessor {
                 await this.browser.initialize({ profileId });
 
                 const progress = ProgressTracker.getProgress(folderPath);
-                const existingNotebookUrl = spConfig.skipNotebookCreation ? progress?.steps.notebooklm_notebook_created?.notebookUrl : undefined;
+
+                // For video 1: Only use existing URL if explicitly skipping notebook creation
+                // For video 2: Always reuse the notebook created/used by video 1
+                let existingNotebookUrl: string | undefined;
+                if (videoNum === 1) {
+                    existingNotebookUrl = spConfig.skipNotebookCreation ? progress?.steps.notebooklm_notebook_created?.notebookUrl : undefined;
+                } else {
+                    // Video 2 should always reuse the notebook from video 1
+                    existingNotebookUrl = progress?.steps.notebooklm_notebook_created?.notebookUrl ||
+                        progress?.steps.notebooklm_video_1_started?.notebookUrl;
+                }
 
                 const testConfig: NotebookLMTestConfig = {
                     sourceFolder: folderPath,
@@ -227,7 +237,8 @@ export class BatchProcessor {
                     existingNotebookUrl,
                     skipSourcesUpload: spConfig.skipSourcesUpload,
                     forceSourceUpload: startPoint === 'update-sources' && videoNum === 1,
-                    skipNotebookCreation: spConfig.skipNotebookCreation
+                    // For video 2, always skip notebook creation (reuse video 1's notebook)
+                    skipNotebookCreation: videoNum === 2 ? true : spConfig.skipNotebookCreation
                 };
 
                 this.log(`${folderName}: Starting video ${videoNum}/2 generation with profile ${profileId}`);

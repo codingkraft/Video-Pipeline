@@ -1,0 +1,237 @@
+{
+  "OTIO_SCHEMA": "Timeline.1",
+  "name": "MultiTrack_OTIO_Test",
+  "global_start_time": {
+    "OTIO_SCHEMA": "RationalTime.1",
+    "value": 0,
+    "rate": 30
+  },
+  "tracks": {
+    "OTIO_SCHEMA": "Stack.1",
+    "name": "Tracks",
+    "children": [
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Images 2",
+        "kind": "Video",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "V2_Clip_img",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 30
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 150,
+                "rate": 30
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///F:/Workspaces/Video Creator/test_output/timeline_export/dummy_image.jpg",
+              "available_range": null
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Images 1",
+        "kind": "Video",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "V1_Clip_img",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 30
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 150,
+                "rate": 30
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///F:/Workspaces/Video Creator/test_output/timeline_export/dummy_image.jpg",
+              "available_range": null
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Video 2",
+        "kind": "Video",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "V2_Clip",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 30
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 150,
+                "rate": 30
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///C:/Users/Nitin/Videos/sample_video.mp4",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 0,
+                  "rate": 30
+                },
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 150,
+                  "rate": 30
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Video 1",
+        "kind": "Video",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "V1_Clip",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 30
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 150,
+                "rate": 30
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///C:/Users/Nitin/Videos/sample_video.mp4",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 0,
+                  "rate": 30
+                },
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 150,
+                  "rate": 30
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 1",
+        "kind": "Audio",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "A1_Clip",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 30
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 300,
+                "rate": 30
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///C:/Users/Nitin/Music/sample_audio.mp3",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 0,
+                  "rate": 30
+                },
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 300,
+                  "rate": 30
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Audio 2",
+        "kind": "Audio",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.2",
+            "name": "A2_Clip",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 30
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 300,
+                "rate": 30
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///C:/Users/Nitin/Music/sample_audio.mp3",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 0,
+                  "rate": 30
+                },
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 300,
+                  "rate": 30
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
