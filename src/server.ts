@@ -10,7 +10,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer);
 
-const PORT = 3000;
+const PORT = 3002;
 
 // Configure multer for file uploads
 // Configure multer with disk storage to preserve filenames
@@ -1367,7 +1367,7 @@ app.post('/api/parse-script', async (req: Request, res: Response) => {
 // API: Generate video input folders from parsed script
 app.post('/api/generate-video-folders', async (req: Request, res: Response) => {
     try {
-        const { MarkdownScriptParser } = await import('./services/MarkdownScriptParser');
+        const { getVideoFolderCreator } = await import('./services/VideoFolderCreator');
         const { scriptPath, outputBaseDir } = req.body;
 
         if (!scriptPath) {
@@ -1382,81 +1382,67 @@ app.post('/api/generate-video-folders', async (req: Request, res: Response) => {
         const scriptDir = path.dirname(scriptPath);
         const baseOutputDir = outputBaseDir || path.join(scriptDir, 'Per Video Input');
 
-        // Create base output directory
-        if (!fs.existsSync(baseOutputDir)) {
-            fs.mkdirSync(baseOutputDir, { recursive: true });
-        }
+        console.log(`[ScriptParser] Generating folders with screenshots in: ${baseOutputDir}`);
 
-        console.log(`[ScriptParser] Generating folders in: ${baseOutputDir}`);
+        // Initialize VideoFolderCreator with Puppeteer for screenshots
+        const folderCreator = getVideoFolderCreator();
 
-        // Parse the script
-        const parseResult = MarkdownScriptParser.parseFile(scriptPath);
-
-        const generatedFolders: any[] = [];
-        const errors: string[] = [];
-
-        for (const video of parseResult.videos) {
-            try {
-                // Create folder for this video
-                const folderName = `Video ${video.videoNumber}`;
-                const folderPath = path.join(baseOutputDir, folderName);
-
-                if (!fs.existsSync(folderPath)) {
-                    fs.mkdirSync(folderPath, { recursive: true });
-                }
-
-                // Generate narration TXT
-                const narrationContent = MarkdownScriptParser.generateNarrationFile(video);
-                const narrationPath = path.join(folderPath, `narration.txt`);
-                fs.writeFileSync(narrationPath, narrationContent, 'utf-8');
-
-                // Generate code blocks file (for reference)
-                if (video.allCodeBlocks.length > 0) {
-                    const codeContent = video.allCodeBlocks.map((block, i) =>
-                        `# Code Block ${i + 1} (Slide ${block.slideNumber}: ${block.slideTitle})\n` +
-                        `\`\`\`${block.language}\n${block.code}\n\`\`\`\n` +
-                        (block.expectedOutput ? `\n# Expected Output:\n${block.expectedOutput}\n` : '') +
-                        '\n---\n'
-                    ).join('\n');
-
-                    const codePath = path.join(folderPath, 'code_blocks.md');
-                    fs.writeFileSync(codePath, codeContent, 'utf-8');
-                }
-
-                // Generate slide summary
-                const slidesSummary = video.slides.map(s =>
-                    `## Slide ${s.number}: ${s.title}\n` +
-                    (s.visual ? `**Visual:** ${s.visual}\n` : '') +
-                    (s.audio ? `**Audio:** ${s.audio}\n` : '') +
-                    (s.duration ? `**Duration:** ${s.duration}s\n` : '')
-                ).join('\n---\n\n');
-
-                const slidesPath = path.join(folderPath, 'slides.md');
-                fs.writeFileSync(slidesPath, `# ${video.title}\n\n${slidesSummary}`, 'utf-8');
-
-                generatedFolders.push({
-                    videoNumber: video.videoNumber,
-                    title: video.title,
-                    folderPath,
-                    files: ['narration.txt', 'slides.md', ...(video.allCodeBlocks.length > 0 ? ['code_blocks.md'] : [])]
-                });
-
-                console.log(`[ScriptParser] ✅ Created: ${folderName}`);
-
-            } catch (err: any) {
-                errors.push(`Video ${video.videoNumber}: ${err.message}`);
-                console.error(`[ScriptParser] ❌ Failed: Video ${video.videoNumber}:`, err.message);
-            }
-        }
-
-        res.json({
-            success: errors.length === 0,
-            outputDir: baseOutputDir,
-            totalGenerated: generatedFolders.length,
-            totalErrors: errors.length,
-            folders: generatedFolders,
-            errors
+        // Initialize Puppeteer for screenshot generation
+        const puppeteer = require('puppeteer');
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
+        const page = await browser.newPage();
+
+        // Set high-resolution viewport (2x scale for Retina-quality screenshots)
+        await page.setViewport({
+            width: 1920,
+            height: 1080,
+            deviceScaleFactor: 2  // 2x resolution (3840x2160 effective)
+        });
+
+        await folderCreator.initialize(page);
+
+        try {
+            // Generate all folders with screenshots and DOCX
+            const result = await folderCreator.generateAll({
+                sourceMarkdownPath: scriptPath,
+                outputBaseDir: baseOutputDir,
+                chapterPrefix: 'chapter',
+                generateScreenshots: true,
+                generateDocx: true,
+                generateNarration: true
+            });
+
+            await browser.close();
+
+            // Format response
+            const folders = result.results.map(r => ({
+                videoNumber: r.videoNumber,
+                title: '', // Not available in result
+                folderPath: r.folderPath,
+                files: [
+                    ...(r.narrationPath ? ['narration.txt'] : []),
+                    ...(r.docxPath ? [path.basename(r.docxPath)] : []),
+                    ...r.screenshotPaths.map(p => path.basename(p))
+                ],
+                screenshotCount: r.screenshotPaths.length
+            }));
+
+            res.json({
+                success: result.failCount === 0,
+                outputDir: baseOutputDir,
+                totalGenerated: result.successCount,
+                totalErrors: result.failCount,
+                folders,
+                errors: result.results.filter(r => !r.success).map(r => `Video ${r.videoNumber}: ${r.error}`)
+            });
+
+        } catch (error: any) {
+            await browser.close();
+            throw error;
+        }
 
     } catch (error) {
         console.error('[ScriptParser] Error:', error);

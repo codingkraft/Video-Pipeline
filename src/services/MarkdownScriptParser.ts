@@ -29,7 +29,7 @@ export interface Slide {
  * Represents a complete video section
  */
 export interface VideoSection {
-    videoNumber: number;
+    videoNumber: string;
     title: string;
     duration?: string;
     concept?: string;
@@ -77,7 +77,7 @@ export class MarkdownScriptParser {
 
         for (let i = 0; i < videoMatches.length; i++) {
             const match = videoMatches[i];
-            const videoNumber = parseInt(match[1]);
+            const videoNumber = match[1]; // Keep as string to support decimals like "9.1"
             const videoTitle = match[2].trim();
 
             // Get content for this video (until next video or end)
@@ -103,7 +103,7 @@ export class MarkdownScriptParser {
     /**
      * Parse a single video section
      */
-    private static parseVideoSection(content: string, videoNumber: number, title: string): VideoSection {
+    private static parseVideoSection(content: string, videoNumber: string, title: string): VideoSection {
         const slides: Slide[] = [];
         const allCodeBlocks: CodeBlock[] = [];
         const narrationParts: string[] = [];
@@ -244,7 +244,7 @@ export class MarkdownScriptParser {
     /**
      * Get all code blocks for a specific video
      */
-    static getCodeBlocksForVideo(result: ParseResult, videoNumber: number): CodeBlock[] {
+    static getCodeBlocksForVideo(result: ParseResult, videoNumber: string): CodeBlock[] {
         const video = result.videos.find(v => v.videoNumber === videoNumber);
         return video ? video.allCodeBlocks : [];
     }
@@ -252,7 +252,7 @@ export class MarkdownScriptParser {
     /**
      * Get full narration for a specific video
      */
-    static getNarrationForVideo(result: ParseResult, videoNumber: number): string {
+    static getNarrationForVideo(result: ParseResult, videoNumber: string): string {
         const video = result.videos.find(v => v.videoNumber === videoNumber);
         return video ? video.fullNarration : '';
     }

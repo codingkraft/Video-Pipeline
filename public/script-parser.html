@@ -513,8 +513,8 @@
             listEl.innerHTML = data.folders.map(f => `
                 <div class="result-item">
                     <span class="check">✅</span>
-                    <span class="folder-name">Video ${f.videoNumber}: ${f.title}</span>
-                    <span class="files">${f.files.join(', ')}</span>
+                    <span class="folder-name">Video ${f.videoNumber}${f.title ? ': ' + f.title : ''}</span>
+                    <span class="files">${f.screenshotCount || 0} screenshots, ${f.files.length} files</span>
                 </div>
             `).join('');
 

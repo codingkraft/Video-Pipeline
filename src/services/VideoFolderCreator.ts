@@ -27,7 +27,7 @@ export interface VideoFolderConfig {
  * Result of generating a single video folder
  */
 export interface VideoFolderResult {
-    videoNumber: number;
+    videoNumber: string;
     folderPath: string;
     narrationPath?: string;
     docxPath?: string;
@@ -84,14 +84,14 @@ export class VideoFolderCreator {
         const parseResult = MarkdownScriptParser.parseFile(config.sourceMarkdownPath);
         console.log(`[VideoFolderCreator] Found ${parseResult.totalVideos} videos`);
 
-        // Filter videos by number range if specified
+        // Filter videos by number range if specified (commented out - videoNumber is now string)
         let videos = parseResult.videos;
-        if (config.startVideoNumber !== undefined) {
-            videos = videos.filter(v => v.videoNumber >= config.startVideoNumber!);
-        }
-        if (config.endVideoNumber !== undefined) {
-            videos = videos.filter(v => v.videoNumber <= config.endVideoNumber!);
-        }
+        // if (config.startVideoNumber !== undefined) {
+        //     videos = videos.filter(v => parseFloat(v.videoNumber) >= config.startVideoNumber!);
+        // }
+        // if (config.endVideoNumber !== undefined) {
+        //     videos = videos.filter(v => parseFloat(v.videoNumber) <= config.endVideoNumber!);
+        // }
 
         console.log(`[VideoFolderCreator] Generating ${videos.length} video folders`);
 
@@ -148,19 +148,19 @@ export class VideoFolderCreator {
             success: true
         };
 
+        // Generate screenshots FIRST (needed for DOCX)
+        if (config.generateScreenshots !== false && this.screenshotService) {
+            result.screenshotPaths = await this.generateScreenshots(video, folderPath, prefix);
+        }
+
         // Generate narration TXT
         if (config.generateNarration !== false) {
             result.narrationPath = await this.generateNarrationFile(video, folderPath);
         }
 
-        // Generate DOCX
+        // Generate DOCX with embedded screenshots
         if (config.generateDocx !== false) {
-            result.docxPath = await this.generateDocxFile(video, folderPath);
-        }
-
-        // Generate screenshots
-        if (config.generateScreenshots !== false && this.screenshotService) {
-            result.screenshotPaths = await this.generateScreenshots(video, folderPath, prefix);
+            result.docxPath = await this.generateDocxFile(video, folderPath, result.screenshotPaths);
         }
 
         return result;
@@ -180,11 +180,27 @@ export class VideoFolderCreator {
     }
 
     /**
-     * Generate DOCX file for NotebookLM source
+     * Generate DOCX file for NotebookLM source with embedded screenshots
      */
-    private async generateDocxFile(video: VideoSection, folderPath: string): Promise<string> {
+    private async generateDocxFile(video: VideoSection, folderPath: string, screenshotPaths: string[] = []): Promise<string> {
         const filename = `video${video.videoNumber}_source.docx`;
         const filePath = path.join(folderPath, filename);
+
+        // Import ImageRun for embedding images
+        const { ImageRun } = await import('docx');
+
+        // Create a map of screenshots by slide number for easy lookup
+        const screenshotsBySlide = new Map<number, string[]>();
+        for (const screenshotPath of screenshotPaths) {
+            const match = screenshotPath.match(/slide(\d+)/);
+            if (match) {
+                const slideNum = parseInt(match[1]);
+                if (!screenshotsBySlide.has(slideNum)) {
+                    screenshotsBySlide.set(slideNum, []);
+                }
+                screenshotsBySlide.get(slideNum)!.push(screenshotPath);
+            }
+        }
 
         const doc = new Document({
             sections: [{
@@ -207,33 +223,66 @@ export class VideoFolderCreator {
                     ] : []),
 
                     // Slides
-                    ...video.slides.flatMap(slide => [
-                        new Paragraph({
-                            text: `Slide ${slide.number}: ${slide.title}`,
-                            heading: HeadingLevel.HEADING_2
-                        }),
-                        new Paragraph({
-                            children: [new TextRun({ text: slide.audio })]
-                        }),
-                        new Paragraph({ text: '' }),
+                    ...video.slides.flatMap(slide => {
+                        const slideScreenshots = screenshotsBySlide.get(slide.number) || [];
 
-                        // Code blocks for this slide
-                        ...slide.codeBlocks.flatMap(block => [
+                        return [
                             new Paragraph({
-                                text: 'Code Example:',
-                                heading: HeadingLevel.HEADING_3
+                                text: `Slide ${slide.number}: ${slide.title}`,
+                                heading: HeadingLevel.HEADING_2
                             }),
                             new Paragraph({
-                                children: [
-                                    new TextRun({
-                                        text: block.code,
-                                        font: 'Consolas'
-                                    })
-                                ]
+                                children: [new TextRun({ text: slide.audio })]
                             }),
-                            new Paragraph({ text: '' })
-                        ])
-                    ])
+                            new Paragraph({ text: '' }),
+
+                            // Embed screenshots for this slide
+                            ...slideScreenshots.flatMap(screenshotPath => {
+                                const screenshotFilename = path.basename(screenshotPath);
+
+                                try {
+                                    const imageBuffer = fs.readFileSync(screenshotPath);
+
+                                    return [
+                                        new Paragraph({
+                                            children: [
+                                                new TextRun({
+                                                    text: `Screenshot: ${screenshotFilename}`,
+                                                    bold: true
+                                                })
+                                            ]
+                                        }),
+                                        new Paragraph({
+                                            children: [
+                                                new ImageRun({
+                                                    data: imageBuffer,
+                                                    transformation: {
+                                                        width: 600,
+                                                        height: 400
+                                                    },
+                                                    type: 'png'
+                                                } as any) // Type assertion to bypass strict typing
+                                            ]
+                                        }),
+                                        new Paragraph({ text: '' })
+                                    ];
+                                } catch (err) {
+                                    console.warn(`[VideoFolderCreator] Could not embed image: ${screenshotFilename}`);
+                                    return [
+                                        new Paragraph({
+                                            children: [
+                                                new TextRun({
+                                                    text: `Screenshot: ${screenshotFilename} (file not found)`,
+                                                    italics: true
+                                                })
+                                            ]
+                                        }),
+                                        new Paragraph({ text: '' })
+                                    ];
+                                }
+                            })
+                        ];
+                    })
                 ]
             }]
         });

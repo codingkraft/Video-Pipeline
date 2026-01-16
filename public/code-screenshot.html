@@ -303,13 +303,21 @@
 
         body.puppeteer-mode .input-section,
         body.puppeteer-mode .output-section h2,
-        body.puppeteer-mode .instructions,
-        body.puppeteer-mode #preview-container {
+        body.puppeteer-mode .instructions {
             display: none;
+        }
+
+        body.puppeteer-mode .output-section {
+            width: fit-content;
+        }
+
+        body.puppeteer-mode #preview-container {
+            width: fit-content;
         }
 
         body.puppeteer-mode #screenshot-target {
             margin: 0;
+            display: inline-block;
         }
     </style>
 </head>

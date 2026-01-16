@@ -204,8 +204,9 @@ export class CodeScreenshotService {
             (window as any).render();
         }, { code, output, filename, showLineNumbers, showCommand, mode });
 
-        // Wait for rendering
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for rendering and ensure element is visible
+        await this.page.waitForSelector('#screenshot-target', { visible: true, timeout: 5000 });
+        await new Promise(resolve => setTimeout(resolve, 300)); // Additional wait for animations
 
         // Get the screenshot element
         const element = await this.page.$('#screenshot-target');
