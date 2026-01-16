@@ -25,6 +25,7 @@
   "dependencies": {
     "@types/express": "^5.0.6",
     "@types/multer": "^2.0.0",
+    "docx": "^9.5.1",
     "express": "^4.22.1",
     "fluent-ffmpeg": "^2.1.2",
     "multer": "^2.0.2",

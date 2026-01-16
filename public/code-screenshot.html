@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Screenshot Generator</title>
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <!-- Pyodide for running Python in browser -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .input-section {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .input-section h2 {
+            margin-bottom: 15px;
+            color: #00d9ff;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .input-group textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #333;
+            margin-left: 10px;
+        }
+
+        .output-section {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .output-section h2 {
+            margin-bottom: 15px;
+            color: #00d9ff;
+        }
+
+        /* ===== SCREENSHOT PREVIEW STYLES ===== */
+        #preview-container {
+            background: #0d0d0d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* The actual screenshot element */
+        #screenshot-target {
+            background: #1e1e1e;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 15px;
+            line-height: 1.6;
+            min-width: 700px;
+            max-width: 900px;
+        }
+
+        /* Window title bar */
+        .window-header {
+            background: #323233;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .window-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+        }
+
+        .window-title {
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        /* Code section */
+        .code-section {
+            padding: 16px 20px;
+            background: #1e1e1e;
+        }
+
+        .code-line {
+            display: flex;
+            min-height: 24px;
+        }
+
+        .line-number {
+            color: #6e7681;
+            text-align: right;
+            padding-right: 20px;
+            min-width: 40px;
+            user-select: none;
+        }
+
+        .line-content {
+            flex: 1;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        /* Terminal/Output section */
+        .terminal-section {
+            background: #1e1e1e;
+            border-top: 1px solid #333;
+            padding: 16px 20px;
+        }
+
+        .terminal-prompt {
+            color: #569CD6;
+            margin-bottom: 8px;
+        }
+
+        .terminal-output {
+            color: #FFFFFF;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .terminal-output .normal-output {
+            color: #FFFFFF;
+        }
+
+        .terminal-output .error {
+            color: #F44747;
+        }
+
+        /* Syntax highlighting overrides to match screenshot style */
+        .code-section .hljs {
+            background: transparent;
+            padding: 0;
+        }
+
+        .code-section .hljs-comment {
+            color: #6A9955;
+        }
+
+        .code-section .hljs-string {
+            color: #CE9178;
+        }
+
+        .code-section .hljs-keyword {
+            color: #C586C0;
+        }
+
+        .code-section .hljs-built_in {
+            color: #DCDCAA;
+        }
+
+        .code-section .hljs-function {
+            color: #DCDCAA;
+        }
+
+        .code-section .hljs-number {
+            color: #B5CEA8;
+        }
+
+        .code-section .hljs-variable {
+            color: #9CDCFE;
+        }
+
+        .code-section .hljs-title {
+            color: #4EC9B0;
+        }
+
+        /* Download instructions */
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 217, 255, 0.1);
+            border-radius: 8px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .instructions code {
+            background: #1a1a2e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #00d9ff;
+        }
+
+        /* Mode selector for code-only or code+output */
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-tab {
+            padding: 8px 16px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #aaa;
+            transition: all 0.2s;
+        }
+
+        .mode-tab.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
+        .mode-tab:hover:not(.active) {
+            border-color: #667eea;
+        }
+
+        /* Puppeteer mode - hide UI elements */
+        body.puppeteer-mode {
+            padding: 0;
+            background: transparent;
+        }
+
+        body.puppeteer-mode .input-section,
+        body.puppeteer-mode .output-section h2,
+        body.puppeteer-mode .instructions,
+        body.puppeteer-mode #preview-container {
+            display: none;
+        }
+
+        body.puppeteer-mode #screenshot-target {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Input Section -->
+        <div class="input-section">
+            <h2>📝 Input</h2>
+
+            <div class="input-group">
+                <label>Filename (shown in title bar)</label>
+                <input type="text" id="filename" value="main.py" placeholder="e.g., main.py">
+            </div>
+
+            <div class="mode-tabs">
+                <div class="mode-tab active" data-mode="code-output">Code + Output</div>
+                <div class="mode-tab" data-mode="code-only">Code Only</div>
+                <div class="mode-tab" data-mode="output-only">Output Only</div>
+            </div>
+
+            <div class="input-group" id="code-input-group">
+                <label>Python Code</label>
+                <textarea id="code-input" placeholder="Enter your Python code here...">game_title = "CodeStrike"
+max_players = 100
+player_level = 5</textarea>
+            </div>
+
+            <div class="input-group" id="output-input-group">
+                <label>Program Output (leave empty for code-only screenshot)</label>
+                <textarea id="output-input" placeholder="Leave empty for code-only screenshot..."></textarea>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="show-line-numbers" checked>
+                <label for="show-line-numbers">Show line numbers</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="show-command" checked>
+                <label for="show-command">Show "python main.py" command</label>
+            </div>
+
+            <button class="btn" onclick="runPythonCode()" id="run-btn">▶️ Run Code</button>
+            <button class="btn btn-secondary" onclick="updatePreview()">🔄 Update Preview</button>
+            <button class="btn btn-secondary" onclick="downloadScreenshot()">📥 Download PNG</button>
+
+            <div id="pyodide-status" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
+        </div>
+
+        <!-- Output/Preview Section -->
+        <div class="output-section">
+            <h2>👁️ Preview</h2>
+
+            <div id="size-warning"
+                style="display: none; background: #ff9800; color: #000; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: 500;">
+            </div>
+
+            <div id="preview-container">
+                <div id="screenshot-target">
+                    <!-- This is what gets captured -->
+                    <div class="window-header">
+                        <div class="window-dot"></div>
+                        <span class="window-title" id="preview-title">main.py</span>
+                    </div>
+                    <div class="code-section" id="code-display">
+                        <!-- Code lines rendered here -->
+                    </div>
+                    <div class="terminal-section" id="terminal-display">
+                        <div class="terminal-prompt" id="terminal-prompt">PS C:\project&gt; python main.py</div>
+                        <div class="terminal-output" id="terminal-output">(No output)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <strong>💡 Tips:</strong><br>
+                • Click "Update Preview" after making changes<br>
+                • Use "Download PNG" to save the screenshot<br>
+                • For Puppeteer automation, add <code>?mode=puppeteer</code> to URL<br>
+                • Pass data via URL params: <code>?code=...&output=...&filename=...</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- html2canvas for screenshot capture -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        let currentMode = 'code-output';
+        const MAX_LINES_WITH_OUTPUT = 15; // If code exceeds this, output is shown separately
+
+        // Pyodide instance
+        let pyodide = null;
+        let pyodideReady = false;
+        let pyodideLoading = false;
+
+        // Initialize Pyodide (lazy load on first use)
+        async function initPyodide() {
+            if (pyodideReady) return true;
+            if (pyodideLoading) {
+                // Wait for existing load to complete
+                while (pyodideLoading) {
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                return pyodideReady;
+            }
+
+            pyodideLoading = true;
+            const statusEl = document.getElementById('pyodide-status');
+            statusEl.textContent = '⏳ Loading Python runtime (first time only)...';
+            statusEl.style.color = '#ff9800';
+
+            try {
+                pyodide = await loadPyodide();
+                pyodideReady = true;
+                statusEl.textContent = '✅ Python ready';
+                statusEl.style.color = '#4CAF50';
+                return true;
+            } catch (error) {
+                statusEl.textContent = '❌ Failed to load Python: ' + error.message;
+                statusEl.style.color = '#f44336';
+                pyodideLoading = false;
+                return false;
+            } finally {
+                pyodideLoading = false;
+            }
+        }
+
+        // Run Python code and populate output
+        async function runPythonCode() {
+            const code = document.getElementById('code-input').value;
+            const outputEl = document.getElementById('output-input');
+            const runBtn = document.getElementById('run-btn');
+            const statusEl = document.getElementById('pyodide-status');
+
+            if (!code.trim()) {
+                outputEl.value = '';
+                updatePreview();
+                return;
+            }
+
+            // Disable button while running
+            runBtn.disabled = true;
+            runBtn.textContent = '⏳ Running...';
+
+            try {
+                // Initialize Pyodide if needed
+                if (!await initPyodide()) {
+                    runBtn.disabled = false;
+                    runBtn.textContent = '▶️ Run Code';
+                    return;
+                }
+
+                statusEl.textContent = '🔄 Executing...';
+                statusEl.style.color = '#00d9ff';
+
+                // Setup stdout/stderr capture
+                pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+sys.stderr = StringIO()
+                `);
+
+                // Run the user's code and capture any errors
+                let stdout = '';
+                let stderr = '';
+
+                try {
+                    pyodide.runPython(code);
+                } catch (pyError) {
+                    // Clean up Pyodide traceback to look like native Python
+                    stderr = cleanPyodideTraceback(pyError.message, code);
+                }
+
+                // Always get stdout (even if there was an error)
+                try {
+                    stdout = pyodide.runPython('sys.stdout.getvalue()') || '';
+                    // Also get any stderr that was written (e.g., warnings)
+                    const pyStderr = pyodide.runPython('sys.stderr.getvalue()') || '';
+                    if (pyStderr && !stderr) {
+                        stderr = pyStderr;
+                    }
+                } catch (e) {
+                    // Ignore if we can't get stdout
+                }
+
+                // Store separately with a marker for the preview renderer
+                // Format: stdout|||stderr (using ||| as separator that won't appear in normal output)
+                let output = '';
+                if (stdout && stderr) {
+                    output = `${stdout}|||${stderr}`;
+                } else if (stderr) {
+                    output = `|||${stderr}`;
+                } else {
+                    output = stdout;
+                }
+
+                if (stderr) {
+                    statusEl.textContent = '❌ Python error';
+                    statusEl.style.color = '#f44336';
+                } else {
+                    statusEl.textContent = '✅ Executed successfully';
+                    statusEl.style.color = '#4CAF50';
+                }
+
+                outputEl.value = output;
+                updatePreview();
+
+            } catch (error) {
+                outputEl.value = 'Error: ' + error.message;
+                statusEl.textContent = '❌ Execution failed';
+                statusEl.style.color = '#f44336';
+                updatePreview();
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = '▶️ Run Code';
+            }
+        }
+
+        // Clean up Pyodide traceback to look like native Python
+        function cleanPyodideTraceback(errorMessage, userCode) {
+            const lines = errorMessage.split('\n');
+            const cleanedLines = [];
+            let inUserCode = false;
+
+            // Get the filename we're displaying
+            const filename = document.getElementById('filename').value || 'main.py';
+
+            // Find the error type and message (usually the last line)
+            let errorTypeLine = '';
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (line && (line.includes('Error:') || line.includes('Exception:'))) {
+                    errorTypeLine = line;
+                    break;
+                }
+            }
+
+            // Try to find the line number from <exec> references
+            let lineNumber = null;
+            for (const line of lines) {
+                const execMatch = line.match(/File "<exec>", line (\d+)/);
+                if (execMatch) {
+                    lineNumber = execMatch[1];
+                    break;
+                }
+            }
+
+            // Build a clean traceback like native Python
+            cleanedLines.push('Traceback (most recent call last):');
+
+            if (lineNumber) {
+                // Get the actual code line
+                const codeLines = userCode.split('\n');
+                const codeLine = codeLines[parseInt(lineNumber) - 1] || '';
+                cleanedLines.push(`  File "${filename}", line ${lineNumber}, in <module>`);
+                cleanedLines.push(`    ${codeLine.trim()}`);
+            }
+
+            if (errorTypeLine) {
+                cleanedLines.push(errorTypeLine);
+            }
+
+            return cleanedLines.join('\n');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for puppeteer mode
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('mode') === 'puppeteer') {
+                document.body.classList.add('puppeteer-mode');
+            }
+
+            // Load from URL params if present
+            if (urlParams.has('code')) {
+                document.getElementById('code-input').value = decodeURIComponent(urlParams.get('code'));
+            }
+            if (urlParams.has('output')) {
+                document.getElementById('output-input').value = decodeURIComponent(urlParams.get('output'));
+            }
+            if (urlParams.has('filename')) {
+                document.getElementById('filename').value = decodeURIComponent(urlParams.get('filename'));
+            }
+            if (urlParams.has('type')) {
+                setMode(urlParams.get('type'));
+            }
+
+            // Mode tab click handlers
+            document.querySelectorAll('.mode-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    setMode(tab.dataset.mode);
+                });
+            });
+
+            updatePreview();
+        });
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.mode === mode);
+            });
+
+            // Show/hide input groups based on mode
+            const codeGroup = document.getElementById('code-input-group');
+            const outputGroup = document.getElementById('output-input-group');
+
+            codeGroup.style.display = (mode === 'output-only') ? 'none' : 'block';
+            outputGroup.style.display = (mode === 'code-only') ? 'none' : 'block';
+
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const code = document.getElementById('code-input').value;
+            const output = document.getElementById('output-input').value;
+            const filename = document.getElementById('filename').value;
+            const showLineNumbers = document.getElementById('show-line-numbers').checked;
+            const showCommand = document.getElementById('show-command').checked;
+
+            // Update title
+            document.getElementById('preview-title').textContent = filename;
+
+            // Render code section
+            const codeSection = document.getElementById('code-display');
+            const terminalSection = document.getElementById('terminal-display');
+
+            if (currentMode === 'output-only') {
+                codeSection.style.display = 'none';
+            } else {
+                codeSection.style.display = 'block';
+                const lines = code.split('\n');
+                let html = '';
+
+                lines.forEach((line, index) => {
+                    const lineNum = showLineNumbers
+                        ? `<span class="line-number">${index + 1}</span>`
+                        : '';
+
+                    // Highlight the line
+                    const highlighted = hljs.highlight(line || ' ', { language: 'python' }).value;
+                    html += `<div class="code-line">${lineNum}<span class="line-content">${highlighted}</span></div>`;
+                });
+
+                codeSection.innerHTML = html;
+            }
+
+            // Render terminal section
+            // Hide terminal entirely if: mode is code-only OR output is empty OR code is too big
+            const outputTrimmed = output.trim();
+            const hasOutput = outputTrimmed.length > 0 && outputTrimmed !== '(No output)';
+            const codeLines = code.split('\n').length;
+            const codeTooBig = codeLines > MAX_LINES_WITH_OUTPUT;
+
+            // Show warning if code is too big and has output
+            const warningEl = document.getElementById('size-warning');
+            if (codeTooBig && hasOutput && currentMode === 'code-output') {
+                warningEl.style.display = 'block';
+                warningEl.textContent = `⚠️ Code has ${codeLines} lines (>${MAX_LINES_WITH_OUTPUT}). Output will be generated separately.`;
+            } else {
+                warningEl.style.display = 'none';
+            }
+
+            // Hide terminal if code-only, no output, or code is too big (auto-separate)
+            const shouldHideTerminal = currentMode === 'code-only' ||
+                (currentMode === 'code-output' && !hasOutput) ||
+                (currentMode === 'code-output' && codeTooBig);
+
+            if (shouldHideTerminal) {
+                terminalSection.style.display = 'none';
+            } else {
+                terminalSection.style.display = 'block';
+
+                const promptText = showCommand
+                    ? `PS C:\\project&gt; python ${filename}`
+                    : '';
+                document.getElementById('terminal-prompt').innerHTML = promptText;
+                document.getElementById('terminal-prompt').style.display = showCommand ? 'block' : 'none';
+
+                const terminalOutputEl = document.getElementById('terminal-output');
+
+                // Check if output contains the ||| separator (from Pyodide execution)
+                // Format: stdout|||stderr
+                if (outputTrimmed.includes('|||')) {
+                    const [stdoutPart, stderrPart] = outputTrimmed.split('|||');
+                    const stdout = stdoutPart.trim();
+                    const stderr = stderrPart.trim();
+
+                    let html = '';
+                    if (stdout) {
+                        html += `<span class="normal-output">${escapeHtml(stdout)}</span>`;
+                    }
+                    if (stderr) {
+                        if (html) html += '\n';
+                        html += `<span class="error">${escapeHtml(stderr)}</span>`;
+                    }
+                    terminalOutputEl.innerHTML = html || escapeHtml(outputTrimmed);
+                } else {
+                    // Manual input - try to detect errors by pattern matching
+                    const tracebackIndex = outputTrimmed.indexOf('Traceback');
+                    const errorPatterns = ['Error:', 'Exception:', 'SyntaxError:', 'NameError:',
+                        'TypeError:', 'ValueError:', 'IndexError:', 'KeyError:',
+                        'AttributeError:', 'ImportError:', 'ModuleNotFoundError:',
+                        'ZeroDivisionError:', 'FileNotFoundError:', 'RuntimeError:'];
+
+                    let errorStartIndex = tracebackIndex;
+
+                    // If no Traceback, check for other error patterns
+                    if (errorStartIndex === -1) {
+                        for (const pattern of errorPatterns) {
+                            const idx = outputTrimmed.indexOf(pattern);
+                            if (idx !== -1 && (errorStartIndex === -1 || idx < errorStartIndex)) {
+                                errorStartIndex = idx;
+                            }
+                        }
+                    }
+
+                    if (errorStartIndex > 0) {
+                        // There's normal output before the error
+                        const normalPart = outputTrimmed.substring(0, errorStartIndex).trim();
+                        const errorPart = outputTrimmed.substring(errorStartIndex);
+
+                        if (normalPart) {
+                            terminalOutputEl.innerHTML =
+                                `<span class="normal-output">${escapeHtml(normalPart)}</span>\n` +
+                                `<span class="error">${escapeHtml(errorPart)}</span>`;
+                        } else {
+                            terminalOutputEl.innerHTML = `<span class="error">${escapeHtml(outputTrimmed)}</span>`;
+                        }
+                    } else if (errorStartIndex === 0) {
+                        // Error at the start - entire output is error
+                        terminalOutputEl.innerHTML = `<span class="error">${escapeHtml(outputTrimmed)}</span>`;
+                    } else {
+                        // No error detected - show as normal output (white)
+                        terminalOutputEl.textContent = outputTrimmed;
+                    }
+                }
+            }
+        }
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function downloadScreenshot() {
+            const element = document.getElementById('screenshot-target');
+
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#1e1e1e',
+                    scale: 2, // Higher resolution
+                    logging: false
+                });
+
+                const link = document.createElement('a');
+                link.download = `${document.getElementById('filename').value.replace('.py', '')}_screenshot.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (error) {
+                console.error('Screenshot failed:', error);
+                alert('Failed to capture screenshot. See console for details.');
+            }
+        }
+
+        // Expose functions for Puppeteer
+        window.setCode = (code) => { document.getElementById('code-input').value = code; };
+        window.setOutput = (output) => { document.getElementById('output-input').value = output; };
+        window.setFilename = (name) => { document.getElementById('filename').value = name; };
+        window.setScreenshotMode = setMode;
+        window.render = updatePreview;
+        window.getScreenshotElement = () => document.getElementById('screenshot-target');
+    </script>
+</body>
+
+</html>

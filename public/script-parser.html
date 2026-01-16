@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Parser - Video Creator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a1525 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(30, 30, 50, 0.8);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: #00d9ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d9ff, #0099cc);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #000;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(100, 100, 120, 0.5);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(120, 120, 140, 0.5);
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-message.info {
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            color: #00d9ff;
+            display: block;
+        }
+
+        .status-message.success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: #00ff88;
+            display: block;
+        }
+
+        .status-message.error {
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            color: #ff4444;
+            display: block;
+        }
+
+        /* Videos Preview */
+        .videos-preview {
+            display: none;
+        }
+
+        .videos-preview.show {
+            display: block;
+        }
+
+        .chapter-title {
+            font-size: 1.1rem;
+            color: #00ff88;
+            margin-bottom: 15px;
+        }
+
+        .video-count {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .videos-list {
+            margin-top: 20px;
+        }
+
+        .video-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #00d9ff;
+        }
+
+        .video-item h3 {
+            font-size: 1rem;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .video-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .video-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .video-meta .icon {
+            color: #00d9ff;
+        }
+
+        /* Confirm Section */
+        .confirm-section {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .confirm-section.show {
+            display: block;
+        }
+
+        .confirm-section p {
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+
+        .output-path {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #00ff88;
+            margin-bottom: 15px;
+            word-break: break-all;
+        }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .result-item .check {
+            color: #00ff88;
+            font-size: 1.2rem;
+        }
+
+        .result-item .folder-name {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .result-item .files {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        /* Back link */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #888;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .back-link:hover {
+            color: #00d9ff;
+        }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+
+        <h1>📜 Script Parser</h1>
+        <p class="subtitle">Parse a markdown script and generate video input folders</p>
+
+        <!-- Step 1: Input Script Path -->
+        <div class="card" id="step1">
+            <h2>📁 Step 1: Select Script File</h2>
+
+            <div class="input-group">
+                <input type="text" id="scriptPath" placeholder="Enter path to markdown script file (.md)">
+                <button class="btn-secondary" onclick="browseFile()">Browse...</button>
+                <button class="btn-primary" id="parseBtn" onclick="parseScript()">Parse Script</button>
+            </div>
+
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+
+        <!-- Step 2: Preview Videos -->
+        <div class="card videos-preview" id="step2">
+            <h2>📋 Step 2: Review Parsed Videos</h2>
+
+            <div class="chapter-title" id="chapterTitle"></div>
+            <div class="video-count"><span id="videoCount">0</span> videos found</div>
+
+            <div class="videos-list" id="videosList"></div>
+
+            <div class="confirm-section" id="confirmSection">
+                <p>Folders will be created in:</p>
+                <div class="output-path" id="outputPath"></div>
+
+                <button class="btn-success" id="generateBtn" onclick="generateFolders()">
+                    ✅ Confirm & Generate Folders
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="card results-section" id="step3">
+            <h2>✨ Generation Complete</h2>
+
+            <div id="resultsMessage" class="status-message success"></div>
+
+            <div id="resultsList"></div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn-secondary" onclick="openFolder()">📂 Open Output Folder</button>
+                <button class="btn-primary" onclick="resetForm()">🔄 Parse Another Script</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let parsedScriptPath = '';
+        let outputDir = '';
+
+        async function browseFile() {
+            try {
+                const response = await fetch('/api/browse-file');
+                const data = await response.json();
+
+                if (data.path) {
+                    document.getElementById('scriptPath').value = data.path;
+                }
+            } catch (error) {
+                // Browse file endpoint might not exist, user can type manually
+                console.log('Browse not available, enter path manually');
+            }
+        }
+
+        async function parseScript() {
+            const scriptPath = document.getElementById('scriptPath').value.trim();
+
+            if (!scriptPath) {
+                showStatus('Please enter the path to a markdown script file.', 'error');
+                return;
+            }
+
+            const parseBtn = document.getElementById('parseBtn');
+            parseBtn.disabled = true;
+            parseBtn.innerHTML = '<span class="spinner"></span>Parsing...';
+
+            showStatus('Parsing script...', 'info');
+
+            try {
+                const response = await fetch('/api/parse-script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scriptPath })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || data.message || 'Parse failed');
+                }
+
+                // Store for later
+                parsedScriptPath = scriptPath;
+
+                // Determine output path
+                const pathParts = scriptPath.split(/[\\\/]/);
+                pathParts.pop(); // Remove filename
+                outputDir = pathParts.join('\\') + '\\Per Video Input';
+
+                // Show results
+                showStatus(`Successfully parsed ${data.totalVideos} videos!`, 'success');
+                displayVideos(data);
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            } finally {
+                parseBtn.disabled = false;
+                parseBtn.textContent = 'Parse Script';
+            }
+        }
+
+        function displayVideos(data) {
+            // Show step 2
+            document.getElementById('step2').classList.add('show');
+
+            // Chapter title
+            const chapterEl = document.getElementById('chapterTitle');
+            chapterEl.textContent = data.chapterTitle || '';
+            chapterEl.style.display = data.chapterTitle ? 'block' : 'none';
+
+            // Video count
+            document.getElementById('videoCount').textContent = data.totalVideos;
+
+            // Videos list
+            const listEl = document.getElementById('videosList');
+            listEl.innerHTML = data.videos.map(v => `
+                <div class="video-item">
+                    <h3>Video ${v.videoNumber}: ${v.title}</h3>
+                    <div class="video-meta">
+                        <span><span class="icon">🎬</span> ${v.slideCount} slides</span>
+                        <span><span class="icon">💻</span> ${v.codeBlockCount} code blocks</span>
+                        ${v.duration ? `<span><span class="icon">⏱️</span> ${v.duration}</span>` : ''}
+                        ${v.concept ? `<span><span class="icon">💡</span> ${v.concept}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            // Output path
+            document.getElementById('outputPath').textContent = outputDir;
+
+            // Show confirm section
+            document.getElementById('confirmSection').classList.add('show');
+        }
+
+        async function generateFolders() {
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="spinner"></span>Generating...';
+
+            try {
+                const response = await fetch('/api/generate-video-folders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scriptPath: parsedScriptPath,
+                        outputBaseDir: outputDir
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || data.message || 'Generation failed');
+                }
+
+                // Update outputDir with actual path from server
+                outputDir = data.outputDir;
+
+                // Show results
+                displayResults(data);
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '✅ Confirm & Generate Folders';
+            }
+        }
+
+        function displayResults(data) {
+            // Hide step 2, show step 3
+            document.getElementById('step2').classList.remove('show');
+            document.getElementById('step3').classList.add('show');
+
+            // Results message
+            const msg = document.getElementById('resultsMessage');
+            if (data.success) {
+                msg.className = 'status-message success';
+                msg.textContent = `✅ Successfully generated ${data.totalGenerated} video folders!`;
+            } else {
+                msg.className = 'status-message error';
+                msg.textContent = `⚠️ Generated ${data.totalGenerated} folders with ${data.totalErrors} errors.`;
+            }
+
+            // Results list
+            const listEl = document.getElementById('resultsList');
+            listEl.innerHTML = data.folders.map(f => `
+                <div class="result-item">
+                    <span class="check">✅</span>
+                    <span class="folder-name">Video ${f.videoNumber}: ${f.title}</span>
+                    <span class="files">${f.files.join(', ')}</span>
+                </div>
+            `).join('');
+
+            if (data.errors && data.errors.length > 0) {
+                listEl.innerHTML += data.errors.map(e => `
+                    <div class="result-item" style="border-left: 3px solid #ff4444;">
+                        <span style="color: #ff4444;">❌</span>
+                        <span class="folder-name">${e}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function openFolder() {
+            // Try to open the folder using the system
+            fetch('/api/open-folder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: outputDir })
+            }).catch(() => {
+                // If endpoint doesn't exist, show the path
+                alert('Output folder:\n' + outputDir);
+            });
+        }
+
+        function resetForm() {
+            // Reset all
+            document.getElementById('scriptPath').value = '';
+            document.getElementById('step2').classList.remove('show');
+            document.getElementById('step3').classList.remove('show');
+            document.getElementById('confirmSection').classList.remove('show');
+            document.getElementById('statusMessage').className = 'status-message';
+            parsedScriptPath = '';
+            outputDir = '';
+        }
+
+        function showStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = 'status-message ' + type;
+        }
+    </script>
+</body>
+
+</html>

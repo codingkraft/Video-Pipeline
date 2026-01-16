@@ -1,0 +1,28 @@
+Video 10: Working with Multiple Variables
+==================================================
+
+Concept: Real programs use many variables together (including True/False)
+
+[Slide 1: Title Screen]
+One variable is lonely. Real programs juggle lots of variables at once: username, score, level, settings, inventory—everything. Let's build a character profile to see how variables work together.
+
+[Slide 2: Character Profile (Multiple Types)]
+Meet our hero. Great name… questionable stats. Notice we're using different types: text for names, numbers for stats, and True/False for behavior. That True/False type is called a Boolean—basically an on/off switch.
+
+[Slide 3: Backpack Pockets (Independence)]
+Think of each variable like its own pocket. Weapon pocket, speed pocket, name pocket. Changing one pocket doesn't magically change the others.
+
+[Slide 4: Printing Multiple Values (Comma Method)]
+Use commas in print() to show labels and values together. print() handles spacing for you. Clean, readable output.
+
+[Slide 5: Combining Strings (Superglue)]
+You can glue strings together with plus. Some people call this concatenation, but think of it as superglue for text. Here's how it works: Python takes hero_name—that's 'Swift_Shadow_Assassin'—adds a space, then adds 'The Legendary'. They stick together into one long string. Now our cowardly hero has a properly formatted title.
+
+[Slide 6: Variables Stay Independent]
+Changing hero_speed doesn't change enemy_speed. Variables don't affect each other unless you explicitly connect them. They're separate containers.
+
+[Slide 7: Stay Organized (Prefixes)]
+Organization matters. Prefixes like player_ and enemy_ keep your variables from turning into a confusing soup. The player has 50 HP, the enemy has 500. Accidentally swapping those would make for a very short, very one-sided game.
+
+[Slide 8: Key Takeaway]
+Real programs coordinate many variables of different types. Name them clearly, keep them organized, and use them together to describe bigger systems.

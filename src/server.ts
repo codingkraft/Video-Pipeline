@@ -300,6 +300,55 @@ app.get('/api/browse-folder', async (req: Request, res: Response) => {
     }
 });
 
+// API: Open File Picker (for selecting .md files)
+app.get('/api/browse-file', async (req: Request, res: Response) => {
+    try {
+        const { exec } = require('child_process');
+
+        // Open file dialog for markdown files
+        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Select Markdown Script File'; $d.Filter = 'Markdown Files|*.md|All Files|*.*'; $d.InitialDirectory = [Environment]::GetFolderPath('Desktop'); if ($d.ShowDialog() -eq 'OK') { $d.FileName } }"`;
+
+        console.log('Opening file picker...');
+
+        exec(cmd, { timeout: 120000 }, (error: any, stdout: string, stderr: string) => {
+            if (error) {
+                console.error('Picker error:', error.message);
+                return res.json({ path: null, cancelled: true });
+            }
+            const selectedPath = stdout.trim();
+            console.log('Selected file:', selectedPath || '(empty - user cancelled?)');
+            res.json({ path: selectedPath || null });
+        });
+    } catch (e) {
+        console.error('Browse file error:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// API: Open folder in Windows Explorer
+app.post('/api/open-folder', async (req: Request, res: Response) => {
+    try {
+        const { exec } = require('child_process');
+        const { path: folderPath } = req.body;
+
+        if (!folderPath) {
+            return res.status(400).json({ error: 'path is required' });
+        }
+
+        // Open folder in Explorer
+        exec(`explorer "${folderPath}"`, (error: any) => {
+            if (error) {
+                console.warn('Could not open folder:', error.message);
+            }
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Open folder error:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
 // API: List files in a folder
 app.get('/api/list-folder', (req: Request, res: Response) => {
     const folderPath = req.query.path as string;
@@ -1262,6 +1311,158 @@ app.post('/api/create-timeline', async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             message: 'Timeline creation failed: ' + (error as Error).message
+        });
+    }
+});
+
+// ============================================
+// SCRIPT PARSER ENDPOINTS
+// ============================================
+
+// API: Parse markdown script and preview extracted videos
+app.post('/api/parse-script', async (req: Request, res: Response) => {
+    try {
+        const { MarkdownScriptParser } = await import('./services/MarkdownScriptParser');
+        const { scriptPath } = req.body;
+
+        if (!scriptPath) {
+            return res.status(400).json({ error: 'scriptPath is required' });
+        }
+
+        if (!fs.existsSync(scriptPath)) {
+            return res.status(404).json({ error: `Script file not found: ${scriptPath}` });
+        }
+
+        console.log(`[ScriptParser] Parsing: ${scriptPath}`);
+        const result = MarkdownScriptParser.parseFile(scriptPath);
+
+        // Return preview information
+        const videoSummaries = result.videos.map(v => ({
+            videoNumber: v.videoNumber,
+            title: v.title,
+            duration: v.duration,
+            concept: v.concept,
+            slideCount: v.slides.length,
+            codeBlockCount: v.allCodeBlocks.length,
+            narrationPreview: v.fullNarration.substring(0, 200) + (v.fullNarration.length > 200 ? '...' : '')
+        }));
+
+        res.json({
+            success: true,
+            scriptPath,
+            chapterTitle: result.chapterTitle,
+            totalVideos: result.totalVideos,
+            videos: videoSummaries
+        });
+
+    } catch (error) {
+        console.error('[ScriptParser] Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to parse script: ' + (error as Error).message
+        });
+    }
+});
+
+// API: Generate video input folders from parsed script
+app.post('/api/generate-video-folders', async (req: Request, res: Response) => {
+    try {
+        const { MarkdownScriptParser } = await import('./services/MarkdownScriptParser');
+        const { scriptPath, outputBaseDir } = req.body;
+
+        if (!scriptPath) {
+            return res.status(400).json({ error: 'scriptPath is required' });
+        }
+
+        if (!fs.existsSync(scriptPath)) {
+            return res.status(404).json({ error: `Script file not found: ${scriptPath}` });
+        }
+
+        // Determine output directory
+        const scriptDir = path.dirname(scriptPath);
+        const baseOutputDir = outputBaseDir || path.join(scriptDir, 'Per Video Input');
+
+        // Create base output directory
+        if (!fs.existsSync(baseOutputDir)) {
+            fs.mkdirSync(baseOutputDir, { recursive: true });
+        }
+
+        console.log(`[ScriptParser] Generating folders in: ${baseOutputDir}`);
+
+        // Parse the script
+        const parseResult = MarkdownScriptParser.parseFile(scriptPath);
+
+        const generatedFolders: any[] = [];
+        const errors: string[] = [];
+
+        for (const video of parseResult.videos) {
+            try {
+                // Create folder for this video
+                const folderName = `Video ${video.videoNumber}`;
+                const folderPath = path.join(baseOutputDir, folderName);
+
+                if (!fs.existsSync(folderPath)) {
+                    fs.mkdirSync(folderPath, { recursive: true });
+                }
+
+                // Generate narration TXT
+                const narrationContent = MarkdownScriptParser.generateNarrationFile(video);
+                const narrationPath = path.join(folderPath, `narration.txt`);
+                fs.writeFileSync(narrationPath, narrationContent, 'utf-8');
+
+                // Generate code blocks file (for reference)
+                if (video.allCodeBlocks.length > 0) {
+                    const codeContent = video.allCodeBlocks.map((block, i) =>
+                        `# Code Block ${i + 1} (Slide ${block.slideNumber}: ${block.slideTitle})\n` +
+                        `\`\`\`${block.language}\n${block.code}\n\`\`\`\n` +
+                        (block.expectedOutput ? `\n# Expected Output:\n${block.expectedOutput}\n` : '') +
+                        '\n---\n'
+                    ).join('\n');
+
+                    const codePath = path.join(folderPath, 'code_blocks.md');
+                    fs.writeFileSync(codePath, codeContent, 'utf-8');
+                }
+
+                // Generate slide summary
+                const slidesSummary = video.slides.map(s =>
+                    `## Slide ${s.number}: ${s.title}\n` +
+                    (s.visual ? `**Visual:** ${s.visual}\n` : '') +
+                    (s.audio ? `**Audio:** ${s.audio}\n` : '') +
+                    (s.duration ? `**Duration:** ${s.duration}s\n` : '')
+                ).join('\n---\n\n');
+
+                const slidesPath = path.join(folderPath, 'slides.md');
+                fs.writeFileSync(slidesPath, `# ${video.title}\n\n${slidesSummary}`, 'utf-8');
+
+                generatedFolders.push({
+                    videoNumber: video.videoNumber,
+                    title: video.title,
+                    folderPath,
+                    files: ['narration.txt', 'slides.md', ...(video.allCodeBlocks.length > 0 ? ['code_blocks.md'] : [])]
+                });
+
+                console.log(`[ScriptParser] ✅ Created: ${folderName}`);
+
+            } catch (err: any) {
+                errors.push(`Video ${video.videoNumber}: ${err.message}`);
+                console.error(`[ScriptParser] ❌ Failed: Video ${video.videoNumber}:`, err.message);
+            }
+        }
+
+        res.json({
+            success: errors.length === 0,
+            outputDir: baseOutputDir,
+            totalGenerated: generatedFolders.length,
+            totalErrors: errors.length,
+            folders: generatedFolders,
+            errors
+        });
+
+    } catch (error) {
+        console.error('[ScriptParser] Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate folders: ' + (error as Error).message
         });
     }
 });

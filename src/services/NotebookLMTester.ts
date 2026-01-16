@@ -39,6 +39,163 @@ export class NotebookLMTester {
     }
 
     /**
+     * MODULE: Setup Notebook
+     * Creates a new notebook and uploads sources.
+     * Uses modular recovery: Open → Work → Close, with 3 retries.
+     * 
+     * @param config Configuration for notebook setup
+     * @returns Notebook URL on success, throws on failure after retries
+     */
+    public async setupNotebook(config: NotebookLMTestConfig): Promise<string> {
+        await this.browser.initialize({
+            headless: config.headless,
+            profileId: config.profileId || 'default'
+        });
+
+        const targetUrl = config.existingNotebookUrl || NOTEBOOKLM_URL;
+
+        return await this.browser.withModularRecovery<string>(
+            'notebooklm-setup',
+            targetUrl,
+            async (page) => {
+                const steps: string[] = [];
+                let notebookUrl: string | undefined;
+
+                // Step 1: Create or use existing notebook
+                if (config.existingNotebookUrl) {
+                    notebookUrl = config.existingNotebookUrl;
+                    steps.push(`✓ Using existing notebook: ${notebookUrl}`);
+                } else if (config.skipNotebookCreation) {
+                    const savedProgress = ProgressTracker.getProgress(config.sourceFolder);
+                    notebookUrl = savedProgress?.steps.notebooklm_notebook_created?.notebookUrl;
+                    if (!notebookUrl) {
+                        throw new Error('No existing notebook URL found. Cannot skip notebook creation.');
+                    }
+                    steps.push(`✓ Found existing notebook URL: ${notebookUrl}`);
+                } else {
+                    const folderName = path.basename(config.sourceFolder);
+                    notebookUrl = await this.createNotebook(page, folderName, steps);
+
+                    if (!notebookUrl) {
+                        throw new Error('Failed to create notebook');
+                    }
+
+                    ProgressTracker.markStepComplete(config.sourceFolder, 'notebooklm_notebook_created', {
+                        notebookUrl
+                    });
+                }
+
+                // Step 2: Upload sources
+                let filesToUpload = config.files || [];
+                if (filesToUpload.length === 0 && config.sourceFolder) {
+                    if (fs.existsSync(config.sourceFolder)) {
+                        filesToUpload = fs.readdirSync(config.sourceFolder)
+                            .filter(f => !f.startsWith('~') && /\.(pdf|txt|md|docx?|jpe?g|png|gif|webp|bmp)$/i.test(f))
+                            .map(f => path.join(config.sourceFolder, f));
+                    }
+                }
+
+                if (filesToUpload.length > 0) {
+                    const alreadyUploaded = ProgressTracker.isStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded');
+
+                    if (config.skipSourcesUpload) {
+                        steps.push(`✓ Skipping source upload (skipSourcesUpload=true)`);
+                    } else if (alreadyUploaded && !config.forceSourceUpload) {
+                        steps.push(`✓ Sources already uploaded (skipping)`);
+                    } else {
+                        await this.uploadSources(page, filesToUpload, steps);
+                        ProgressTracker.markStepComplete(config.sourceFolder, 'notebooklm_sources_uploaded', {
+                            sourceCount: filesToUpload.length
+                        });
+                    }
+                }
+
+                console.log('[NotebookLM Setup] Steps:', steps.join('\n'));
+                return notebookUrl;
+            }
+        );
+    }
+
+    /**
+     * MODULE: Generate Video
+     * Navigates to existing notebook and triggers video generation.
+     * Uses modular recovery: Open → Work → Close, with 3 retries.
+     * 
+     * @param notebookUrl URL of existing notebook (from setupNotebook)
+     * @param config Configuration for video generation
+     */
+    public async generateVideo(notebookUrl: string, config: NotebookLMTestConfig): Promise<NotebookLMTestResult> {
+        await this.browser.initialize({
+            headless: config.headless,
+            profileId: config.profileId || 'default'
+        });
+
+        return await this.browser.withModularRecovery<NotebookLMTestResult>(
+            'notebooklm-video',
+            notebookUrl,
+            async (page) => {
+                const steps: string[] = [];
+                steps.push(`✓ Navigated to notebook: ${notebookUrl}`);
+
+                // Load steering prompt
+                await this.loadSteeringPrompt(config, steps);
+
+                // Navigate to video creation and trigger generation
+                await this.navigateToVideoCreation(page, steps, config);
+
+                // Take screenshot
+                const outputDir = path.join(config.sourceFolder, 'output');
+                if (!fs.existsSync(outputDir)) {
+                    fs.mkdirSync(outputDir, { recursive: true });
+                }
+                const screenshotPath = path.join(outputDir, 'notebooklm_screenshot.png');
+                await page.screenshot({ path: screenshotPath, fullPage: true });
+
+                return {
+                    success: true,
+                    message: 'Video generation started successfully',
+                    details: {
+                        steps,
+                        notebookUrl,
+                        screenshotPath
+                    }
+                };
+            }
+        );
+    }
+
+    /**
+     * Helper to load steering prompt from files or progress
+     */
+    private async loadSteeringPrompt(config: NotebookLMTestConfig, steps: string[]): Promise<void> {
+        if (config.steeringPrompt) return;
+
+        const progress = ProgressTracker.getProgress(config.sourceFolder);
+        if (progress?.steps.perplexity?.steeringPrompt) {
+            config.steeringPrompt = progress.steps.perplexity.steeringPrompt;
+            steps.push(`✓ Loaded steering prompt from progress`);
+            return;
+        }
+
+        // Try loading from file
+        const promptPaths = [
+            path.join(config.sourceFolder, 'perplexity_video_response.txt'),
+            path.join(config.sourceFolder, 'perplexity_response.txt'),
+            path.join(config.sourceFolder, 'output', 'perplexity_response.txt')
+        ];
+
+        for (const promptPath of promptPaths) {
+            if (fs.existsSync(promptPath)) {
+                config.steeringPrompt = fs.readFileSync(promptPath, 'utf-8');
+                steps.push(`✓ Loaded steering prompt from ${path.basename(promptPath)}`);
+                return;
+            }
+        }
+
+        steps.push(`⚠ No steering prompt found`);
+    }
+
+    /**
      * Test the complete NotebookLM workflow:
      * 1. Navigate to NotebookLM
      * 2. Create a new notebook
@@ -524,168 +681,145 @@ export class NotebookLMTester {
 
     /**
      * Navigate to the video/audio creation section.
+     * THROWS on critical failures (button not found, modal not appearing, etc.)
      */
     private async navigateToVideoCreation(page: Page, steps: string[], config?: NotebookLMTestConfig): Promise<void> {
-        try {
-            // Look for Audio Overview or Studio tab
-            const videoButtonSelectors = [
-                'button[aria-label="Customize Video Overview"]', // User identified correct button
-                'button[aria-label*="Customize Video"]',
-            ];
+        // Look for Audio Overview or Studio tab
+        const videoButtonSelectors = [
+            'button[aria-label="Customize Video Overview"]',
+            'button[aria-label*="Customize Video"]',
+        ];
 
-            let clicked = false;
-            for (const selector of videoButtonSelectors) {
-                try {
-                    const btn = await page.$(selector);
-                    if (btn) {
-                        await btn.click();
-                        clicked = true;
-                        steps.push(`✓ Clicked video/audio button: ${selector}`);
-                        break;
-                    }
-                } catch {
-                    continue;
+        let clicked = false;
+        for (const selector of videoButtonSelectors) {
+            try {
+                const btn = await page.$(selector);
+                if (btn) {
+                    await btn.click();
+                    clicked = true;
+                    steps.push(`✓ Clicked video button: ${selector}`);
+                    break;
                 }
+            } catch {
+                continue;
             }
-
-
-            if (clicked) {
-                steps.push('✓ Clicked "Customize Video Overview" button');
-
-                // Wait for the modal to appear
-                try {
-                    const modalSelector = 'mat-dialog-container';
-                    await page.waitForSelector(modalSelector, { timeout: 5000 });
-                    steps.push('✓ Opened "Customize Video Overview" modal');
-                    await this.browser.randomDelay(1000, 2000);
-
-                    // 1. Click on Explainer
-                    const explainerClicked = await page.evaluate(() => {
-                        const radios = Array.from(document.querySelectorAll('mat-radio-button'));
-                        const explainer = radios.find(r => r.textContent?.includes('Explainer'));
-                        if (explainer) {
-                            const explainerInput = explainer.querySelector('input');
-                            if (explainerInput) {
-                                explainerInput.click();
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-
-                    if (explainerClicked) {
-                        steps.push('✓ Selected "Explainer" format');
-                        await this.browser.randomDelay(500, 1000);
-                    } else {
-                        steps.push('⚠ Could not find "Explainer" option');
-                    }
-
-                    // 2. Click on Custom Visual Style
-                    const customStyleClicked = await page.evaluate(() => {
-                        const radios = Array.from(document.querySelectorAll('mat-radio-button'));
-                        const custom = radios.find(r => r.textContent?.includes('Custom'));
-                        if (custom) {
-                            const customInput = custom.querySelector('input');
-                            if (customInput) {
-                                customInput.click();
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-
-                    if (customStyleClicked) {
-                        steps.push('✓ Selected "Custom" visual style');
-                        await this.browser.randomDelay(500, 1000);
-
-                        // 3. Put the visual style from settings in the custom visual style input
-                        if (config?.visualStyle) {
-                            // Look for the input that appears for Custom style
-                            await new Promise(r => setTimeout(r, 500)); // Wait for input to appear
-                            const inputFound = await page.evaluate((styleText) => {
-                                const textareas = Array.from(document.querySelectorAll('mat-dialog-container textarea'));
-                                // @ts-ignore - Valid JS at runtime, textarea has placeholder
-                                const styleInput = textareas.find(t => t.placeholder && t.placeholder.includes('Try a story-like style'));
-
-                                if (styleInput) {
-                                    // @ts-ignore - Valid JS at runtime
-                                    styleInput.value = styleText;
-                                    styleInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                    styleInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                    return true;
-                                }
-                                return false;
-                            }, config.visualStyle);
-
-                            if (inputFound) {
-                                steps.push('✓ Entered custom visual style');
-                            } else {
-                                steps.push('⚠ Could not find input for custom visual style');
-                            }
-                        }
-                    } else {
-                        steps.push('⚠ Could not find "Custom" visual style option');
-                    }
-
-                    // 4. Put the steering prompt created by perplexity in what should the AI focus on
-                    if (config?.steeringPrompt) {
-                        const promptEntered = await page.evaluate((promptText) => {
-                            const textareas = Array.from(document.querySelectorAll('mat-dialog-container textarea'));
-                            // @ts-ignore - Valid JS at runtime, textarea has placeholder
-                            const focusInput = textareas.find(t => (t.placeholder && t.placeholder.includes('Things to try')));
-
-                            if (focusInput) {
-                                // @ts-ignore - Valid JS at runtime
-                                focusInput.value = promptText;
-                                focusInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                focusInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                return true;
-                            }
-                            return false;
-                        }, config.steeringPrompt);
-
-                        if (promptEntered) {
-                            steps.push('✓ Entered steering prompt');
-                        } else {
-                            steps.push('⚠ Could not find "What should AI focus on" input');
-                        }
-                    }
-
-                    await this.browser.randomDelay(1000, 2000);
-
-                    // Click the "Generate" button inside the modal
-                    const generateClicked = await page.evaluate(() => {
-                        const buttons = Array.from(document.querySelectorAll('mat-dialog-container button'));
-                        const generateBtn = buttons.find(b => b.textContent?.includes('Generate'));
-                        if (generateBtn) {
-                            (generateBtn as HTMLElement).click();
-                            return true;
-                        }
-                        return false;
-                    });
-
-                    if (generateClicked) {
-                        steps.push('✓ Clicked "Generate" button');
-                        await this.browser.randomDelay(2000, 3000);
-
-                        // Mark step as complete explicitly since multiple things happen here
-                        // Actually, progress tracking handles 'notebooklm_video_started' separately? 
-                        // We'll let the caller handle progress tracking updates if needed, 
-                        // but for now just logging it is enough.
-                    } else {
-                        steps.push('⚠ Could not find "Generate" button in modal');
-                    }
-                } catch (e) {
-                    steps.push(`⚠ Modal did not appear or error interacting: ${(e as Error).message}`);
-                }
-
-            } else {
-                steps.push('⚠ Audio/Studio/Customize button not found - may need manual navigation');
-            }
-
-        } catch (error) {
-            steps.push(`⚠ Navigation error: ${(error as Error).message}`);
         }
+
+        if (!clicked) {
+            throw new Error('Video/Customize button not found - cannot proceed');
+        }
+
+        // Wait for the modal to appear
+        const modalSelector = 'mat-dialog-container';
+        try {
+            await page.waitForSelector(modalSelector, { timeout: 5000 });
+        } catch {
+            throw new Error('Video modal did not appear after clicking button');
+        }
+        steps.push('✓ Opened video customization modal');
+        await this.browser.randomDelay(1000, 2000);
+
+        // 1. Click on Explainer
+        const explainerClicked = await page.evaluate(() => {
+            const radios = Array.from(document.querySelectorAll('mat-radio-button'));
+            const explainer = radios.find(r => r.textContent?.includes('Explainer'));
+            if (explainer) {
+                const explainerInput = explainer.querySelector('input');
+                if (explainerInput) {
+                    explainerInput.click();
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        if (explainerClicked) {
+            steps.push('✓ Selected "Explainer" format');
+            await this.browser.randomDelay(500, 1000);
+        }
+        // Explainer is optional, don't throw
+
+        // 2. Click on Custom Visual Style
+        const customStyleClicked = await page.evaluate(() => {
+            const radios = Array.from(document.querySelectorAll('mat-radio-button'));
+            const custom = radios.find(r => r.textContent?.includes('Custom'));
+            if (custom) {
+                const customInput = custom.querySelector('input');
+                if (customInput) {
+                    customInput.click();
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        if (customStyleClicked) {
+            steps.push('✓ Selected "Custom" visual style');
+            await this.browser.randomDelay(500, 1000);
+
+            // 3. Enter visual style if provided
+            if (config?.visualStyle) {
+                await new Promise(r => setTimeout(r, 500));
+                const inputFound = await page.evaluate((styleText) => {
+                    const textareas = Array.from(document.querySelectorAll('mat-dialog-container textarea'));
+                    // @ts-ignore
+                    const styleInput = textareas.find(t => t.placeholder && t.placeholder.includes('Try a story-like style'));
+                    if (styleInput) {
+                        // @ts-ignore
+                        styleInput.value = styleText;
+                        styleInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        styleInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        return true;
+                    }
+                    return false;
+                }, config.visualStyle);
+
+                if (inputFound) {
+                    steps.push('✓ Entered custom visual style');
+                }
+            }
+        }
+
+        // 4. Enter steering prompt if provided
+        if (config?.steeringPrompt) {
+            const promptEntered = await page.evaluate((promptText) => {
+                const textareas = Array.from(document.querySelectorAll('mat-dialog-container textarea'));
+                // @ts-ignore
+                const focusInput = textareas.find(t => (t.placeholder && t.placeholder.includes('Things to try')));
+                if (focusInput) {
+                    // @ts-ignore
+                    focusInput.value = promptText;
+                    focusInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    focusInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+                return false;
+            }, config.steeringPrompt);
+
+            if (promptEntered) {
+                steps.push('✓ Entered steering prompt');
+            }
+        }
+
+        await this.browser.randomDelay(1000, 2000);
+
+        // Click the "Generate" button - THIS IS CRITICAL
+        const generateClicked = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('mat-dialog-container button'));
+            const generateBtn = buttons.find(b => b.textContent?.includes('Generate'));
+            if (generateBtn) {
+                (generateBtn as HTMLElement).click();
+                return true;
+            }
+            return false;
+        });
+
+        if (!generateClicked) {
+            throw new Error('Generate button not found in modal - cannot trigger video creation');
+        }
+
+        steps.push('✓ Clicked "Generate" button');
+        await this.browser.randomDelay(2000, 3000);
     }
 
     /**
@@ -915,9 +1049,218 @@ export class NotebookLMTester {
             return false;
         }
     }
+    /**
+     * MODULE: Collect Videos
+     * Checks video status and downloads all ready videos from a notebook.
+     * Uses modular recovery: Open → Check → Download → Close, with 3 retries.
+     * 
+     * @param notebookUrl URL of the notebook to collect videos from
+     * @param outputDir Directory to save videos
+     * @param expectedVideoCount Number of videos expected (default 2)
+     * @returns Array of downloaded video paths
+     */
+    public async collectVideos(
+        notebookUrl: string,
+        outputDir: string,
+        expectedVideoCount: number = 2,
+        profileId?: string
+    ): Promise<{ downloaded: string[]; status: 'generating' | 'ready' | 'error' }> {
+        if (profileId) {
+            await this.browser.initialize({ profileId });
+        }
+
+        return await this.browser.withModularRecovery(
+            'notebooklm-collect',
+            notebookUrl,
+            async (page) => {
+                const downloaded: string[] = [];
+
+                // First, check overall status
+                const status = await this.checkVideoStatusInternal(page);
+
+                if (status === 'generating') {
+                    console.log('[NotebookLM Collect] Videos still generating');
+                    return { downloaded: [], status: 'generating' };
+                }
+
+                if (status === 'error') {
+                    throw new Error('Video generation failed on NotebookLM');
+                }
+
+                // Count actual available video artifacts
+                const actualVideoCount = await page.evaluate(() => {
+                    const videoArtifacts = document.querySelectorAll('button[aria-description="Video Overview"]');
+                    return videoArtifacts.length;
+                });
+
+                console.log(`[NotebookLM Collect] Found ${actualVideoCount} video artifact(s), expected ${expectedVideoCount}`);
+
+                if (actualVideoCount === 0) {
+                    throw new Error('No video artifacts found on the page');
+                }
+
+                if (actualVideoCount < expectedVideoCount) {
+                    throw new Error(`Only ${actualVideoCount} video(s) found, expected ${expectedVideoCount}. Stopping folder processing.`);
+                }
+
+                // Download available videos (up to expected count)
+                const videosToDownload = Math.min(actualVideoCount, expectedVideoCount);
+
+                for (let i = 1; i <= videosToDownload; i++) {
+                    const outputPath = path.join(outputDir, `notebooklm_video_${i}.mp4`);
+                    const success = await this.downloadVideoInternal(page, outputPath, i);
+
+                    if (success) {
+                        downloaded.push(outputPath);
+                        console.log(`[NotebookLM Collect] Downloaded video ${i}/${videosToDownload}`);
+                    } else {
+                        throw new Error(`Failed to download video ${i} - download button not found or download failed`);
+                    }
+                }
+
+                return { downloaded, status: 'ready' };
+            }
+        );
+    }
+
+    /**
+     * Internal check video status (operates on existing page)
+     */
+    private async checkVideoStatusInternal(page: Page): Promise<'generating' | 'ready' | 'error'> {
+        await this.browser.randomDelay(2000, 3000);
+
+        const status = await page.evaluate(() => {
+            const generatingButton = document.querySelector(
+                'button.mat-mdc-button-disabled mat-icon.sync.rotate, ' +
+                'button[disabled] mat-icon.rotate'
+            );
+            if (generatingButton) return 'generating';
+
+            const generatingText = document.querySelector('.artifact-title');
+            if (generatingText?.textContent?.includes('Generating')) {
+                return 'generating';
+            }
+
+            const subscriptionsIcon = document.querySelector(
+                'artifact-library-item mat-icon[data-mat-icon-type="font"]'
+            );
+            const playButton = document.querySelector(
+                'button[aria-label="Play"], button mat-icon'
+            );
+
+            if (subscriptionsIcon &&
+                subscriptionsIcon.textContent?.trim() === 'subscriptions' &&
+                playButton) {
+                return 'ready';
+            }
+
+            const videoButton = document.querySelector(
+                'artifact-library-item button:not([disabled])'
+            );
+            const noRotatingIcon = !document.querySelector('mat-icon.rotate');
+            if (videoButton && noRotatingIcon) {
+                return 'ready';
+            }
+
+            const errorEl = document.querySelector(
+                '[class*="error"], [role="alert"], .generation-failed'
+            );
+            if (errorEl) return 'error';
+
+            return 'generating';
+        });
+
+        return status as 'generating' | 'ready' | 'error';
+    }
+
+    /**
+     * Internal download video (operates on existing page)
+     */
+    private async downloadVideoInternal(page: Page, outputPath: string, videoIndex: number): Promise<boolean> {
+        const outputDir = path.dirname(outputPath);
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        const client = await page.createCDPSession();
+        await client.send('Page.setDownloadBehavior', {
+            behavior: 'allow',
+            downloadPath: outputDir
+        });
+
+        const downloadClicked = await page.evaluate(async (index) => {
+            const videoArtifacts = Array.from(document.querySelectorAll('button[aria-description="Video Overview"]'));
+            if (videoArtifacts.length === 0) return false;
+
+            const targetArtifact = videoArtifacts[index - 1] as HTMLElement;
+            if (!targetArtifact) return false;
+
+            const moreButton = targetArtifact.querySelector('button[aria-label="More"]') as HTMLElement;
+            if (!moreButton) return false;
+
+            moreButton.click();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const menuItems = Array.from(document.querySelectorAll('.mat-mdc-menu-item'));
+            const downloadItem = menuItems.find(item =>
+                item.textContent?.trim().includes('Download')
+            ) as HTMLElement;
+
+            if (downloadItem) {
+                downloadItem.click();
+                return true;
+            }
+            return false;
+        }, videoIndex);
+
+        if (!downloadClicked) {
+            return false;
+        }
+
+        // Wait for download
+        const existingFiles = new Set(fs.readdirSync(outputDir));
+        let newFile: string | undefined;
+        const maxWaitTime = 60000;
+        const pollInterval = 2000;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitTime) {
+            await this.browser.randomDelay(pollInterval, pollInterval + 500);
+
+            const currentFiles = fs.readdirSync(outputDir);
+            const candidates = currentFiles.filter(f =>
+                !existingFiles.has(f) &&
+                (f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mov'))
+            );
+
+            if (candidates.length > 0) {
+                const candidate = candidates[0];
+                if (!candidate.endsWith('.crdownload') && !candidate.endsWith('.tmp')) {
+                    newFile = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (newFile) {
+            const downloadedPath = path.join(outputDir, newFile);
+            if (downloadedPath !== outputPath && fs.existsSync(downloadedPath)) {
+                if (fs.existsSync(outputPath)) {
+                    try { fs.unlinkSync(outputPath); } catch (e) { }
+                }
+                fs.renameSync(downloadedPath, outputPath);
+            }
+            return true;
+        }
+
+        return false;
+    }
 
 
     public async close(): Promise<void> {
         await this.browser.closePage('notebooklm-test');
+        await this.browser.closePage('notebooklm-setup');
+        await this.browser.closePage('notebooklm-video');
+        await this.browser.closePage('notebooklm-collect');
     }
 }

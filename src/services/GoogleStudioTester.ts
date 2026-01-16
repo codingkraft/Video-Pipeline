@@ -309,16 +309,74 @@ export class GoogleStudioTester {
 
             // Wait for audio generation (this may take a while)
             steps.push(`⏳ Waiting for audio generation...`);
-            await this.browser.randomDelay(5000, 10000);
 
-            // Wait for download button or audio element to appear
-            let downloadReady = false;
-            for (let attempt = 0; attempt < 200; attempt++) {
-                downloadReady = await page.evaluate(() => {
-                    // Look for download button or audio element
-                    const downloadBtn = document.querySelector('button[aria-label*="download"], button[title*="download"], a[download]');
+
+            // Helper to check if generation is in progress
+            const isGenerating = async (): Promise<boolean> => {
+                return await page.evaluate(() => {
+                    // Check for spinning progress indicator or Stop button
+                    const spinningIcon = document.querySelector('ms-run-button .spin');
+                    const stopButton = document.querySelector('ms-run-button button');
+                    if (stopButton) {
+                        const text = stopButton.textContent?.toLowerCase() || '';
+                        if (text.includes('stop')) return true;
+                    }
+                    return !!spinningIcon;
+                });
+            };
+
+            // Phase 1a: Wait for the Stop/progress button to APPEAR (generation started)
+            // Give it up to 10 seconds for the button to change to Stop state
+            let generationStarted = false;
+            for (let attempt = 0; attempt < 10; attempt++) {
+                if (await isGenerating()) {
+                    generationStarted = true;
+                    steps.push(`✓ Generation started...`);
+                    break;
+                }
+                await this.browser.randomDelay(1000, 1500);
+            }
+
+            if (!generationStarted) {
+                // Check if maybe it completed super fast (rare for audio)
+                const hasDownload = await page.evaluate(() => {
+                    const downloadBtn = document.querySelector('button[aria-label*="download"], button[aria-label*="Download"]');
                     const audioElement = document.querySelector('audio[src]');
                     return !!(downloadBtn || audioElement);
+                });
+                if (!hasDownload) {
+                    throw new Error('Generation did not start - Run button may have failed');
+                }
+                // If download is already available, skip waiting
+            } else {
+                // Phase 1b: Wait for the Stop/progress button to DISAPPEAR (generation complete)
+                let generationComplete = false;
+                for (let attempt = 0; attempt < 300; attempt++) { // 10 to 12.5 mins before give up
+                    if (!(await isGenerating())) {
+                        generationComplete = true;
+                        break;
+                    }
+                    await this.browser.randomDelay(2000, 2500);
+                }
+
+                if (!generationComplete) {
+                    throw new Error('Audio generation timed out (Stop button still present after 4 mins)');
+                }
+            }
+
+            steps.push(`✓ Generation finished, looking for download...`);
+
+            // Phase 2: Check for download button with max 2 retries
+            let downloadReady = false;
+            for (let attempt = 0; attempt < 2; attempt++) {
+                downloadReady = await page.evaluate(() => {
+                    // Look for download button or audio element
+                    const downloadBtn = document.querySelector('button[aria-label*="download"], button[aria-label*="Download"], button[title*="download"], a[download]');
+                    const audioElement = document.querySelector('audio[src]');
+                    // Also check for download icon in button
+                    const downloadIcon = document.querySelector('button .material-symbols-outlined');
+                    const hasDownloadIcon = downloadIcon && downloadIcon.textContent?.includes('download');
+                    return !!(downloadBtn || audioElement || hasDownloadIcon);
                 });
 
                 if (downloadReady) break;
@@ -326,14 +384,15 @@ export class GoogleStudioTester {
             }
 
             if (!downloadReady) {
-                steps.push(`⚠ Audio generation timed out`);
-                return false;
+                throw new Error('Audio generation failed - download button not found after generation completed');
             }
 
             steps.push(`✓ Audio generated`);
 
             // Download the audio file
             const downloaded = await this.downloadAudio(page, config.outputPath, steps);
+
+            await this.browser.randomDelay(2000, 3000);
 
             if (downloaded) {
                 steps.push(`✓ Saved: ${path.basename(config.outputPath)}`);
@@ -362,11 +421,28 @@ export class GoogleStudioTester {
                 downloadPath: downloadDir
             });
 
+            // Snapshot existing files before download
+            const existingFiles = new Set(fs.readdirSync(downloadDir));
+
             // Click download button
             const downloadClicked = await page.evaluate(() => {
-                const downloadBtn = document.querySelector('button[aria-label*="download"], button[title*="download"]') as HTMLElement;
+                // Try download button with various selectors
+                const downloadBtn = document.querySelector(
+                    'button[aria-label*="download"], button[aria-label*="Download"], button[title*="download"], button[title*="Download"]'
+                ) as HTMLElement;
                 if (downloadBtn) {
                     downloadBtn.click();
+                    return true;
+                }
+
+                // Try finding any button with download icon
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const dlBtn = buttons.find(b => {
+                    const icon = b.querySelector('.material-symbols-outlined');
+                    return icon && icon.textContent?.toLowerCase().includes('download');
+                });
+                if (dlBtn) {
+                    dlBtn.click();
                     return true;
                 }
 
@@ -410,27 +486,67 @@ export class GoogleStudioTester {
                 return false;
             }
 
-            // Wait for download to complete
-            await this.browser.randomDelay(3000, 5000);
+            steps.push(`✓ Download clicked, waiting for file...`);
 
-            // Find the downloaded file and rename it
-            const files = fs.readdirSync(downloadDir)
-                .filter(f => f.endsWith('.wav') || f.endsWith('.mp3'))
-                .map(f => ({
-                    name: f,
-                    time: fs.statSync(path.join(downloadDir, f)).mtime.getTime()
-                }))
-                .sort((a, b) => b.time - a.time);
+            // Wait for download to complete - poll for new file and size stability
+            let downloadedFile: string | null = null;
+            let lastSize = 0;
+            let stableCount = 0;
+            const maxWaitMs = 120000; // 2 minutes max
+            const startTime = Date.now();
 
-            if (files.length > 0) {
-                const latestFile = path.join(downloadDir, files[0].name);
-                if (latestFile !== outputPath) {
-                    fs.renameSync(latestFile, outputPath);
+            while (Date.now() - startTime < maxWaitMs) {
+                await this.browser.randomDelay(2000, 2500);
+
+                // Find new audio files
+                const currentFiles = fs.readdirSync(downloadDir);
+                const newFiles = currentFiles.filter(f =>
+                    !existingFiles.has(f) &&
+                    (f.endsWith('.wav') || f.endsWith('.mp3')) &&
+                    !f.endsWith('.crdownload') &&
+                    !f.endsWith('.tmp')
+                );
+
+                if (newFiles.length > 0) {
+                    const filePath = path.join(downloadDir, newFiles[0]);
+                    const currentSize = fs.statSync(filePath).size;
+
+                    if (currentSize > 0 && currentSize === lastSize) {
+                        stableCount++;
+                        // File size stable for 3 checks (6+ seconds) = download complete
+                        if (stableCount >= 3) {
+                            downloadedFile = filePath;
+                            break;
+                        }
+                    } else {
+                        stableCount = 0;
+                        lastSize = currentSize;
+                    }
                 }
-                return true;
             }
 
-            return false;
+            if (!downloadedFile) {
+                steps.push(`⚠ Download timed out or file not found`);
+                return false;
+            }
+
+            // Validate minimum file size (at least 10KB for a real audio file)
+            const finalSize = fs.statSync(downloadedFile).size;
+            if (finalSize < 10000) {
+                steps.push(`⚠ Downloaded file too small (${finalSize} bytes) - may be corrupted`);
+                return false;
+            }
+
+            // Rename to target path
+            if (downloadedFile !== outputPath) {
+                if (fs.existsSync(outputPath)) {
+                    fs.unlinkSync(outputPath);
+                }
+                fs.renameSync(downloadedFile, outputPath);
+            }
+
+            steps.push(`✓ Download complete (${Math.round(finalSize / 1024)}KB)`);
+            return true;
 
         } catch (error) {
             steps.push(`✗ Download error: ${(error as Error).message}`);

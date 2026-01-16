@@ -1,0 +1,37 @@
+Video 6: Storing Data in Memory
+==================================================
+
+Concept: Variables are named storage containers
+
+[Slide 1: Title Screen]
+You're building a game and need to remember the player's username, score, and level. Print them once? They're gone. You need to store data so you can use it throughout your code. That's what variables do—Python's little memory system.
+
+[Slide 2: The Hardcode Trap]
+This works… until you change your mind. And you will. Because naming a character is a sacred ritual: you pick something cool, then immediately regret it.
+
+[Slide 3: The "Missed One" Bug]
+This is the classic bug: you update most lines, miss one, and now your game has identity issues. It's not broken in a dramatic way—it's broken in an embarrassing way.
+
+[Slide 4: The Variable Fix (Show payoff)]
+With variables, you store the name once, then reuse it everywhere. Now changing the character name is one edit, not a scavenger hunt.
+
+[Slide 5: Change It Once]
+Change one line at the top, and the whole game updates. That's the real power of variables: update in one place, affect everything.
+
+[Slide 6: Real-World Analogy — Phone Contacts]
+Variables are like phone contacts. You don't retype your mom's number every time you call—because you'd get it wrong by digit three. You save it once as 'Mom' and reuse it forever. If the number changes, you update it once and every call uses the new number.
+
+[Slide 7: Creating Your First Variable]
+Creating a variable is simple. Pick a name—like favorite_snack—use the equals sign, then provide the value. This is called assignment. You're telling Python: 'Whenever I say favorite_snack, I mean Kale Chips.' We're definitely lying to ourselves, but Python trusts us.
+
+[Slide 8: Variables Hold Different Types (Backpack Pockets)]
+Variables can store different kinds of data, like pockets in a backpack. Phone in one pocket, laptop in another, water bottle on the side, and that mystery sandwich from last week in the hidden pocket—we're not opening that. Each pocket just holds what you put in. Variables do the same thing.
+
+[Slide 9: The Assignment Symbol]
+Important: the equals sign isn't saying 'level IS 5' like a math fact. It's an instruction. Here's what Python does: First, it looks at the right side and grabs the value 5. Then it stores that 5 into the variable called level. Right side first, then store in the left side. That's the pattern every time.
+
+[Slide 10: Variables vs Direct Values]
+Printing a value directly is like a Snapchat message. It appears once, then vanishes. Variables are like saving it to your camera roll—you store it once, then reuse it anywhere. We stored the message in channel_message, and now we can print it three times without retyping.
+
+[Slide 11: Key Takeaway]
+Variables are named storage containers. Store a value once, then reuse it by name anywhere in your program. Update it in one place, and everything that uses it updates too.

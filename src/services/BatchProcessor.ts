@@ -169,6 +169,8 @@ export class BatchProcessor {
 
     /**
      * Process video generation for a single folder (2 videos)
+     * Uses modular approach: setupNotebook (once) + generateVideo (per video)
+     * On error after retries, stops processing this folder.
      */
     private async processFolderVideos(
         folderConfig: FolderConfig,
@@ -181,14 +183,56 @@ export class BatchProcessor {
         const spConfig = START_POINT_CONFIGS[startPoint] || START_POINT_CONFIGS['start-fresh'];
 
         let currentProfileIndex = profileIndex;
+        let notebookUrl: string | undefined;
 
+        // Step 1: Setup notebook (only for video 1 if needed)
+        const needsSetup = !spConfig.skipNotebookCreation &&
+            !ProgressTracker.isStepComplete(folderPath, 'notebooklm_notebook_created');
+
+        if (needsSetup || startPoint === 'update-sources') {
+            try {
+                const profileId = this.assignProfile(folderPath, config.selectedProfiles, currentProfileIndex);
+                currentProfileIndex++;
+
+                this.log(`${folderName}: Setting up notebook with profile ${profileId}...`);
+                this.updateFolderStatus(folderPath, { status: 'video_generating', profileId });
+
+                notebookUrl = await this.notebookLMTester.setupNotebook({
+                    sourceFolder: folderPath,
+                    headless: false,
+                    profileId,
+                    visualStyle: config.visualStyle,
+                    forceSourceUpload: startPoint === 'update-sources'
+                });
+
+                this.log(`${folderName}: Notebook setup complete: ${notebookUrl}`);
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
+                this.log(`${folderName}: Notebook setup failed - ${errorMsg}. Stopping folder processing.`);
+                return currentProfileIndex;  // Stop processing this folder
+            }
+        } else {
+            // Get existing notebook URL
+            const progress = ProgressTracker.getProgress(folderPath);
+            notebookUrl = progress?.steps.notebooklm_notebook_created?.notebookUrl ||
+                progress?.steps.notebooklm_video_1_started?.notebookUrl;
+        }
+
+        if (!notebookUrl) {
+            this.updateFolderStatus(folderPath, { status: 'error', error: 'No notebook URL available' });
+            this.log(`${folderName}: No notebook URL found. Stopping folder processing.`);
+            return currentProfileIndex;
+        }
+
+        // Step 2: Generate videos
         for (let videoNum = 1; videoNum <= 2; videoNum++) {
             if (this.abortRequested) break;
 
             const behavior = videoNum === 1 ? spConfig.video1Behavior : spConfig.video2Behavior;
             const videoStepName = `notebooklm_video_${videoNum}_started` as const;
 
-            // 1. Evaluate Behavior
+            // Evaluate Behavior
             if (behavior === 'skip') {
                 this.log(`${folderName}: Video ${videoNum} behavior is 'skip', skipping`);
                 continue;
@@ -196,13 +240,8 @@ export class BatchProcessor {
 
             const isComplete = ProgressTracker.isStepComplete(folderPath, videoStepName);
             if (behavior === 'if-needed' && isComplete) {
-                this.log(`${folderName}: Video ${videoNum} already started and behavior is 'if-needed', skipping`);
+                this.log(`${folderName}: Video ${videoNum} already started, skipping`);
                 continue;
-            }
-
-            // If behavior is 'force' or ('if-needed' and !isComplete), we proceed to fire
-            if (behavior === 'force') {
-                this.log(`${folderName}: Video ${videoNum} behavior is 'force', regenerating...`);
             }
 
             try {
@@ -211,59 +250,36 @@ export class BatchProcessor {
 
                 this.updateFolderStatus(folderPath, {
                     status: 'video_generating',
-                    profileId
+                    profileId,
+                    notebookUrl
                 });
 
-                await this.browser.initialize({ profileId });
+                this.log(`${folderName}: Starting video ${videoNum}/2 generation with profile ${profileId}`);
 
-                const progress = ProgressTracker.getProgress(folderPath);
-
-                // For video 1: Only use existing URL if explicitly skipping notebook creation
-                // For video 2: Always reuse the notebook created/used by video 1
-                let existingNotebookUrl: string | undefined;
-                if (videoNum === 1) {
-                    existingNotebookUrl = spConfig.skipNotebookCreation ? progress?.steps.notebooklm_notebook_created?.notebookUrl : undefined;
-                } else {
-                    // Video 2 should always reuse the notebook from video 1
-                    existingNotebookUrl = progress?.steps.notebooklm_notebook_created?.notebookUrl ||
-                        progress?.steps.notebooklm_video_1_started?.notebookUrl;
-                }
-
-                const testConfig: NotebookLMTestConfig = {
+                const result = await this.notebookLMTester.generateVideo(notebookUrl, {
                     sourceFolder: folderPath,
                     headless: false,
                     visualStyle: config.visualStyle,
                     profileId,
-                    existingNotebookUrl,
-                    skipSourcesUpload: spConfig.skipSourcesUpload,
-                    forceSourceUpload: startPoint === 'update-sources' && videoNum === 1,
-                    // For video 2, always skip notebook creation (reuse video 1's notebook)
-                    skipNotebookCreation: videoNum === 2 ? true : spConfig.skipNotebookCreation
-                };
+                    existingNotebookUrl: notebookUrl
+                });
 
-                this.log(`${folderName}: Starting video ${videoNum}/2 generation with profile ${profileId}`);
-                const result = await this.notebookLMTester.testWorkflow(testConfig);
+                // Update progress
+                ProgressTracker.updateStep(folderPath, videoStepName, {
+                    completed: true,
+                    videoStartedAt: new Date().toISOString(),
+                    notebookUrl: result.details?.notebookUrl || notebookUrl
+                });
 
-                if (result.success) {
-                    ProgressTracker.updateStep(folderPath, videoStepName, {
-                        completed: true,
-                        videoStartedAt: new Date().toISOString(),
-                        notebookUrl: result.details?.notebookUrl
-                    });
+                this.updateFolderStatus(folderPath, {
+                    status: 'video_generating',
+                    videoStartedAt: new Date().toISOString(),
+                    notebookUrl: result.details?.notebookUrl || notebookUrl
+                });
 
-                    this.updateFolderStatus(folderPath, {
-                        status: 'video_generating',
-                        videoStartedAt: new Date().toISOString(),
-                        notebookUrl: result.details?.notebookUrl
-                    });
+                this.log(`${folderName}: Video ${videoNum}/2 generation started successfully`);
 
-                    this.log(`${folderName}: Video ${videoNum}/2 generation started successfully`);
-                } else {
-                    this.updateFolderStatus(folderPath, { status: 'error', error: result.message });
-                    this.log(`${folderName}: Failed to start video ${videoNum}/2 - ${result.message}`);
-                }
-
-                if (!this.abortRequested) {
+                if (!this.abortRequested && videoNum < 2) {
                     const delayMs = this.delays.betweenVideoStartsMs;
                     this.log(`Waiting ${delayMs / 1000}s before next video (rate limiting)...`);
                     await this.sleep(delayMs);
@@ -271,7 +287,8 @@ export class BatchProcessor {
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 this.updateFolderStatus(folderPath, { status: 'error', error: errorMsg });
-                this.log(`${folderName}: Error on video ${videoNum}/2 - ${errorMsg}`);
+                this.log(`${folderName}: Video ${videoNum}/2 failed - ${errorMsg}. Stopping folder processing.`);
+                return currentProfileIndex;  // Stop processing this folder on error
             }
         }
         return currentProfileIndex;
@@ -414,97 +431,74 @@ export class BatchProcessor {
                 const progress = ProgressTracker.getProgress(folder.folderPath);
                 if (!progress) continue;
 
-                let folderStillPending = false;
-                let anyDownloading = false;
-                let anyError = false;
+                // Get notebook URL
+                const notebookUrl = progress.steps['notebooklm_video_1_started']?.notebookUrl ||
+                    folder.notebookUrl ||
+                    progress.steps.notebooklm_notebook_created?.notebookUrl;
 
-                // Check BOTH videos
-                for (let videoNum = 1; videoNum <= 2; videoNum++) {
-                    const startedKey = `notebooklm_video_${videoNum}_started` as any;
-                    const downloadedKey = `notebooklm_video_${videoNum}_downloaded` as any;
-
-                    const isStarted = progress.steps[startedKey]?.completed;
-                    const isDownloaded = progress.steps[downloadedKey]?.completed;
-
-                    // Allow check if specifically started OR if in "Collect" mode with a valid notebook
-                    const isCollectForce = folder.startPoint === 'collect-videos' &&
-                        !!(progress.steps['notebooklm_notebook_created']?.notebookUrl || folder.notebookUrl);
-
-                    if ((isStarted || isCollectForce) && !isDownloaded) {
-                        try {
-                            // Get URL for this specific video if possible, else fallback to folder/notebook URL
-                            const notebookUrl = progress.steps[startedKey]?.notebookUrl ||
-                                folder.notebookUrl ||
-                                progress.steps.notebooklm_notebook_created?.notebookUrl;
-
-                            if (!notebookUrl) {
-                                this.log(`${folderName} (Video ${videoNum}): No Notebook URL found, cannot check status`);
-                                anyError = true;
-                                folderStillPending = true;
-                                continue;
-                            }
-
-                            // Initialize browser
-                            const profileId = folder.profileId || ProgressTracker.getFolderProfile(folder.folderPath);
-                            if (profileId) await this.browser.initialize({ profileId });
-
-                            // Check status
-                            const status = await this.notebookLMTester.checkVideoStatus(notebookUrl);
-
-                            if (status === 'ready') {
-                                this.log(`${folderName} (Video ${videoNum}): Ready, downloading...`);
-                                anyDownloading = true;
-
-                                // Update UI temporarily
-                                this.updateFolderStatus(folder.folderPath, { status: 'downloading' });
-
-                                // direct videoNum usage
-                                const outputPath = path.join(folder.folderPath, 'output', `notebooklm_video_${videoNum}.mp4`);
-                                const success = await this.notebookLMTester.downloadVideo(notebookUrl, outputPath, videoNum);
-
-                                if (success) {
-                                    ProgressTracker.markStepComplete(folder.folderPath, downloadedKey, {
-                                        videoFilePath: outputPath
-                                    });
-                                    this.log(`${folderName} (Video ${videoNum}): Downloaded`);
-                                } else {
-                                    this.log(`${folderName} (Video ${videoNum}): Download failed, will retry`);
-                                    folderStillPending = true;
-                                }
-                            } else if (status === 'error') {
-                                this.log(`${folderName} (Video ${videoNum}): Generation failed`);
-                                anyError = true;
-                                folderStillPending = true;
-                            } else {
-                                // Generating - this is the only case where we need to wait
-                                const startedAt = progress.steps[startedKey]?.videoStartedAt;
-                                const elapsed = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 60000) : 0;
-                                this.log(`${folderName} (Video ${videoNum}): Still generating... (${elapsed}m)`);
-                                folderStillPending = true;
-                                anyStillGenerating = true; // This triggers the wait
-                            }
-                        } catch (e) {
-                            this.log(`${folderName} (Video ${videoNum}): Error - ${e}`);
-                            anyError = true;
-                            folderStillPending = true;
-                        }
-                    }
-                }
-
-                // Update folder status based on overall state
-                if (anyError) {
+                if (!notebookUrl) {
+                    this.log(`${folderName}: No Notebook URL found, cannot collect videos`);
                     this.updateFolderStatus(folder.folderPath, { status: 'error' });
-                } else if (anyDownloading) {
-                    // Status already explicitly updated during download
-                } else if (!folderStillPending) {
-                    // All done!
-                    this.updateFolderStatus(folder.folderPath, { status: 'complete' });
-                    // Remove from pendingFolders
                     const idx = pendingFolders.indexOf(folder);
                     if (idx > -1) pendingFolders.splice(idx, 1);
-                } else {
-                    // Still pending
+                    continue;
+                }
+
+                // Determine expected video count (2 by default, or check how many were started)
+                const v1Started = progress.steps['notebooklm_video_1_started']?.completed;
+                const v2Started = progress.steps['notebooklm_video_2_started']?.completed;
+                const expectedVideos = (v1Started && v2Started) ? 2 : (v1Started ? 1 : 2);
+
+                try {
+                    // Initialize browser with profile
+                    const profileId = folder.profileId || ProgressTracker.getFolderProfile(folder.folderPath) || undefined;
+
+                    this.log(`${folderName}: Checking video status...`);
                     this.updateFolderStatus(folder.folderPath, { status: 'video_generating' });
+
+                    // Use the modular collectVideos method
+                    const outputDir = path.join(folder.folderPath, 'output');
+                    const result = await this.notebookLMTester.collectVideos(
+                        notebookUrl,
+                        outputDir,
+                        expectedVideos,
+                        profileId
+                    );
+
+                    if (result.status === 'generating') {
+                        // Still generating - wait
+                        const startedAt = progress.steps['notebooklm_video_1_started']?.videoStartedAt;
+                        const elapsed = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 60000) : 0;
+                        this.log(`${folderName}: Videos still generating... (${elapsed}m)`);
+                        anyStillGenerating = true;
+                    } else if (result.status === 'ready' && result.downloaded.length > 0) {
+                        // Downloaded successfully
+                        this.log(`${folderName}: Downloaded ${result.downloaded.length} video(s)`);
+
+                        // Mark progress for each downloaded video
+                        result.downloaded.forEach((videoPath, idx) => {
+                            const downloadedKey = `notebooklm_video_${idx + 1}_downloaded` as any;
+                            ProgressTracker.markStepComplete(folder.folderPath, downloadedKey, {
+                                videoFilePath: videoPath
+                            });
+                        });
+
+                        this.updateFolderStatus(folder.folderPath, { status: 'complete' });
+                        const idx = pendingFolders.indexOf(folder);
+                        if (idx > -1) pendingFolders.splice(idx, 1);
+                    } else {
+                        // Error status
+                        this.log(`${folderName}: Video collection failed`);
+                        this.updateFolderStatus(folder.folderPath, { status: 'error' });
+                        const idx = pendingFolders.indexOf(folder);
+                        if (idx > -1) pendingFolders.splice(idx, 1);
+                    }
+                } catch (e) {
+                    // Error after retries - stop processing this folder
+                    this.log(`${folderName}: Error - ${(e as Error).message}`);
+                    this.updateFolderStatus(folder.folderPath, { status: 'error' });
+                    const idx = pendingFolders.indexOf(folder);
+                    if (idx > -1) pendingFolders.splice(idx, 1);
                 }
             }
 

@@ -1772,9 +1772,12 @@ async function loadFolderStartPoints() {
         const data = await response.json();
         if (data.success && data.startPoints) {
             // Update each dropdown with available options
-            for (const [folderPath, availablePoints] of Object.entries(data.startPoints)) {
-                const dropdown = document.querySelector(`select[data-folder="${folderPath.replace(/\\/g, '\\\\')}"]`);
-                if (dropdown && availablePoints.length > 0) {
+            // Use index to find dropdown since folder paths have backslash escaping issues
+            selectedLocalFolders.forEach((folderPath, index) => {
+                const availablePoints = data.startPoints[folderPath];
+                const dropdown = document.getElementById(`startPoint_${index}`);
+
+                if (dropdown && availablePoints && availablePoints.length > 0) {
                     dropdown.innerHTML = getStartPointOptionsHTML(availablePoints);
                     // Use stored choice if available, otherwise use the last (most advanced) option
                     if (folderStartPoints[folderPath]) {
@@ -1785,7 +1788,7 @@ async function loadFolderStartPoints() {
                         folderStartPoints[folderPath] = lastKey;
                     }
                 }
-            }
+            });
         }
     } catch (error) {
         console.error('Failed to load folder start points:', error);

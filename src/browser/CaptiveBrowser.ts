@@ -122,6 +122,7 @@ export class CaptiveBrowser {
 
     /**
      * Get a page for a specific service. Creates a new tab if one doesn't exist.
+     * If a URL is provided and the page already exists, navigates to that URL.
      */
     public async getPage(serviceKey: string, url?: string): Promise<Page> {
         if (!this.browser) {
@@ -129,14 +130,22 @@ export class CaptiveBrowser {
         }
 
         let page = this.pages.get(serviceKey);
+        let needsNavigation = false;
 
         if (!page || page.isClosed()) {
             page = await this.browser.newPage();
             this.pages.set(serviceKey, page);
-
-            if (url) {
-                await page.goto(url, { waitUntil: 'networkidle2' });
+            needsNavigation = true;
+        } else if (url) {
+            // Page exists - check if we need to navigate to a different URL
+            const currentUrl = page.url();
+            if (currentUrl !== url && !currentUrl.includes(url) && !url.includes(currentUrl)) {
+                needsNavigation = true;
             }
+        }
+
+        if (needsNavigation && url) {
+            await page.goto(url, { waitUntil: 'networkidle2' });
         }
 
         return page;
@@ -245,6 +254,86 @@ export class CaptiveBrowser {
 
         console.error(`[Action] ${actionName} failed after ${maxRetries} attempts`);
         return false;
+    }
+
+    /**
+     * Execute work within a modular recovery context.
+     * Pattern: Open Page → Execute Work → Close Page
+     * On failure: closes page, retries from opening (up to maxRetries).
+     * After all retries exhausted, throws to allow caller to skip to next folder.
+     * 
+     * @param serviceKey Unique key for this service/module
+     * @param url URL to navigate to when opening the page
+     * @param work Async function that performs the actual work, receives the Page
+     * @param options Configuration for retries and cleanup
+     * @returns The result from the work function
+     */
+    public async withModularRecovery<T>(
+        serviceKey: string,
+        url: string,
+        work: (page: Page) => Promise<T>,
+        options?: {
+            maxRetries?: number;
+            onBeforeRetry?: () => Promise<void>;
+        }
+    ): Promise<T> {
+        const maxRetries = options?.maxRetries ?? 3;
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[ModularRecovery] ${serviceKey}: Starting attempt ${attempt}/${maxRetries}`);
+
+                // Step 1: Open page (fresh navigation)
+                const page = await this.getPage(serviceKey, url);
+                await this.randomDelay(1000, 2000);
+
+                try {
+                    // Step 2: Execute work
+                    const result = await work(page);
+
+                    // Step 3: Close page on success
+                    console.log(`[ModularRecovery] ${serviceKey}: Success, closing page`);
+                    await this.closePage(serviceKey);
+
+                    return result;
+                } catch (workError) {
+                    // Work failed - close page before retry
+                    console.error(`[ModularRecovery] ${serviceKey}: Work failed on attempt ${attempt}:`, (workError as Error).message);
+                    lastError = workError as Error;
+
+                    try {
+                        await this.closePage(serviceKey);
+                    } catch (closeError) {
+                        console.warn(`[ModularRecovery] ${serviceKey}: Error closing page:`, (closeError as Error).message);
+                    }
+
+                    throw workError; // Re-throw to trigger retry logic below
+                }
+            } catch (error) {
+                lastError = error as Error;
+
+                if (attempt < maxRetries) {
+                    console.log(`[ModularRecovery] ${serviceKey}: Retrying in 3 seconds... (attempt ${attempt}/${maxRetries})`);
+
+                    // Optional cleanup before retry
+                    if (options?.onBeforeRetry) {
+                        try {
+                            await options.onBeforeRetry();
+                        } catch (cleanupError) {
+                            console.warn(`[ModularRecovery] ${serviceKey}: Cleanup error:`, (cleanupError as Error).message);
+                        }
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+            }
+        }
+
+        // All retries exhausted - throw to let caller handle (skip to next folder)
+        const finalError = new Error(`[ModularRecovery] ${serviceKey}: Failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
+        console.error(finalError.message);
+        throw finalError;
     }
 
     public getCurrentProfileId(): string {

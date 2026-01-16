@@ -20,7 +20,8 @@ export const PIPELINE_STEPS = [
     // POST-PROCESSING:
     'notebooklm_video_1_logo_removed', // Logo removed from first video
     'notebooklm_video_2_logo_removed', // Logo removed from second video
-    'video_processed'                 // [FUTURE] Final video processing complete
+    'video_processed',                // Final video processing complete
+    'pipeline_completed'              // Pipeline fully completed
 ] as const;
 
 /**
@@ -38,7 +39,8 @@ export const START_POINTS = [
     { key: 'generate-audio', label: 'Generate Audio', resumeFrom: 'audio_generated', description: 'Skip to TTS' },
     { key: 'collect-videos', label: 'Collect Videos', resumeFrom: 'notebooklm_video_1_downloaded', description: 'Skip to video download' },
     { key: 'remove-logo', label: 'Remove Logo', resumeFrom: 'notebooklm_video_1_logo_removed', description: 'Remove branding from downloaded videos' },
-    { key: 'process-video', label: 'Process Video', resumeFrom: 'video_processed', description: '[FUTURE] Final processing' },
+    { key: 'process-video', label: 'Process Video', resumeFrom: 'video_processed', description: 'Final processing' },
+    { key: 'completed', label: '✓ Completed', resumeFrom: 'pipeline_completed', description: 'Skip - folder already complete' },
 ] as const;
 
 export type StartPointKey = typeof START_POINTS[number]['key'];
@@ -118,10 +120,16 @@ export const START_POINT_CONFIGS: Record<StartPointKey, StartPointConfig> = {
         skipLogoRemoval: false, skipVideoProcessing: false
     },
     'process-video': {
-        key: 'process-video', label: 'Process Video', description: '[FUTURE] Final processing',
+        key: 'process-video', label: 'Process Video', description: 'Final processing',
         clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
         video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: false, skipNarrationGeneration: true, skipAudioGeneration: true,
         skipLogoRemoval: true, skipVideoProcessing: false
+    },
+    'completed': {
+        key: 'completed', label: '✓ Completed', description: 'Skip - folder already complete',
+        clearProgress: false, skipPerplexity: true, skipNotebookCreation: true, skipSourcesUpload: true,
+        video1Behavior: 'skip', video2Behavior: 'skip', forceRegenerateNarration: false, skipNarrationGeneration: true, skipAudioGeneration: true,
+        skipLogoRemoval: true, skipVideoProcessing: true
     }
 };
 
@@ -352,7 +360,7 @@ export class ProgressTracker {
     /**
      * Get available start points for a folder based on completed steps.
      * Returns all start points where the previous step is complete.
-     * "Start Fresh" is always available.
+     * "Start Fresh" and "Completed" are always available.
      */
     public static getAvailableStartPoints(folderPath: string): typeof START_POINTS[number][] {
         const available: typeof START_POINTS[number][] = [];
@@ -360,6 +368,9 @@ export class ProgressTracker {
         for (const startPoint of START_POINTS) {
             if (startPoint.key === 'start-fresh') {
                 // Always available
+                available.push(startPoint);
+            } else if (startPoint.key === 'completed') {
+                // "Completed" is always available so users can manually skip folders
                 available.push(startPoint);
             } else {
                 // Check if the step BEFORE this start point is complete

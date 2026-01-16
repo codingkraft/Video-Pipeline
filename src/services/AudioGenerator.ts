@@ -115,6 +115,7 @@ export class AudioGenerator {
 
     /**
      * Generate audio for entire narration (two files)
+     * Each audio file uses modular recovery: Open → Generate → Close
      */
     public async generateAudio(config: AudioGeneratorConfig): Promise<AudioGeneratorResult> {
         const steps: string[] = [];
@@ -138,7 +139,7 @@ export class AudioGenerator {
                 if (fs.existsSync(defaultPath)) narrationPath = defaultPath;
                 else if (fs.existsSync(legacyPath1)) narrationPath = legacyPath1;
                 else if (fs.existsSync(legacyPath2)) narrationPath = legacyPath2;
-                else narrationPath = defaultPath; // Default for error message
+                else narrationPath = defaultPath;
             }
 
             if (!fs.existsSync(narrationPath)) {
@@ -161,11 +162,6 @@ export class AudioGenerator {
             }
             steps.push(`✓ Output directory: ${audioDir}`);
 
-            // Get Google Studio page
-            const page = await this.browser.getPage('google-studio', 'https://aistudio.google.com/generate-speech');
-            await this.browser.randomDelay(2000, 3000);
-            steps.push(`✓ Opened Google AI Studio`);
-
             // Studio configuration
             const studioConfig: GoogleStudioConfig = {
                 sourceFolder: config.sourceFolder,
@@ -175,31 +171,50 @@ export class AudioGenerator {
                 headless: config.headless
             };
 
-            // Generate TWO audio files from the same narration
+            // Generate TWO audio files - each as a separate module
             for (let fileNumber = 1; fileNumber <= 2; fileNumber++) {
                 const outputPath = path.join(audioDir, `narration_take_${fileNumber}.wav`);
-
                 steps.push(`🎙️ Generating audio file ${fileNumber}/2...`);
 
-                const slideConfig: SlideAudioConfig = {
-                    slideNumber: fileNumber,
-                    text: narrationText,
-                    textHash: textHash,
-                    outputPath
-                };
+                try {
+                    // Each audio file is its own modular recovery module
+                    await this.browser.withModularRecovery(
+                        `google-studio-audio-${fileNumber}`,
+                        'https://aistudio.google.com/generate-speech',
+                        async (page) => {
+                            const slideConfig: SlideAudioConfig = {
+                                slideNumber: fileNumber,
+                                text: narrationText,
+                                textHash: textHash,
+                                outputPath
+                            };
 
-                const success = await this.googleStudio.generateSlideAudio(
-                    page,
-                    slideConfig,
-                    studioConfig,
-                    steps
-                );
+                            const localSteps: string[] = [];
+                            const success = await this.googleStudio.generateSlideAudio(
+                                page,
+                                slideConfig,
+                                studioConfig,
+                                localSteps
+                            );
 
-                if (success) {
+                            // Add local steps to main steps
+                            steps.push(...localSteps);
+
+                            if (!success) {
+                                throw new Error(`Audio generation failed for file ${fileNumber}`);
+                            }
+
+                            return true;
+                        }
+                    );
+
                     audioFiles.push(outputPath);
                     steps.push(`✓ Audio file ${fileNumber} generated: ${path.basename(outputPath)}`);
-                } else {
-                    steps.push(`✗ Audio file ${fileNumber} generation failed`);
+                } catch (error) {
+                    const errorMsg = (error as Error).message;
+                    steps.push(`✗ Audio file ${fileNumber} failed: ${errorMsg}`);
+                    // Don't continue to next audio - stop processing on error
+                    throw error;
                 }
 
                 // Small delay between generations
@@ -218,7 +233,7 @@ export class AudioGenerator {
                 message: `Generated ${audioFiles.length} audio files from narration`,
                 details: {
                     steps,
-                    slidesProcessed: 1, // Processing as one complete narration
+                    slidesProcessed: 1,
                     audioFiles,
                     skipped
                 }
