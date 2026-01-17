@@ -189,7 +189,7 @@ export class VideoFolderCreator {
         // Import ImageRun for embedding images
         const { ImageRun } = await import('docx');
 
-        // Create a map of screenshots by slide number for easy lookup
+        // Create a map of screenshots by slide number and code block index
         const screenshotsBySlide = new Map<number, string[]>();
         for (const screenshotPath of screenshotPaths) {
             const match = screenshotPath.match(/slide(\d+)/);
@@ -202,88 +202,183 @@ export class VideoFolderCreator {
             }
         }
 
+        // Build document children - faithfully reproducing source content
+        const children: any[] = [];
+
+        // ===== VIDEO HEADER =====
+        // Video Title
+        children.push(new Paragraph({
+            text: `Video ${video.videoNumber}: ${video.title}`,
+            heading: HeadingLevel.HEADING_1
+        }));
+        children.push(new Paragraph({ text: '' }));
+
+        // Duration (if present)
+        if (video.duration) {
+            children.push(new Paragraph({
+                children: [
+                    new TextRun({ text: 'Duration: ', bold: true }),
+                    new TextRun({ text: video.duration })
+                ]
+            }));
+        }
+
+        // Concept (if present)
+        if (video.concept) {
+            children.push(new Paragraph({
+                children: [
+                    new TextRun({ text: 'Concept: ', bold: true }),
+                    new TextRun({ text: video.concept })
+                ]
+            }));
+        }
+
+        if (video.duration || video.concept) {
+            children.push(new Paragraph({ text: '' }));
+        }
+
+        // ===== SLIDES =====
+        for (const slide of video.slides) {
+            const slideScreenshots = screenshotsBySlide.get(slide.number) || [];
+            let screenshotIndex = 0;
+
+            // Slide Header with duration
+            const slideHeader = slide.duration
+                ? `[SLIDE ${slide.number}: ${slide.title}] **[${slide.duration} seconds]**`
+                : `[SLIDE ${slide.number}: ${slide.title}]`;
+
+            children.push(new Paragraph({
+                text: slideHeader,
+                heading: HeadingLevel.HEADING_2
+            }));
+            children.push(new Paragraph({ text: '' }));
+
+            // Visual (if present)
+            if (slide.visual) {
+                children.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Visual: ', bold: true }),
+                        new TextRun({ text: slide.visual })
+                    ]
+                }));
+                children.push(new Paragraph({ text: '' }));
+            }
+
+            // Code blocks with screenshots
+            for (const codeBlock of slide.codeBlocks) {
+                // Get screenshot for this code block
+                const screenshotPath = slideScreenshots[screenshotIndex];
+                screenshotIndex++;
+
+                if (screenshotPath && fs.existsSync(screenshotPath)) {
+                    const screenshotFilename = path.basename(screenshotPath);
+
+                    try {
+                        const imageBuffer = fs.readFileSync(screenshotPath);
+
+                        // Screenshot filename label
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `[Code Screenshot: ${screenshotFilename}]`,
+                                    bold: true,
+                                    color: '4472C4'
+                                })
+                            ]
+                        }));
+
+                        // Embedded screenshot image
+                        children.push(new Paragraph({
+                            children: [
+                                new ImageRun({
+                                    data: imageBuffer,
+                                    transformation: {
+                                        width: 550,
+                                        height: 350
+                                    },
+                                    type: 'png'
+                                } as any)
+                            ]
+                        }));
+                        children.push(new Paragraph({ text: '' }));
+
+                    } catch (err) {
+                        console.warn(`[VideoFolderCreator] Could not embed image: ${screenshotPath}`);
+                        // Fallback: show code as text
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({ text: 'Code:', bold: true })
+                            ]
+                        }));
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: codeBlock.code,
+                                    font: 'Consolas',
+                                    size: 20 // 10pt
+                                })
+                            ]
+                        }));
+                        children.push(new Paragraph({ text: '' }));
+                    }
+                } else {
+                    // No screenshot - show code as text
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Code:', bold: true })
+                        ]
+                    }));
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: codeBlock.code,
+                                font: 'Consolas',
+                                size: 20
+                            })
+                        ]
+                    }));
+
+                    // Show expected output if present
+                    if (codeBlock.expectedOutput) {
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({ text: 'Output:', bold: true })
+                            ]
+                        }));
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: codeBlock.expectedOutput,
+                                    font: 'Consolas',
+                                    size: 20
+                                })
+                            ]
+                        }));
+                    }
+                    children.push(new Paragraph({ text: '' }));
+                }
+            }
+
+            // Audio/Narration
+            if (slide.audio) {
+                children.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Audio: ', bold: true }),
+                        new TextRun({ text: `"${slide.audio}"`, italics: true })
+                    ]
+                }));
+                children.push(new Paragraph({ text: '' }));
+            }
+
+            // Separator between slides
+            children.push(new Paragraph({ text: '─'.repeat(50) }));
+            children.push(new Paragraph({ text: '' }));
+        }
+
         const doc = new Document({
             sections: [{
                 properties: {},
-                children: [
-                    // Title
-                    new Paragraph({
-                        text: `Video ${video.videoNumber}: ${video.title}`,
-                        heading: HeadingLevel.HEADING_1
-                    }),
-                    new Paragraph({ text: '' }),
-
-                    // Concept
-                    ...(video.concept ? [
-                        new Paragraph({
-                            text: `Concept: ${video.concept}`,
-                            heading: HeadingLevel.HEADING_2
-                        }),
-                        new Paragraph({ text: '' })
-                    ] : []),
-
-                    // Slides
-                    ...video.slides.flatMap(slide => {
-                        const slideScreenshots = screenshotsBySlide.get(slide.number) || [];
-
-                        return [
-                            new Paragraph({
-                                text: `Slide ${slide.number}: ${slide.title}`,
-                                heading: HeadingLevel.HEADING_2
-                            }),
-                            new Paragraph({
-                                children: [new TextRun({ text: slide.audio })]
-                            }),
-                            new Paragraph({ text: '' }),
-
-                            // Embed screenshots for this slide
-                            ...slideScreenshots.flatMap(screenshotPath => {
-                                const screenshotFilename = path.basename(screenshotPath);
-
-                                try {
-                                    const imageBuffer = fs.readFileSync(screenshotPath);
-
-                                    return [
-                                        new Paragraph({
-                                            children: [
-                                                new TextRun({
-                                                    text: `Screenshot: ${screenshotFilename}`,
-                                                    bold: true
-                                                })
-                                            ]
-                                        }),
-                                        new Paragraph({
-                                            children: [
-                                                new ImageRun({
-                                                    data: imageBuffer,
-                                                    transformation: {
-                                                        width: 600,
-                                                        height: 400
-                                                    },
-                                                    type: 'png'
-                                                } as any) // Type assertion to bypass strict typing
-                                            ]
-                                        }),
-                                        new Paragraph({ text: '' })
-                                    ];
-                                } catch (err) {
-                                    console.warn(`[VideoFolderCreator] Could not embed image: ${screenshotFilename}`);
-                                    return [
-                                        new Paragraph({
-                                            children: [
-                                                new TextRun({
-                                                    text: `Screenshot: ${screenshotFilename} (file not found)`,
-                                                    italics: true
-                                                })
-                                            ]
-                                        }),
-                                        new Paragraph({ text: '' })
-                                    ];
-                                }
-                            })
-                        ];
-                    })
-                ]
+                children
             }]
         });
 
@@ -321,7 +416,7 @@ export class VideoFolderCreator {
                         block.code,
                         block.expectedOutput,
                         codePath,
-                        { filename: `slide${block.slideNumber}.py` }
+                        { filename: 'main.py' }
                     );
                     screenshotPaths.push(codePath);
                 } else {
@@ -330,7 +425,7 @@ export class VideoFolderCreator {
                         block.code,
                         folderPath,
                         baseName,
-                        { filename: `slide${block.slideNumber}.py` }
+                        { filename: 'main.py' }
                     );
                     screenshotPaths.push(result.codePath);
                     if (result.outputPath) {
