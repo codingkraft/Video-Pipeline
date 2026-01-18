@@ -300,13 +300,13 @@ app.get('/api/browse-folder', async (req: Request, res: Response) => {
     }
 });
 
-// API: Open File Picker (for selecting .md files)
+// API: Open File Picker (for selecting .md or .docx files)
 app.get('/api/browse-file', async (req: Request, res: Response) => {
     try {
         const { exec } = require('child_process');
 
-        // Open file dialog for markdown files
-        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Select Markdown Script File'; $d.Filter = 'Markdown Files|*.md|All Files|*.*'; $d.InitialDirectory = [Environment]::GetFolderPath('Desktop'); if ($d.ShowDialog() -eq 'OK') { $d.FileName } }"`;
+        // Open file dialog for markdown and docx files
+        const cmd = `powershell -STA -NoProfile -ExecutionPolicy Bypass -Command "& { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Select Script File'; $d.Filter = 'Script Files|*.md;*.docx|Markdown Files|*.md|Word Documents|*.docx|All Files|*.*'; $d.InitialDirectory = [Environment]::GetFolderPath('Desktop'); if ($d.ShowDialog() -eq 'OK') { $d.FileName } }"`;
 
         console.log('Opening file picker...');
 
@@ -1319,10 +1319,9 @@ app.post('/api/create-timeline', async (req: Request, res: Response) => {
 // SCRIPT PARSER ENDPOINTS
 // ============================================
 
-// API: Parse markdown script and preview extracted videos
+// API: Parse markdown/docx script and preview extracted videos
 app.post('/api/parse-script', async (req: Request, res: Response) => {
     try {
-        const { MarkdownScriptParser } = await import('./services/MarkdownScriptParser');
         const { scriptPath } = req.body;
 
         if (!scriptPath) {
@@ -1334,7 +1333,20 @@ app.post('/api/parse-script', async (req: Request, res: Response) => {
         }
 
         console.log(`[ScriptParser] Parsing: ${scriptPath}`);
-        const result = MarkdownScriptParser.parseFile(scriptPath);
+
+        // Auto-detect file type and use appropriate parser
+        const ext = path.extname(scriptPath).toLowerCase();
+        let result;
+
+        if (ext === '.docx') {
+            const { DocxScriptParser } = await import('./services/DocxScriptParser');
+            result = await DocxScriptParser.parseFile(scriptPath);
+            console.log(`[ScriptParser] Using DOCX parser`);
+        } else {
+            const { MarkdownScriptParser } = await import('./services/MarkdownScriptParser');
+            result = MarkdownScriptParser.parseFile(scriptPath);
+            console.log(`[ScriptParser] Using Markdown parser`);
+        }
 
         // Return preview information
         const videoSummaries = result.videos.map(v => ({
@@ -1350,6 +1362,7 @@ app.post('/api/parse-script', async (req: Request, res: Response) => {
         res.json({
             success: true,
             scriptPath,
+            fileType: ext === '.docx' ? 'docx' : 'markdown',
             chapterTitle: result.chapterTitle,
             totalVideos: result.totalVideos,
             videos: videoSummaries

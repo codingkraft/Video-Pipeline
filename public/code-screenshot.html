@@ -130,14 +130,21 @@
             overflow: hidden;
         }
 
-        /* The actual screenshot element */
+        /* The actual screenshot element - auto-adjusts width */
         #screenshot-target {
             background: #1e1e1e;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 15px;
             line-height: 1.6;
-            min-width: 700px;
-            max-width: 900px;
+            min-width: 400px;
+            /* Shrink for short code */
+            max-width: 1200px;
+            /* Wider to fit more content */
+            width: fit-content;
+            /* Auto-adjust to content */
+            word-wrap: break-word;
+            /* Wrap long lines */
+            overflow-wrap: break-word;
         }
 
         /* Window title bar */

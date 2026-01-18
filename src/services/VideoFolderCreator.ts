@@ -7,6 +7,7 @@ import {
     CodeBlock,
     ParseResult
 } from './MarkdownScriptParser';
+import { DocxScriptParser } from './DocxScriptParser';
 import { CodeScreenshotService, getCodeScreenshotService } from './CodeScreenshotService';
 
 /**
@@ -15,7 +16,7 @@ import { CodeScreenshotService, getCodeScreenshotService } from './CodeScreensho
 export interface VideoFolderConfig {
     sourceMarkdownPath: string;
     outputBaseDir: string;
-    chapterPrefix?: string;  // e.g., "chapter2" 
+    chapterPrefix?: string;  // e.g., "chapter" 
     startVideoNumber?: number;  // Generate from this video onwards
     endVideoNumber?: number;    // Generate up to this video
     generateScreenshots?: boolean;  // Whether to generate code screenshots
@@ -47,7 +48,7 @@ export interface BatchResult {
 }
 
 /**
- * Service for creating video input folders from markdown scripts.
+ * Service for creating video input folders from markdown/docx scripts.
  * Generates:
  * - Narration TXT files (for TTS)
  * - DOCX source documents (for NotebookLM)
@@ -72,16 +73,25 @@ export class VideoFolderCreator {
     }
 
     /**
-     * Generate all video folders from a markdown script
+     * Generate all video folders from a markdown or docx script
      */
     async generateAll(config: VideoFolderConfig): Promise<BatchResult> {
         const results: VideoFolderResult[] = [];
         let successCount = 0;
         let failCount = 0;
 
-        // Parse the markdown
+        // Auto-detect file type and use appropriate parser
+        const ext = path.extname(config.sourceMarkdownPath).toLowerCase();
         console.log(`[VideoFolderCreator] Parsing: ${config.sourceMarkdownPath}`);
-        const parseResult = MarkdownScriptParser.parseFile(config.sourceMarkdownPath);
+
+        let parseResult: ParseResult;
+        if (ext === '.docx') {
+            parseResult = await DocxScriptParser.parseFile(config.sourceMarkdownPath);
+            console.log(`[VideoFolderCreator] Using DOCX parser`);
+        } else {
+            parseResult = MarkdownScriptParser.parseFile(config.sourceMarkdownPath);
+            console.log(`[VideoFolderCreator] Using Markdown parser`);
+        }
         console.log(`[VideoFolderCreator] Found ${parseResult.totalVideos} videos`);
 
         // Filter videos by number range if specified (commented out - videoNumber is now string)
