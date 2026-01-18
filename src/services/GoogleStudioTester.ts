@@ -394,15 +394,49 @@ export class GoogleStudioTester {
 
             await this.browser.randomDelay(2000, 3000);
 
+            // Generate timestamp for unique screenshot names
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
             if (downloaded) {
                 steps.push(`✓ Saved: ${path.basename(config.outputPath)}`);
+
+                // Take success screenshot with timestamp
+                const screenshotPath = path.join(
+                    path.dirname(config.outputPath),
+                    `audio_${config.slideNumber}_success_${timestamp}.png`
+                );
+                await page.screenshot({ path: screenshotPath, fullPage: false });
+                steps.push(`📸 Screenshot saved: ${path.basename(screenshotPath)}`);
+
                 return true;
             }
+
+            // Take failure screenshot (download failed) with timestamp
+            const failScreenshotPath = path.join(
+                path.dirname(config.outputPath),
+                `audio_${config.slideNumber}_failed_${timestamp}.png`
+            );
+            await page.screenshot({ path: failScreenshotPath, fullPage: false });
+            steps.push(`📸 Failure screenshot: ${path.basename(failScreenshotPath)}`);
 
             return false;
 
         } catch (error) {
             steps.push(`✗ Error: ${(error as Error).message}`);
+
+            // Take error screenshot with timestamp
+            try {
+                const errorTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const errorScreenshotPath = path.join(
+                    path.dirname(config.outputPath),
+                    `audio_${config.slideNumber}_error_${errorTimestamp}.png`
+                );
+                await page.screenshot({ path: errorScreenshotPath, fullPage: false });
+                steps.push(`📸 Error screenshot: ${path.basename(errorScreenshotPath)}`);
+            } catch (screenshotError) {
+                steps.push(`⚠ Could not save error screenshot`);
+            }
+
             return false;
         }
     }

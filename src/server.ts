@@ -1099,6 +1099,23 @@ app.post('/api/batch/abort', (req: Request, res: Response) => {
     }
 });
 
+// API: Force reset batch processing state (recovery from stuck state)
+app.post('/api/batch/reset', (req: Request, res: Response) => {
+    try {
+        if (!batchProcessor) {
+            return res.json({ success: true, message: 'No batch processor to reset' });
+        }
+
+        batchProcessor.forceReset();
+        res.json({ success: true, message: 'Batch processing state reset successfully' });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reset batch: ' + (error as Error).message
+        });
+    }
+});
+
 // API: Fire videos only (no collect or audio)
 app.post('/api/batch/fire', async (req: Request, res: Response) => {
     try {

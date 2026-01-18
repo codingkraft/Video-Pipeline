@@ -6,7 +6,7 @@ import * as path from 'path';
  * When resetting from a step, all steps after it are also reset.
  */
 export const PIPELINE_STEPS = [
-    'perplexity',                     // Generate video prompt
+    'perplexity',                     // DEPRECATED: Video prompt now from VideoFolderCreator
     'notebooklm_notebook_created',    // Create notebook
     'notebooklm_sources_uploaded',    // Upload sources
     'notebooklm_video_1_started',     // FIRE: First video generation started
@@ -52,7 +52,7 @@ export interface StartPointConfig {
     description: string;
     // Configuration Flags
     clearProgress: boolean;         // Start Fresh: Clear all progress
-    skipPerplexity: boolean;        // Skip video steering prompt generation
+    skipPerplexity: boolean;        // DEPRECATED: Video prompt now from VideoFolderCreator
     skipNotebookCreation: boolean;  // Skip creating new notebook (reuse existing)
     skipSourcesUpload: boolean;     // Skip uploading sources (reuse existing)
     video1Behavior: VideoBehavior;  // Behavior for first video
@@ -67,7 +67,7 @@ export interface StartPointConfig {
 export const START_POINT_CONFIGS: Record<StartPointKey, StartPointConfig> = {
     'start-fresh': {
         key: 'start-fresh', label: 'Start Fresh', description: 'Clear all, regenerate everything',
-        clearProgress: true, skipPerplexity: false, skipNotebookCreation: false, skipSourcesUpload: false,
+        clearProgress: true, skipPerplexity: true, skipNotebookCreation: false, skipSourcesUpload: false,
         video1Behavior: 'force', video2Behavior: 'force', forceRegenerateNarration: true, skipNarrationGeneration: false, skipAudioGeneration: false,
         skipLogoRemoval: false, skipVideoProcessing: false
     },
@@ -370,8 +370,10 @@ export class ProgressTracker {
                 // Always available
                 available.push(startPoint);
             } else if (startPoint.key === 'completed') {
-                // "Completed" is always available so users can manually skip folders
-                available.push(startPoint);
+                // Only show if actually completed
+                if (ProgressTracker.isStepComplete(folderPath, 'pipeline_completed')) {
+                    available.push(startPoint);
+                }
             } else {
                 // Check if the step BEFORE this start point is complete
                 const stepIndex = PIPELINE_STEPS.indexOf(startPoint.resumeFrom as StaticPipelineStep);

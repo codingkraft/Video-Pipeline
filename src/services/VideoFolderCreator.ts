@@ -349,14 +349,20 @@ export class VideoFolderCreator {
             }));
             children.push(new Paragraph({ text: '' }));
 
-            // Visual (if present)
+            // Visual (if present) - preserve newlines
             if (slide.visual) {
-                children.push(new Paragraph({
-                    children: [
-                        new TextRun({ text: 'Visual: ', bold: true }),
-                        new TextRun({ text: slide.visual })
-                    ]
-                }));
+                // Split visual by newlines to preserve line breaks
+                const visualLines = slide.visual.split('\n');
+                const visualRuns: any[] = [
+                    new TextRun({ text: 'Visual: ', bold: true })
+                ];
+                visualLines.forEach((line, idx) => {
+                    if (idx > 0) {
+                        visualRuns.push(new TextRun({ break: 1 }));
+                    }
+                    visualRuns.push(new TextRun({ text: line || ' ' }));
+                });
+                children.push(new Paragraph({ children: visualRuns }));
                 children.push(new Paragraph({ text: '' }));
             }
 
@@ -450,39 +456,51 @@ export class VideoFolderCreator {
 
                     } catch (err) {
                         console.warn(`[VideoFolderCreator] Could not embed image: ${screenshotPath}`);
-                        // Fallback: show code as text
+                        // Fallback: show code as text with preserved line breaks
                         children.push(new Paragraph({
                             children: [
                                 new TextRun({ text: 'Code:', bold: true })
                             ]
                         }));
-                        children.push(new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: codeBlock.code,
-                                    font: 'Consolas',
-                                    size: 20 // 10pt
-                                })
-                            ]
-                        }));
+
+                        // Split code by lines to preserve newlines
+                        const fallbackCodeLines = codeBlock.code.split('\n');
+                        const fallbackCodeRuns: any[] = [];
+                        fallbackCodeLines.forEach((line, idx) => {
+                            if (idx > 0) {
+                                fallbackCodeRuns.push(new TextRun({ break: 1 }));
+                            }
+                            fallbackCodeRuns.push(new TextRun({
+                                text: line || ' ',
+                                font: 'Consolas',
+                                size: 20
+                            }));
+                        });
+                        children.push(new Paragraph({ children: fallbackCodeRuns }));
                         children.push(new Paragraph({ text: '' }));
                     }
                 } else {
-                    // No screenshot - show code as text
+                    // No screenshot - show code as text with preserved line breaks
                     children.push(new Paragraph({
                         children: [
                             new TextRun({ text: 'Code:', bold: true })
                         ]
                     }));
-                    children.push(new Paragraph({
-                        children: [
-                            new TextRun({
-                                text: codeBlock.code,
-                                font: 'Consolas',
-                                size: 20
-                            })
-                        ]
-                    }));
+
+                    // Split code by lines to preserve newlines and empty lines
+                    const codeLines = codeBlock.code.split('\n');
+                    const codeTextRuns: any[] = [];
+                    codeLines.forEach((line, idx) => {
+                        if (idx > 0) {
+                            codeTextRuns.push(new TextRun({ break: 1 }));
+                        }
+                        codeTextRuns.push(new TextRun({
+                            text: line || ' ', // Use space for empty lines to preserve them
+                            font: 'Consolas',
+                            size: 20
+                        }));
+                    });
+                    children.push(new Paragraph({ children: codeTextRuns }));
 
                     // Show expected output if present
                     if (codeBlock.expectedOutput) {
@@ -491,15 +509,21 @@ export class VideoFolderCreator {
                                 new TextRun({ text: 'Output:', bold: true })
                             ]
                         }));
-                        children.push(new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: codeBlock.expectedOutput,
-                                    font: 'Consolas',
-                                    size: 20
-                                })
-                            ]
-                        }));
+
+                        // Split output by lines to preserve newlines
+                        const outputLines = codeBlock.expectedOutput.split('\n');
+                        const outputTextRuns: any[] = [];
+                        outputLines.forEach((line, idx) => {
+                            if (idx > 0) {
+                                outputTextRuns.push(new TextRun({ break: 1 }));
+                            }
+                            outputTextRuns.push(new TextRun({
+                                text: line || ' ',
+                                font: 'Consolas',
+                                size: 20
+                            }));
+                        });
+                        children.push(new Paragraph({ children: outputTextRuns }));
                     }
                     children.push(new Paragraph({ text: '' }));
                 }

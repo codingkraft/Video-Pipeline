@@ -1,5 +1,5 @@
 {
-  "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 1\\Per Video Input\\Video 4;F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 1\\Per Video Input\\Video 5",
+  "sourceFolder": "F:\\Workspaces\\Codestrike Python Course\\Easy\\Chapter 2\\Per Video Input\\Video 6",
   "headlessMode": false,
   "deleteConversation": false,
   "perplexityModel": "Claude Sonnet 4.5",
@@ -10,7 +10,7 @@
   "stylePrompt": "Professional with smooth transitions",
   "audioNarrationPrompt": "for this now",
   "googleStudioModel": "Gemini 2.5 Flash Preview TTS",
-  "googleStudioVoice": "Autonoe",
+  "googleStudioVoice": "Charon",
   "googleStudioStyleInstructions": "You are a friendly, clear, and relaxed coding instructor. You are speaking naturally to a student. Keep the tone consistent, positive, and easy to follow. Do not be overly dramatic.\n\nImperative Rule: Read the text word-for-word. Do not skip any words, names, or punchlines. Even if there are filler words like \"umm\" or \"look,\" read them naturally.\n\n\nThe Human Tech Expert\n# AUDIO PROFILE: Alex (Autonoe)\n## \"The Bright & Relatable Expert\"\n\n## The Scene: \nA sunny home office. This is a person who has spent way too many hours debugging and can now laugh about it. It's a shared workspace vibe—warm, intelligent, and slightly irreverent.\n\n### DIRECTOR'S NOTES\n* **Tone:** Bright, energetic, and highly relatable. \n* **Vocal Smile:** Keep the energy high and slightly amused. The narrator should sound like they're enjoying the explanation.\n* **Pacing:** Conversational and fluid. Use micro-pauses for comic timing or to let a core concept sink in.se [PAUSE] markers for 3-second silences between slides\n* **Style:** Human-centric. Use self-deprecating humor or witty analogies to make complex topics feel accessible.\n\n### SAMPLE CONTEXT\nIdeal for educational content that needs to feel like a conversation with a smart friend rather than a dry lecture.\n\n# Critical Directive - Non Negotiable \n**DIRECTIVE: Whenever you see the marker '[PAUSE]' in the text, you must remain completely silent for exactly 3 seconds before continuing.**",
   "outputDir": "",
   "activeProfile": "profile2",

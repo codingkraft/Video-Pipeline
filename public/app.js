@@ -1971,6 +1971,25 @@ async function abortBatch() {
     }
 }
 
+// Reset batch processing state (for stuck state recovery)
+async function resetBatch() {
+    if (!confirm('This will reset the batch processing state. Use this if processing got stuck. Continue?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/batch/reset', {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+        addBatchLog(`Reset: ${data.message}`);
+        resetBatchButtons();
+    } catch (error) {
+        addBatchLog(`Error resetting: ${error.message}`, 'error');
+    }
+}
+
 // Reset batch button states
 function resetBatchButtons() {
     document.getElementById('startBatchBtn').disabled = false;

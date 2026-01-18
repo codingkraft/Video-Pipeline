@@ -71,22 +71,26 @@ export class DocxScriptParser {
             : undefined;
 
         // Split by video sections
-        // Pattern: <strong>Video X: Title</strong> or **Video X: Title**
-        const videoRegex = /<strong>Video\s+([\d.]+):\s*([^<]+)<\/strong>/gi;
-        const videoMatches = [...cleanHtml.matchAll(videoRegex)];
+        // Pattern: <strong>Video X: Title</strong> or <h2>Video X: Title</h2>
+        // Match both patterns:
+        // 1. <strong>Video X: Title</strong>
+        // 2. <h2><a id="..."></a>Video X: Title</h2>
+        const videoRegex = /(?:<strong>Video\s+([\d.]+):\s*([^<]+)<\/strong>|<h2>(?:<a[^>]*><\/a>)?Video\s+([\d.]+):\s*([^<]+)<\/h2>)/gi;
+        const videoMatches = [...html.matchAll(videoRegex)];
 
         for (let i = 0; i < videoMatches.length; i++) {
             const match = videoMatches[i];
-            const videoNumber = match[1];
-            const videoTitle = match[2].trim();
+            // For alternation regex: either groups 1,2 (strong) or groups 3,4 (h2) are populated
+            const videoNumber = match[1] || match[3];
+            const videoTitle = (match[2] || match[4]).trim();
 
             // Get content for this video (until next video or end)
             const startIndex = match.index!;
             const endIndex = i < videoMatches.length - 1
                 ? videoMatches[i + 1].index!
-                : cleanHtml.length;
+                : html.length;
 
-            const videoContent = cleanHtml.substring(startIndex, endIndex);
+            const videoContent = html.substring(startIndex, endIndex);
 
             // Parse this video section
             const videoSection = this.parseVideoSection(videoContent, videoNumber, videoTitle);
@@ -116,13 +120,17 @@ export class DocxScriptParser {
         const conceptMatch = textContent.match(/Concept:\s*([^\n]+)/i);
 
         // Split by slides - pattern: [SLIDE N: Title]
-        const slideRegex = /<strong>\[SLIDE\s+(\d+):\s*([^\]]+)\]<\/strong>/gi;
+        // Match both formats:
+        // 1. <strong>[SLIDE N: Title]</strong>
+        // 2. <h3><a id="..."></a>[SLIDE N: Title]</h3>
+        const slideRegex = /(?:<strong>\[SLIDE\s+(\d+):\s*([^\]]+)\]<\/strong>|<h3>(?:<a[^>]*><\/a>)?\[SLIDE\s+(\d+):\s*([^\]]+)\]<\/h3>)/gi;
         const slideMatches = [...content.matchAll(slideRegex)];
 
         for (let i = 0; i < slideMatches.length; i++) {
             const match = slideMatches[i];
-            const slideNumber = parseInt(match[1]);
-            const slideTitle = match[2].trim();
+            // For alternation regex: either groups 1,2 (strong) or groups 3,4 (h3) are populated
+            const slideNumber = parseInt(match[1] || match[3]);
+            const slideTitle = (match[2] || match[4]).trim();
 
             // Get content for this slide
             const startIndex = match.index!;
@@ -161,120 +169,99 @@ export class DocxScriptParser {
      */
     private static parseSlide(content: string, number: number, title: string): Slide {
         const codeBlocks: CodeBlock[] = [];
+        let visual: string | undefined;
+        let audio: string | undefined;
         let expectedOutput: string | undefined;
+        let duration: number | undefined;
 
-        // Split content at Output: to separate code from output
-        // Both may use the same styling, so we need to distinguish by position
-        const outputIndex = content.search(/\bOutput:/i);
-        const codeContent = outputIndex > 0 ? content.substring(0, outputIndex) : content;
-        const outputContent = outputIndex > 0 ? content.substring(outputIndex) : '';
-
-        // Extract styled code - look for <code> tags and content between them
-        // Replace <br/> with newlines to preserve empty lines
-        const codeSection = codeContent
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<\/code>\s*<code>/gi, '\n')  // Join adjacent code tags
-            .replace(/<\/code>\s*\n\s*<code>/gi, '\n\n');  // Preserve paragraph breaks
-
-        // Extract all code content from tags
-        const codeTagMatches = [...codeSection.matchAll(/<code>([^<]*)<\/code>/gi)];
-        const preTagMatches = [...codeSection.matchAll(/<pre>([^<]*)<\/pre>/gi)];
-
-        // Combine all styled code content, preserving empty entries for blank lines
-        const styledCodeParts: string[] = [];
-        for (const match of codeTagMatches) {
-            // Keep empty strings to preserve blank lines
-            styledCodeParts.push(match[1]);
-        }
-        for (const match of preTagMatches) {
-            styledCodeParts.push(match[1]);
-        }
-
-        // Extract styled output from AFTER Output section
-        if (outputContent) {
-            const cleanedOutput = outputContent
+        // For h3 format: sections are marked by <strong>Visual:</strong>, <strong>Audio:</strong>, etc.
+        // Extract visual section (between Visual: and Audio: or Output: or [seconds])
+        const visualMatch = content.match(/<strong>Visual:<\/strong>(?:<\/p>)?(?:<p>)?([\s\S]*?)(?=<strong>(?:Audio:|Output:|\[\d+\s*seconds?\]))/i);
+        if (visualMatch) {
+            // Clean the visual content - this contains the code
+            let visualContent = visualMatch[1]
                 .replace(/<br\s*\/?>/gi, '\n')
-                .replace(/<\/code>\s*<code>/gi, '\n');
-            const outputCodeMatches = [...cleanedOutput.matchAll(/<code>([^<]*)<\/code>/gi)];
-            const outputPreMatches = [...cleanedOutput.matchAll(/<pre>([^<]*)<\/pre>/gi)];
-            const outputParts: string[] = [];
-            for (const match of outputCodeMatches) {
-                outputParts.push(match[1]);
-            }
-            for (const match of outputPreMatches) {
-                outputParts.push(match[1]);
-            }
-            if (outputParts.length > 0) {
-                expectedOutput = outputParts.join('\n').trim();
-            }
-        }
-
-        // If we found styled code, create a code block from it
-        if (styledCodeParts.length > 0) {
-            // Join with newlines and clean up while preserving intentional blank lines
-            const code = styledCodeParts.join('\n')
-                .replace(/\n{3,}/g, '\n\n')  // Max 2 consecutive newlines
+                .replace(/<\/?p>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
                 .trim();
-            if (code) {
+
+            // Check if this looks like code (requires stronger Python patterns)
+            // Must have common Python patterns, not just colons (which appear in titles like "Video 6:")
+            const hasCodePatterns =
+                /print\s*\(/.test(visualContent) ||         // print function
+                /=\s*["']/.test(visualContent) ||           // string assignment
+                /=\s*\d/.test(visualContent) ||             // number assignment
+                /def\s+\w+\s*\(/.test(visualContent) ||     // function definition
+                /import\s+\w/.test(visualContent) ||        // import statement
+                /^\s*#/.test(visualContent) ||              // Comment at start
+                /\n\s*#/.test(visualContent) ||             // Comment on any line
+                /\[\s*\d/.test(visualContent) ||            // List with numbers
+                /for\s+\w+\s+in/.test(visualContent) ||     // for loop
+                /if\s+\w/.test(visualContent) ||            // if statement
+                /\w+\s*\(.*\)/.test(visualContent);         // function call with args
+
+            if (hasCodePatterns && visualContent.length > 15) {
+                // This is code content
                 codeBlocks.push({
-                    code,
+                    code: visualContent,
                     language: 'python',
                     slideNumber: number,
-                    slideTitle: title,
-                    expectedOutput
+                    slideTitle: title
                 });
+                // For visual, just use the title or first short description
+                visual = title;
+            } else {
+                // Not code, use as visual description (first line only)
+                visual = visualContent.split('\n')[0];
             }
         }
 
-        // Remove HTML tags for text extraction
-        const textContent = content
-            .replace(/<[^>]+>/g, '')
-            .replace(/\n{3,}/g, '\n\n');
+        // Extract output section (between Output: and Audio: or [seconds])
+        const outputMatch = content.match(/<strong>Output:<\/strong>(?:<\/p>)?(?:<p>)?([\s\S]*?)(?=<strong>(?:Audio:|\[\d+\s*seconds?\]))/i);
+        if (outputMatch && codeBlocks.length > 0) {
+            expectedOutput = outputMatch[1]
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/?p>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .trim();
+            codeBlocks[codeBlocks.length - 1].expectedOutput = expectedOutput;
+        }
 
-        // Extract visual description
-        const visualMatch = textContent.match(/Visual:\s*([^\n]+(?:\n(?!Audio:|Code:|\[SLIDE|\[\d+\s*seconds?\]).*)*)/i);
-        let visual = visualMatch ? visualMatch[1].trim() : undefined;
-
-        // Extract audio/narration
-        const audioMatch = textContent.match(/Audio:\s*\n?"?([^"]+)"?/i);
-        let audio = audioMatch ? this.cleanNarration(audioMatch[1]) : '';
+        // Extract audio/narration section (between Audio: and [seconds] or end)
+        const audioMatch = content.match(/<strong>Audio:<\/strong>(?:<br\s*\/?>)?"?([\s\S]*?)(?="?<\/p>\s*<p>\s*<strong>\[\d+|"?<\/p>\s*$)/i);
+        if (audioMatch) {
+            audio = audioMatch[1]
+                .replace(/<br\s*\/?>/gi, ' ')
+                .replace(/<[^>]+>/g, '')
+                .replace(/["""'']/g, '')  // Remove all types of quotes
+                .replace(/\s+/g, ' ')
+                .trim();
+            audio = this.cleanNarration(audio);
+        }
 
         // Extract duration
-        const durationMatch = textContent.match(/\[(\d+)\s*seconds?\]/i);
-        const duration = durationMatch ? parseInt(durationMatch[1]) : undefined;
-
-        // Fallback: Extract code from visual using pattern matching
-        // Only if style-based detection didn't find code (mammoth style mapping may not work for all documents)
-        if (codeBlocks.length === 0 && visual) {
-            // Filter out obvious false positives before pattern matching
-            const isNotCode =
-                /^"?Video\s+\d+/i.test(visual) ||           // Video title references
-                /^"?[A-Z][a-z]+\s+\d+:/i.test(visual) ||    // Section headers like "Slide 1:"
-                visual.length < 10 ||                        // Too short to be code
-                !/[=()[\]{}:#]/.test(visual);              // No code-like characters
-
-            if (!isNotCode) {
-                const codeLines = this.extractCodeFromVisual(visual);
-                if (codeLines) {
-                    codeBlocks.push({
-                        code: codeLines.code,
-                        language: 'python',
-                        slideNumber: number,
-                        slideTitle: title,
-                        expectedOutput: codeLines.output
-                    });
-                    visual = codeLines.remainingVisual?.trim() || visual;
-                }
-            }
+        const durationMatch = content.match(/<strong>\[(\d+)\s*seconds?\]<\/strong>/i);
+        if (durationMatch) {
+            duration = parseInt(durationMatch[1]);
         }
 
-        // Also check for explicit Code: section
-        const codeMatch = textContent.match(/Code:\s*\n([\s\S]*?)(?=\nAudio:|\nOutput:|\n\[|\n\*\*|$)/i);
-        if (codeMatch && codeMatch[1].trim()) {
-            const code = codeMatch[1].trim();
-            if (!codeBlocks.some(cb => cb.code === code)) {
+        // Fallback: If no code found via Visual section, try looking for code patterns directly
+        if (codeBlocks.length === 0) {
+            const textContent = content
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .trim();
+
+            // Look for explicit Code: section
+            const codeMatch = textContent.match(/Code:\s*\n([\s\S]*?)(?=\nAudio:|\nOutput:|\n\[|$)/i);
+            if (codeMatch && codeMatch[1].trim()) {
                 codeBlocks.push({
-                    code,
+                    code: codeMatch[1].trim(),
                     language: 'python',
                     slideNumber: number,
                     slideTitle: title
@@ -282,17 +269,11 @@ export class DocxScriptParser {
             }
         }
 
-        // Extract output
-        const outputMatch = textContent.match(/Output:\s*\n([\s\S]*?)(?=\nAudio:|\n\[|\n\*\*|$)/i);
-        if (outputMatch && codeBlocks.length > 0) {
-            codeBlocks[codeBlocks.length - 1].expectedOutput = outputMatch[1].trim();
-        }
-
         return {
             number,
             title,
-            visual: visual?.split('\n')[0], // First line of visual only
-            audio,
+            visual,
+            audio: audio || '',
             codeBlocks,
             duration
         };
@@ -371,7 +352,7 @@ export class DocxScriptParser {
      */
     private static cleanNarration(text: string): string {
         return text
-            .replace(/^["']|["']$/g, '')  // Remove surrounding quotes
+            .replace(/^["""'']+|["""'']+$/g, '')  // Remove surrounding quotes (all types)
             .replace(/\s+/g, ' ')          // Normalize whitespace
             .replace(/\n+/g, ' ')          // Remove line breaks
             .trim();
