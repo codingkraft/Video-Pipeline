@@ -259,28 +259,28 @@ export class MarkdownScriptParser {
 
     /**
      * Generate narration file content for a video (for NotebookLM source)
+     * Starts with narration directly, with slide markers between slides
      */
     static generateNarrationFile(video: VideoSection): string {
-        const lines: string[] = [];
-
-        lines.push(`Video ${video.videoNumber}: ${video.title}`);
-        lines.push('='.repeat(50));
-        lines.push('');
-
-        if (video.concept) {
-            lines.push(`Concept: ${video.concept}`);
-            lines.push('');
-        }
+        const parts: string[] = [];
+        let isFirst = true;
 
         for (const slide of video.slides) {
-            lines.push(`[Slide ${slide.number}: ${slide.title}]`);
             if (slide.audio) {
-                lines.push(slide.audio);
+                if (isFirst) {
+                    // First slide: just the narration, no header
+                    parts.push(slide.audio);
+                    isFirst = false;
+                } else {
+                    // Subsequent slides: add slide marker before narration
+                    parts.push(`[Slide ${slide.number}: ${slide.title}]`);
+                    parts.push(slide.audio);
+                }
             }
-            lines.push('');
         }
 
-        return lines.join('\n');
+        // Join with double newlines for paragraph separation
+        return parts.join('\n\n');
     }
 }
 

@@ -312,6 +312,56 @@ export class VideoFolderCreator {
                         }));
                         children.push(new Paragraph({ text: '' }));
 
+                        // Add original code as text (for reference/copy-paste)
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({ text: 'Original Code:', bold: true, italics: true, color: '808080' })
+                            ]
+                        }));
+
+                        // Split code by lines and create TextRuns with breaks
+                        const codeLines = codeBlock.code.split('\n');
+                        const codeTextRuns: any[] = [];
+                        codeLines.forEach((line, idx) => {
+                            if (idx > 0) {
+                                codeTextRuns.push(new TextRun({ break: 1 }));
+                            }
+                            codeTextRuns.push(new TextRun({
+                                text: line || ' ', // Use space for empty lines to preserve them
+                                font: 'Consolas',
+                                size: 18,
+                                color: '666666'
+                            }));
+                        });
+                        children.push(new Paragraph({ children: codeTextRuns }));
+                        children.push(new Paragraph({ text: '' }));
+
+                        // Add expected output if present
+                        if (codeBlock.expectedOutput) {
+                            children.push(new Paragraph({
+                                children: [
+                                    new TextRun({ text: 'Expected Output:', bold: true, italics: true, color: '808080' })
+                                ]
+                            }));
+
+                            // Split output by lines and create TextRuns with breaks
+                            const outputLines = codeBlock.expectedOutput.split('\n');
+                            const outputTextRuns: any[] = [];
+                            outputLines.forEach((line, idx) => {
+                                if (idx > 0) {
+                                    outputTextRuns.push(new TextRun({ break: 1 }));
+                                }
+                                outputTextRuns.push(new TextRun({
+                                    text: line || ' ',
+                                    font: 'Consolas',
+                                    size: 18,
+                                    color: '666666'
+                                }));
+                            });
+                            children.push(new Paragraph({ children: outputTextRuns }));
+                            children.push(new Paragraph({ text: '' }));
+                        }
+
                     } catch (err) {
                         console.warn(`[VideoFolderCreator] Could not embed image: ${screenshotPath}`);
                         // Fallback: show code as text
