@@ -22,6 +22,7 @@ export interface VideoFolderConfig {
     generateScreenshots?: boolean;  // Whether to generate code screenshots
     generateDocx?: boolean;     // Whether to generate DOCX files
     generateNarration?: boolean; // Whether to generate narration TXT files
+    generateVideoResponse?: boolean; // Whether to generate video_response.txt with image mappings
 }
 
 /**
@@ -32,6 +33,7 @@ export interface VideoFolderResult {
     folderPath: string;
     narrationPath?: string;
     docxPath?: string;
+    videoResponsePath?: string;
     screenshotPaths: string[];
     success: boolean;
     error?: string;
@@ -173,6 +175,12 @@ export class VideoFolderCreator {
             result.docxPath = await this.generateDocxFile(video, folderPath, result.screenshotPaths);
         }
 
+        // Generate video_response.txt with image mappings
+        if (config.generateVideoResponse !== false) {
+            const narrationFilename = result.narrationPath ? path.basename(result.narrationPath) : `video${video.videoNumber}_narration.txt`;
+            result.videoResponsePath = await this.generateVideoResponseFile(video, folderPath, narrationFilename, result.screenshotPaths);
+        }
+
         return result;
     }
 
@@ -185,6 +193,84 @@ export class VideoFolderCreator {
 
         const content = MarkdownScriptParser.generateNarrationFile(video);
         fs.writeFileSync(filePath, content, 'utf-8');
+
+        return filePath;
+    }
+
+    /**
+     * Generate video_response.txt with narration filename and slide-to-image mappings
+     */
+    private async generateVideoResponseFile(
+        video: VideoSection,
+        folderPath: string,
+        narrationFilename: string,
+        screenshotPaths: string[]
+    ): Promise<string> {
+        // Create output subfolder
+        const outputFolder = path.join(folderPath, 'output');
+        if (!fs.existsSync(outputFolder)) {
+            fs.mkdirSync(outputFolder, { recursive: true });
+        }
+
+        const filename = `video${video.videoNumber}_response.txt`;
+        const filePath = path.join(outputFolder, filename);
+
+        // Build screenshot map by slide number
+        const screenshotsBySlide = new Map<number, string[]>();
+        for (const screenshotPath of screenshotPaths) {
+            const basename = path.basename(screenshotPath);
+            const match = basename.match(/slide(\d+)/);
+            if (match) {
+                const slideNum = parseInt(match[1]);
+                if (!screenshotsBySlide.has(slideNum)) {
+                    screenshotsBySlide.set(slideNum, []);
+                }
+                screenshotsBySlide.get(slideNum)!.push(basename);
+            }
+        }
+
+        // Build content with full prompt template
+        const lines: string[] = [];
+
+        // Header and instructions
+        lines.push(`Create a Video Overview using the DOCX as the single source.`);
+        lines.push(`CRITICAL: SINGLE-VOICE NARRATION ONLY`);
+        lines.push(`The narration file (${narrationFilename}) is the SOLE source of all audio content. JACK is the only voice. There is NO second speaker, NO dialogue, NO host interruptions, NO banter.`);
+        lines.push(`ABSOLUTE RULES:`);
+        lines.push(``);
+        lines.push(`Read ONLY the exact text in the narration file—verbatim, word-for-word.`);
+        lines.push(``);
+        lines.push(`JACK narrates every single line. Do NOT introduce a second voice, character, or host.`);
+        lines.push(``);
+        lines.push(`Do NOT add intro/outro, transitions, filler words ("So," "Okay," "Well"), definitions, or summaries.`);
+        lines.push(``);
+        lines.push(`ALWAYS complete full narration for every segment—even if images are missing.`);
+        lines.push(``);
+
+        // Slide timing section
+        const timingParts: string[] = [];
+        let totalSeconds = 0;
+        for (const slide of video.slides) {
+            // Use slide duration if available, otherwise default to 15s
+            const duration = slide.duration ?? 15;
+            totalSeconds += duration;
+            timingParts.push(`Slide ${slide.number} (${duration}s)`);
+        }
+        lines.push(`SLIDE TIMING (EXACT):`);
+        lines.push(`${timingParts.join(', ')}. Total: ~${totalSeconds} seconds.`);
+
+        // Visual assets section - only slides with images
+        lines.push(`VISUAL ASSETS TO FEATURE:`);
+        for (const slide of video.slides) {
+            const images = screenshotsBySlide.get(slide.number) || [];
+            if (images.length > 0) {
+                lines.push(`Slide ${slide.number}: ${images.join(', ')}`);
+            }
+        }
+        lines.push(``);
+
+        fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        console.log(`[VideoFolderCreator] Generated: ${filePath}`);
 
         return filePath;
     }
