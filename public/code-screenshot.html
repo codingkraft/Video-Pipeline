@@ -5,9 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Screenshot Generator</title>
-    <!-- Highlight.js for syntax highlighting -->
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <!-- Highlight.js for syntax highlighting (compatible with Pyodide) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
     <!-- Pyodide for running Python in browser -->
@@ -226,36 +225,74 @@
             padding: 0;
         }
 
+        /* ===== Highlight.js VS Code-like Colors ===== */
+        /* The vs2015 theme is close but we override for better matching */
+
+        /* Base code section styling */
+        .code-section {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        /* Comments - Green */
         .code-section .hljs-comment {
             color: #6A9955;
         }
 
+        /* Strings - Orange */
         .code-section .hljs-string {
             color: #CE9178;
         }
 
+        /* Keywords - Blue (def, class, if, for, while, return, import, from, etc.) */
         .code-section .hljs-keyword {
-            color: #C586C0;
+            color: #569CD6;
         }
 
-        .code-section .hljs-built_in {
+        /* Built-in functions and methods - Yellow */
+        .code-section .hljs-built_in,
+        .code-section .hljs-title.function_ {
             color: #DCDCAA;
         }
 
-        .code-section .hljs-function {
-            color: #DCDCAA;
-        }
-
+        /* Numbers - Light green */
         .code-section .hljs-number {
             color: #B5CEA8;
         }
 
-        .code-section .hljs-variable {
+        /* True, False, None - Blue */
+        .code-section .hljs-literal {
+            color: #569CD6;
+        }
+
+        /* Function/method names when defined - Yellow */
+        .code-section .hljs-title {
+            color: #DCDCAA;
+        }
+
+        /* Class names - Teal */
+        .code-section .hljs-title.class_ {
+            color: #4EC9B0;
+        }
+
+        /* Variable names and parameters - Light blue */
+        .code-section .hljs-variable,
+        .code-section .hljs-params {
             color: #9CDCFE;
         }
 
-        .code-section .hljs-title {
-            color: #4EC9B0;
+        /* Operators - White */
+        .code-section .hljs-operator {
+            color: #D4D4D4;
+        }
+
+        /* Self keyword - Blue */
+        .code-section .hljs-variable.language_ {
+            color: #569CD6;
+        }
+
+        /* Decorators - Yellow */
+        .code-section .hljs-meta {
+            color: #DCDCAA;
         }
 
         /* Download instructions */
@@ -416,6 +453,8 @@ player_level = 5</textarea>
     <script>
         let currentMode = 'code-output';
         const MAX_LINES_WITH_OUTPUT = 15; // If code exceeds this, output is shown separately
+
+        // Highlight.js is loaded via CDN and ready to use
 
         // Pyodide instance
         let pyodide = null;
@@ -667,7 +706,7 @@ sys.stderr = StringIO()
                         ? `<span class="line-number">${index + 1}</span>`
                         : '';
 
-                    // Highlight the line
+                    // Highlight the line using Highlight.js (vs2015 theme)
                     const highlighted = hljs.highlight(line || ' ', { language: 'python' }).value;
                     html += `<div class="code-line">${lineNum}<span class="line-content">${highlighted}</span></div>`;
                 });
