@@ -23,6 +23,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.0.0",
     "docx": "^9.5.1",

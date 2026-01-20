@@ -3,6 +3,7 @@ import { NotebookLMTester, NotebookLMTestConfig } from './NotebookLMTester';
 import { PerplexityTester } from './PerplexityTester';
 import { GoogleStudioTester } from './GoogleStudioTester';
 import { NotebookLMRemoverTester } from './NotebookLMRemoverTester';
+import { LocalLogoRemover } from './LocalLogoRemover';
 import { CaptiveBrowser } from '../browser/CaptiveBrowser';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,7 +36,8 @@ export interface BatchConfig {
     folders: FolderConfig[];            // Folders with their start points
     selectedProfiles: string[];         // DEPRECATED: Use selectedProfile instead
     selectedProfile?: string;           // Single profile to use for all processing
-    concurrencyLimit?: number;          // Max folders to process in parallel (default: 5)
+    concurrencyLimit?: number;          // Max folders to process in parallel for video generation (default: 5)
+    browserConcurrencyLimit?: number;   // Max parallel browser operations for audio/logo removal (default: 3)
     visualStyle?: string;               // Global visual style setting
     notebookLmChatSettings?: string;
     // NOTE: operation field removed - startPoint in FolderConfig is now the single source of truth
@@ -85,6 +87,7 @@ export class BatchProcessor {
     private googleStudioTester: GoogleStudioTester;
     private perplexityTester: PerplexityTester;
     private logoRemoverTester: NotebookLMRemoverTester;
+    private localLogoRemover: LocalLogoRemover;
     private browser: CaptiveBrowser;
     private delays: DelaySettings;
     private currentBatch: FolderBatchStatus[] = [];
@@ -100,6 +103,7 @@ export class BatchProcessor {
         this.googleStudioTester = new GoogleStudioTester();
         this.perplexityTester = new PerplexityTester();
         this.logoRemoverTester = new NotebookLMRemoverTester();
+        this.localLogoRemover = new LocalLogoRemover();
         this.browser = CaptiveBrowser.getInstance();
         this.delays = this.loadDelaySettings();
     }
@@ -881,27 +885,30 @@ export class BatchProcessor {
 
 
     /**
-     * PHASE 3: Remove logos from all collected videos
+     * PHASE 5: Remove logos from all collected videos (now runs in parallel)
      */
-    public async removeLogosForAll(): Promise<void> {
-        this.log('Starting PHASE 3: Remove logos');
+    public async removeLogosForAll(config?: BatchConfig, concurrencyLimit: number = 3): Promise<void> {
+        this.log(`Starting PHASE 5: Remove logos (concurrency: ${concurrencyLimit})`);
 
-        for (const folderStatus of this.currentBatch) {
-            if (this.abortRequested) break;
+        // Create folder configs from current batch
+        const folderConfigs = this.currentBatch.map(folderStatus => ({
+            path: folderStatus.folderPath,
+            startPoint: (folderStatus.startPoint as StartPointKey) || 'start-fresh'
+        } as FolderConfig));
 
-            // Re-constitute minimal config for the method
-            const folderConfig: FolderConfig = {
-                path: folderStatus.folderPath,
-                startPoint: (folderStatus.startPoint as any) || 'start-fresh'
-            };
-
-            await this.processFolderLogoRemoval(folderConfig, {
-                folders: [],
-                selectedProfiles: [],
-                // We don't really need full batch config here for this specific method
-                notebookLmChatSettings: ''
-            });
-        }
+        // Process in parallel with the specified concurrency limit
+        await this.processInParallel(
+            folderConfigs,
+            async (folderConfig) => {
+                await this.processFolderLogoRemoval(folderConfig, config || {
+                    folders: [],
+                    selectedProfiles: [],
+                    notebookLmChatSettings: ''
+                });
+                return folderConfig.path;
+            },
+            concurrencyLimit
+        );
     }
 
     /**
@@ -1118,7 +1125,19 @@ export class BatchProcessor {
 
             this.log(`${folderName}: Removing logo from video ${i} (${path.basename(targetPath)})...`);
 
-            const result = await this.logoRemoverTester.removeLogo(targetPath);
+            // Use local FFmpeg (website blocks automated uploads)
+            let result: { success: boolean; cleanVideoPath?: string; message?: string };
+
+            const ffmpegAvailable = await this.localLogoRemover.isFFmpegInstalled();
+
+            if (ffmpegAvailable) {
+                this.log(`${folderName}: Using local FFmpeg for logo removal...`);
+                result = await this.localLogoRemover.removeLogo(targetPath);
+            } else {
+                // FFmpeg not installed, try website (may not work with automated uploads)
+                this.log(`${folderName}: FFmpeg not installed, trying website (may fail)...`);
+                result = await this.logoRemoverTester.removeLogo(targetPath);
+            }
 
             if (result.success && result.cleanVideoPath) {
                 ProgressTracker.updateStep(folderPath, stepName, {

@@ -528,20 +528,39 @@ export class GoogleStudioTester {
             let stableCount = 0;
             const maxWaitMs = 120000; // 2 minutes max
             const startTime = Date.now();
+            const downloadStartTime = Date.now(); // Timestamp when we clicked download
 
             while (Date.now() - startTime < maxWaitMs) {
                 await this.browser.randomDelay(2000, 2500);
 
                 // Find new audio files
                 const currentFiles = fs.readdirSync(downloadDir);
-                const newFiles = currentFiles.filter(f =>
-                    !existingFiles.has(f) &&
-                    (f.endsWith('.wav') || f.endsWith('.mp3')) &&
-                    !f.endsWith('.crdownload') &&
-                    !f.endsWith('.tmp')
-                );
+                const newFiles = currentFiles.filter(f => {
+                    if (existingFiles.has(f)) return false;
+                    if (!(f.endsWith('.wav') || f.endsWith('.mp3'))) return false;
+                    if (f.endsWith('.crdownload') || f.endsWith('.tmp')) return false;
+
+                    // Additional safeguard: check file creation time to avoid picking up
+                    // files from parallel downloads (file should be created after we clicked download)
+                    try {
+                        const filePath = path.join(downloadDir, f);
+                        const stats = fs.statSync(filePath);
+                        const fileCreatedTime = stats.birthtimeMs || stats.mtimeMs;
+                        // File should be created within 5 seconds before download click to 2 mins after
+                        return fileCreatedTime >= (downloadStartTime - 5000);
+                    } catch {
+                        return false;
+                    }
+                });
 
                 if (newFiles.length > 0) {
+                    // Sort by creation time to get the most recent file (in case multiple match)
+                    newFiles.sort((a, b) => {
+                        const statsA = fs.statSync(path.join(downloadDir, a));
+                        const statsB = fs.statSync(path.join(downloadDir, b));
+                        return (statsB.birthtimeMs || statsB.mtimeMs) - (statsA.birthtimeMs || statsA.mtimeMs);
+                    });
+
                     const filePath = path.join(downloadDir, newFiles[0]);
                     const currentSize = fs.statSync(filePath).size;
 

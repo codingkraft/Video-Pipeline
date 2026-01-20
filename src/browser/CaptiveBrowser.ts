@@ -4,8 +4,27 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import path from 'path';
 import os from 'os';
 
-// Apply stealth plugin to avoid bot detection
-puppeteerExtra.use(StealthPlugin());
+// Apply stealth plugin with all evasions enabled
+const stealthPlugin = StealthPlugin();
+// Enable all evasions for maximum anti-bot-detection
+stealthPlugin.enabledEvasions.add('chrome.app');
+stealthPlugin.enabledEvasions.add('chrome.csi');
+stealthPlugin.enabledEvasions.add('chrome.loadTimes');
+stealthPlugin.enabledEvasions.add('chrome.runtime');
+stealthPlugin.enabledEvasions.add('defaultArgs');
+stealthPlugin.enabledEvasions.add('iframe.contentWindow');
+stealthPlugin.enabledEvasions.add('media.codecs');
+stealthPlugin.enabledEvasions.add('navigator.hardwareConcurrency');
+stealthPlugin.enabledEvasions.add('navigator.languages');
+stealthPlugin.enabledEvasions.add('navigator.permissions');
+stealthPlugin.enabledEvasions.add('navigator.plugins');
+stealthPlugin.enabledEvasions.add('navigator.vendor');
+stealthPlugin.enabledEvasions.add('navigator.webdriver');
+stealthPlugin.enabledEvasions.add('sourceurl');
+stealthPlugin.enabledEvasions.add('user-agent-override');
+stealthPlugin.enabledEvasions.add('webgl.vendor');
+stealthPlugin.enabledEvasions.add('window.outerdimensions');
+puppeteerExtra.use(stealthPlugin);
 
 export interface BrowserConfig {
     headless: boolean;
@@ -120,6 +139,19 @@ export class CaptiveBrowser {
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding',
                 '--disable-background-networking',
+                // Enable WebGL and WebAssembly (required by some sites like notebooklmremover)
+                '--enable-webgl',
+                '--enable-accelerated-2d-canvas',
+                '--enable-gpu-rasterization',
+                '--enable-features=SharedArrayBuffer',
+                '--disable-features=IsolateOrigins,site-per-process',
+                // Make it appear more like a regular browser
+                '--disable-popup-blocking',
+                '--disable-extensions',
+                '--disable-dev-shm-usage',
+                '--ignore-certificate-errors',
+                // Window settings
+                '--window-size=1920,1080',
             ];
 
             if (startMinimized) {
