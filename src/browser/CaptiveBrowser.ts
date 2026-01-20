@@ -20,6 +20,7 @@ export class CaptiveBrowser {
     private pages: Map<string, Page> = new Map();
     private config: BrowserConfig;
     private currentProfileId: string = 'default';
+    private initializationPromise: Promise<void> | null = null;  // Lock to prevent parallel browser launches
 
     private constructor(config?: Partial<BrowserConfig>) {
         const defaultUserDataDir = path.join(os.homedir(), '.video-creator', 'browser-profile');
@@ -48,6 +49,17 @@ export class CaptiveBrowser {
     }
 
     public async initialize(config?: Partial<BrowserConfig>): Promise<void> {
+        // If initialization is already in progress, wait for it to complete
+        if (this.initializationPromise) {
+            console.log('Browser initialization already in progress, waiting...');
+            await this.initializationPromise;
+            // After waiting, check if we need to change profiles
+            if (!config?.profileId || config.profileId === this.currentProfileId) {
+                return;
+            }
+            // Profile change needed - continue to handle it below
+        }
+
         // Update config if provided
         if (config) {
             const newProfileId = config.profileId ?? this.currentProfileId;
@@ -92,32 +104,46 @@ export class CaptiveBrowser {
             }
         }
 
-        console.log(`Launching browser with profile: ${this.currentProfileId} (${this.config.userDataDir})`);
+        // Create the initialization promise (lock)
+        this.initializationPromise = (async () => {
+            console.log(`Launching browser with profile: ${this.currentProfileId} (${this.config.userDataDir})`);
 
+            const startMinimized = this.config.headless; // "headless" config now triggers minimized mode
 
-        const startMinimized = this.config.headless; // "headless" config now triggers minimized mode
+            const args = [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                // Disable background tab throttling for parallel automation
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-background-networking',
+            ];
 
-        const args = [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled',
-            '--disable-infobars',
-        ];
+            if (startMinimized) {
+                args.push('--start-minimized');
+            } else {
+                args.push('--start-maximized');
+            }
 
-        if (startMinimized) {
-            args.push('--start-minimized');
-        } else {
-            args.push('--start-maximized');
+            this.browser = await puppeteerExtra.launch({
+                headless: false, // Always visible (false), just minimized if requested
+                userDataDir: this.config.userDataDir,
+                defaultViewport: null, // Use full screen viewport
+                args: args,
+            });
+
+            console.log('Browser launched successfully');
+        })();
+
+        try {
+            await this.initializationPromise;
+        } finally {
+            // Clear the lock after completion (success or failure)
+            this.initializationPromise = null;
         }
-
-        this.browser = await puppeteerExtra.launch({
-            headless: false, // Always visible (false), just minimized if requested
-            userDataDir: this.config.userDataDir,
-            defaultViewport: null, // Use full screen viewport
-            args: args,
-        });
-
-        console.log('Browser launched successfully');
     }
 
     /**

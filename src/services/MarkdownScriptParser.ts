@@ -109,17 +109,17 @@ export class MarkdownScriptParser {
         const narrationParts: string[] = [];
 
         // Extract duration and concept from header
-        const durationMatch = content.match(/\*\*Duration:\*\*\s*([^\n]+)/);
+        const durationMatch = content.match(/\*\*Duration:*\*\*:*\s*([^\n]+)/);
         const conceptMatch = content.match(/\*\*Concept:\*\*\s*([^\n]+)/);
 
         // Split by slides (### [SLIDE N: Title])
-        const slideRegex = /^###\s+\[SLIDE\s+(\d+):\s*([^\]]+)\]/gm;
+        const slideRegex = /^(###\s+|\*\*)\[SLIDE\s+(\d+):\s*([^\]]+)\]/gm;
         const slideMatches = [...content.matchAll(slideRegex)];
 
         for (let i = 0; i < slideMatches.length; i++) {
             const match = slideMatches[i];
-            const slideNumber = parseInt(match[1]);
-            const slideTitle = match[2].trim();
+            const slideNumber = parseInt(match[2]);
+            const slideTitle = match[3].trim();
 
             // Get content for this slide (until next slide or end of video section)
             const startIndex = match.index!;
@@ -160,11 +160,11 @@ export class MarkdownScriptParser {
         const codeBlocks: CodeBlock[] = [];
 
         // Extract audio/narration
-        const audioMatch = content.match(/\*\*Audio:\*\*\s*\n?"?([^"]+)"?/);
+        const audioMatch = content.match(/\*\*Audio:*\*\*:*[\s\*"]+(.*?)["\*]*\n/);
         const audio = audioMatch ? this.cleanNarration(audioMatch[1]) : '';
 
         // Extract visual description
-        const visualMatch = content.match(/\*\*Visual:\*\*\s*([^\n]+(?:\n(?!\*\*).*)*)/);
+        const visualMatch = content.match(/\*\*Visual:*\*\*:*\s*([^\n]+(?:\n(?!\*\*).*)*)/);
         const visual = visualMatch ? visualMatch[1].trim() : undefined;
 
         // Extract duration
@@ -172,7 +172,7 @@ export class MarkdownScriptParser {
         const duration = durationMatch ? parseInt(durationMatch[1]) : undefined;
 
         // Extract code blocks
-        const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+        const codeBlockRegex = /```(python\s*?)\n([\s\S]*?)```/g;
         let codeMatch;
         while ((codeMatch = codeBlockRegex.exec(content)) !== null) {
             const language = codeMatch[1] || 'python';

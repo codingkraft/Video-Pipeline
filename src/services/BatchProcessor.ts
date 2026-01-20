@@ -746,6 +746,10 @@ export class BatchProcessor {
 
             // PHASE 2: FIRE all videos in parallel
             if (!this.abortRequested) {
+                // Pre-initialize browser ONCE before parallel processing to avoid race conditions
+                this.log(`🔧 Pre-initializing browser with profile: ${profileId}...`);
+                await this.browser.initialize({ profileId });
+
                 this.log(`🚀 Phase 2: Firing videos in parallel (${concurrencyLimit} at a time)...`);
                 await this.processInParallel(
                     config.folders,

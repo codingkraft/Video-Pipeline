@@ -40,8 +40,12 @@ export class PerplexityTester {
 
             const targetUrl = config.chatUrl || PERPLEXITY_URL;
 
+            // Use folder name in service key for parallel processing support
+            const folderName = config.sourceFolder ? path.basename(config.sourceFolder) : 'default';
+            const serviceKey = `perplexity-test-${folderName}`;
+
             return await this.browser.withModularRecovery(
-                'perplexity-test',
+                serviceKey,
                 targetUrl,
                 async (page) => {
                     return await this.executePerplexityWorkflow(page, config);

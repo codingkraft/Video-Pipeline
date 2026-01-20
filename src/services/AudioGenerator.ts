@@ -180,13 +180,15 @@ export class AudioGenerator {
             steps.push(`📊 Expecting ${expectedSegments} audio segments (based on ${slides.length} slides)`);
 
             // Helper to generate a single audio file
+            const folderName = path.basename(config.sourceFolder);
             const generateAudioFile = async (fileNumber: number): Promise<string> => {
                 const outputPath = path.join(audioDir, `narration_take_${fileNumber}.wav`);
                 steps.push(`🎙️ Generating audio file ${fileNumber}...`);
 
                 try {
+                    // Use folder name in service key for parallel processing support
                     await this.browser.withModularRecovery(
-                        `google-studio-audio-${fileNumber}`,
+                        `google-studio-audio-${folderName}-${fileNumber}`,
                         'https://aistudio.google.com/generate-speech',
                         async (page) => {
                             const slideConfig: SlideAudioConfig = {

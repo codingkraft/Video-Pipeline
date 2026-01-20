@@ -33,8 +33,12 @@ export class NotebookLMRemoverTester {
 
             console.log(`[LogoRemover] Processing: ${path.basename(videoPath)}`);
 
+            // Use video filename in service key for parallel processing support
+            const videoName = path.basename(videoPath, path.extname(videoPath));
+            const serviceKey = `notebooklm-remover-${videoName}`;
+
             return await this.browser.withModularRecovery(
-                'notebooklm-remover',
+                serviceKey,
                 this.baseUrl,
                 async (page) => {
                     return await this.executeLogoRemoval(page, videoPath);

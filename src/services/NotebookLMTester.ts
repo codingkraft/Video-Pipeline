@@ -53,9 +53,12 @@ export class NotebookLMTester {
         });
 
         const targetUrl = config.existingNotebookUrl || NOTEBOOKLM_URL;
+        // Use folder name in service key to ensure each parallel operation gets its own tab
+        const folderName = path.basename(config.sourceFolder);
+        const serviceKey = `notebooklm-setup-${folderName}`;
 
         return await this.browser.withModularRecovery<string>(
-            'notebooklm-setup',
+            serviceKey,
             targetUrl,
             async (page) => {
                 const steps: string[] = [];
@@ -130,8 +133,12 @@ export class NotebookLMTester {
             profileId: config.profileId || 'default'
         });
 
+        // Use folder name in service key to ensure each parallel operation gets its own tab
+        const folderName = path.basename(config.sourceFolder);
+        const serviceKey = `notebooklm-video-${folderName}`;
+
         return await this.browser.withModularRecovery<NotebookLMTestResult>(
-            'notebooklm-video',
+            serviceKey,
             notebookUrl,
             async (page) => {
                 const steps: string[] = [];
@@ -1069,8 +1076,12 @@ export class NotebookLMTester {
             await this.browser.initialize({ profileId });
         }
 
+        // Use folder name in service key to ensure each parallel operation gets its own tab
+        const folderName = path.basename(path.dirname(outputDir)); // outputDir is typically "folder/output"
+        const serviceKey = `notebooklm-collect-${folderName}`;
+
         return await this.browser.withModularRecovery(
-            'notebooklm-collect',
+            serviceKey,
             notebookUrl,
             async (page) => {
                 const downloaded: string[] = [];
