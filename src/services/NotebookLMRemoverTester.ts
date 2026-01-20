@@ -185,42 +185,63 @@ export class NotebookLMRemoverTester {
 
                 if (!fileInput) throw new Error('File input not found');
 
-                // Try using Puppeteer's built-in uploadFile first (simpler approach)
+                // Advanced Strategy: Simulate Drag and Drop with DataTransfer
+                // This bypasses file input detection by mimicking a user drop action
                 try {
-                    const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
-                    await inputElement.uploadFile(videoPath);
-                    console.log('[LogoRemover] File uploaded via uploadFile');
+                    console.log('[LogoRemover] Attempting advanced Drag & Drop simulation...');
+                    const fileBuffer = fs.readFileSync(videoPath);
+                    const base64Data = fileBuffer.toString('base64');
+                    const fileName = path.basename(videoPath);
+                    const mimeType = 'video/mp4';
 
-                    // Manually dispatch events to ensure the page reacts
-                    await page.evaluate(() => {
-                        const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-                        if (input && input.files && input.files.length > 0) {
+                    await page.evaluate(async (base64, name, type) => {
+                        // Helper to convert base64 to File
+                        const res = await fetch(`data:${type};base64,${base64}`);
+                        const blob = await res.blob();
+                        const file = new File([blob], name, { type });
+
+                        // Find the dropzone
+                        const dropzone = document.querySelector('.upload-area, [class*="upload"], [class*="dropzone"], .border-dashed') || document.body;
+
+                        // Create synthetic DataTransfer
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+
+                        // Create and dispatch events
+                        const createEvent = (type: string) => {
+                            const event = new DragEvent(type, {
+                                bubbles: true,
+                                cancelable: true,
+                                dataTransfer: dataTransfer,
+                                composed: true,
+                                view: window
+                            });
+                            return event;
+                        };
+
+                        console.log('Dispatching drag/drop events on:', dropzone);
+                        dropzone.dispatchEvent(createEvent('dragenter'));
+                        dropzone.dispatchEvent(createEvent('dragover'));
+                        dropzone.dispatchEvent(createEvent('drop'));
+
+                        // Also trigger input change if it exists inside
+                        const input = dropzone.querySelector('input[type="file"]') as HTMLInputElement;
+                        if (input) {
+                            input.files = dataTransfer.files;
                             input.dispatchEvent(new Event('change', { bubbles: true }));
                             input.dispatchEvent(new Event('input', { bubbles: true }));
                         }
-                    });
-                } catch (uploadError) {
-                    console.log(`[LogoRemover] uploadFile failed, trying alternative: ${uploadError}`);
+                    }, base64Data, fileName, mimeType);
 
-                    // Fallback: Try clicking the Select File button to open native dialog
-                    // This won't work in automated context but worth trying
-                    const clickedSelectFile = await page.evaluate(() => {
-                        const buttons = Array.from(document.querySelectorAll('button'));
-                        const selectBtn = buttons.find(b =>
-                            b.textContent?.includes('Select File') ||
-                            b.textContent?.includes('Choose')
-                        );
-                        if (selectBtn) {
-                            selectBtn.click();
-                            return true;
-                        }
-                        return false;
-                    });
+                    console.log('[LogoRemover] Drag & Drop events dispatched');
+                } catch (dropError) {
+                    console.error('[LogoRemover] Drag & Drop simulation failed:', dropError);
 
-                    if (clickedSelectFile) {
-                        throw new Error('Native file dialog opened - cannot automate');
-                    }
-                    throw uploadError;
+                    // Fallback to standard uploadFile if DnD fails
+                    console.log('[LogoRemover] Falling back to standard uploadFile...');
+                    if (!fileInput) throw new Error('File input not found for fallback');
+                    const inputElement = fileInput as import('puppeteer').ElementHandle<HTMLInputElement>;
+                    await inputElement.uploadFile(videoPath);
                 }
             },
             async () => {

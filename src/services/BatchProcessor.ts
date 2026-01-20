@@ -1125,18 +1125,19 @@ export class BatchProcessor {
 
             this.log(`${folderName}: Removing logo from video ${i} (${path.basename(targetPath)})...`);
 
-            // Use local FFmpeg (website blocks automated uploads)
+            // Try website-based remover first (testing bypass)
             let result: { success: boolean; cleanVideoPath?: string; message?: string };
 
-            const ffmpegAvailable = await this.localLogoRemover.isFFmpegInstalled();
+            this.log(`${folderName}: Testing website bypass...`);
+            result = await this.logoRemoverTester.removeLogo(targetPath);
 
-            if (ffmpegAvailable) {
-                this.log(`${folderName}: Using local FFmpeg for logo removal...`);
-                result = await this.localLogoRemover.removeLogo(targetPath);
-            } else {
-                // FFmpeg not installed, try website (may not work with automated uploads)
-                this.log(`${folderName}: FFmpeg not installed, trying website (may fail)...`);
-                result = await this.logoRemoverTester.removeLogo(targetPath);
+            // If website failed, try local FFmpeg as fallback
+            if (!result.success) {
+                const ffmpegAvailable = await this.localLogoRemover.isFFmpegInstalled();
+                if (ffmpegAvailable) {
+                    this.log(`${folderName}: Website failed (${result.message}), trying local FFmpeg...`);
+                    result = await this.localLogoRemover.removeLogo(targetPath);
+                }
             }
 
             if (result.success && result.cleanVideoPath) {
