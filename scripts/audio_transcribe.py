@@ -12,6 +12,7 @@ import os
 import sys
 import argparse
 import json
+import re
 
 
 def get_audio_duration(audio_file: str) -> float:
@@ -64,8 +65,10 @@ def transcribe_audio(
     
     for segment in result.get("segments", []):
         segment_text = segment.get("text", "").lower()
+        # Normalize: remove punctuation for matching
+        normalized_text = re.sub(r'[.,!?;:\'\"]', '', segment_text)
         
-        if target_phrase in segment_text:
+        if target_phrase in normalized_text:
             # Find word-level position
             target_words = target_phrase.split()
             

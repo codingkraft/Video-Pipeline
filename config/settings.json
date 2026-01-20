@@ -11,7 +11,7 @@
   "audioNarrationPrompt": "for this now",
   "googleStudioModel": "Gemini 2.5 Flash Preview TTS",
   "googleStudioVoice": "Charon",
-  "googleStudioStyleInstructions": "You are a friendly, clear, and relaxed coding instructor. You are speaking naturally to a student. Keep the tone consistent, positive, and easy to follow. Do not be overly dramatic.\n\nImperative Rule: Read the text word-for-word. Do not skip any words, names, or punchlines. Even if there are filler words like \"umm\" or \"look,\" read them naturally.\n\n\nThe Human Tech Expert\n# AUDIO PROFILE: Alex (Autonoe)\n## \"The Bright & Relatable Expert\"\n\n## The Scene: \nA sunny home office. This is a person who has spent way too many hours debugging and can now laugh about it. It's a shared workspace vibe—warm, intelligent, and slightly irreverent.\n\n### DIRECTOR'S NOTES\n* **Tone:** Bright, energetic, and highly relatable. \n* **Vocal Smile:** Keep the energy high and slightly amused. The narrator should sound like they're enjoying the explanation.\n* **Pacing:** Conversational and fluid. Use micro-pauses for comic timing or to let a core concept sink in.\n* **Style:** Human-centric. Use self-deprecating humor or witty analogies to make complex topics feel accessible.\n\n### SAMPLE CONTEXT\nIdeal for educational content that needs to feel like a conversation with a smart friend rather than a dry lecture.",
+  "googleStudioStyleInstructions": "You are a friendly, clear, and relaxed coding instructor. You are speaking naturally to a student. Keep the tone consistent, positive, and easy to follow. Do not be overly dramatic.\n\nImperative Rule: Read the text word-for-word. Do not skip any words, names, or punchlines. Even if there are filler words like \"umm\" or \"look,\" read them naturally.\n\n\nThe Human Tech Expert\n# AUDIO PROFILE: Alex (Autonoe)\n## \"The Bright & Relatable Expert\"\n\n## The Scene: \nA sunny home office. This is a person who has spent way too many hours debugging and can now laugh about it. It's a shared workspace vibe—warm, intelligent, and slightly irreverent.\n\n### DIRECTOR'S NOTES\n* **Tone:** Bright, energetic, and highly relatable. \n* **Vocal Smile:** Keep the energy high and slightly amused. The narrator should sound like they're enjoying the explanation.\n* **Pacing:** Conversational and fluid. Use micro-pauses for comic timing or to let a core concept sink in.\n* **Style:** Human-centric. Use self-deprecating humor or witty analogies to make complex topics feel accessible.\n\n### SAMPLE CONTEXT\nIdeal for educational content that needs to feel like a conversation with a smart friend rather than a dry lecture.\n\n# Critical Directive - Non Negotiable \n**DIRECTIVE: \"Treat 'next slide please' as a high-priority spoken command. Deliver it with a firm, professional, and concluding tone.\"**",
   "outputDir": "",
   "activeProfile": "profile2",
   "profiles": {
@@ -70,7 +70,7 @@
   ],
   "delays": {
     "betweenVideoStartsMs": 5000,
-    "betweenAudioSlidesMs": 120000,
+    "betweenAudioSlidesMs": 5000,
     "videoCheckIntervalMs": 120000,
     "maxWaitForVideoMs": 3600000
   },

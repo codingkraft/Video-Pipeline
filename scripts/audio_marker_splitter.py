@@ -56,10 +56,13 @@ def find_slide_markers(audio_file: str, marker_phrase: str = "next slide please"
     
     for segment in result["segments"]:
         segment_text = segment.get("text", "").lower()
-        print(f"  [DEBUG] Segment: '{segment_text}'")
+        # Normalize: remove punctuation for matching
+        import re
+        normalized_text = re.sub(r'[.,!?;:\'\"]', '', segment_text)
+        print(f"  [DEBUG] Segment: '{segment_text}' -> normalized: '{normalized_text}'")
         
-        # Check if the marker phrase appears in this segment
-        if marker_phrase.lower() in segment_text:
+        # Check if the marker phrase appears in this segment (after normalization)
+        if marker_phrase.lower() in normalized_text:
             # Find the word-level timestamps for the marker
             if "words" in segment:
                 for i, word_info in enumerate(segment["words"]):
@@ -140,25 +143,48 @@ def split_audio_with_ffmpeg(
     for i, (start, end) in enumerate(segments, 1):
         output_filename = f"slide_{i}.wav"
         output_path = os.path.join(output_dir, output_filename)
+        temp_path = os.path.join(output_dir, f"temp_slide_{i}.wav")
         
         duration = end - start
         
-        # Use FFmpeg to extract segment
-        cmd = [
+        # Step 1: Extract segment
+        extract_cmd = [
             'ffmpeg', '-y', '-i', audio_file,
             '-ss', str(start),
             '-t', str(duration),
             '-acodec', 'pcm_s16le',
+            temp_path
+        ]
+        
+        result = subprocess.run(extract_cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"  [FAILED] Failed to extract {output_filename}: {result.stderr}")
+            continue
+        
+        # Step 2: Normalize silence - trim leading AND trailing silence, add 1s pad at end
+        # silenceremove: removes silence from start (start_periods=1) and end (stop_periods=-1)
+        # apad: adds 1 second of silence at end
+        normalize_cmd = [
+            'ffmpeg', '-y', '-i', temp_path,
+            '-af', 'silenceremove=start_periods=1:start_silence=0.05:start_threshold=-50dB:stop_periods=-1:stop_duration=0.05:stop_threshold=-50dB,apad=pad_dur=1',
+            '-acodec', 'pcm_s16le',
             output_path
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(normalize_cmd, capture_output=True, text=True)
+        
+        # Clean up temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
         
         if result.returncode == 0:
-            print(f"  Created {output_filename}: {duration:.2f}s")
+            # Get final duration
+            final_duration = get_audio_duration(output_path)
+            print(f"  Created {output_filename}: {final_duration:.2f}s (original: {duration:.2f}s)")
             output_files.append(output_path)
         else:
-            print(f"  [FAILED] Failed to create {output_filename}: {result.stderr}")
+            print(f"  [FAILED] Failed to normalize {output_filename}: {result.stderr}")
     
     return output_files
 

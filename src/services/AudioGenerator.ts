@@ -257,35 +257,49 @@ export class AudioGenerator {
             // Check if Whisper is available
             const whisperAvailable = await checkWhisperInstalled();
 
-            if (whisperAvailable) {
+            // Output directory for split audio clips - use timeline folder
+            const timelineAudioDir = path.join(config.sourceFolder, 'output', 'timeline', 'audio_clips');
+            if (!fs.existsSync(timelineAudioDir)) {
+                fs.mkdirSync(timelineAudioDir, { recursive: true });
+            }
+
+            // Helper function to run marker splitting
+            const runMarkerSplit = async (audioPath: string, takeNumber: number): Promise<{ success: boolean, segments: number, markers: number }> => {
+                if (!whisperAvailable) {
+                    steps.push(`⚠️ Whisper not available, falling back to silence detection...`);
+                    const timelineProcessor = new TimelineProcessor();
+                    const silenceResult = await timelineProcessor.detectSilences(audioPath, 2, -30);
+                    steps.push(`🔍 Take ${takeNumber}: Silence detection found ${silenceResult.clips.length} segments`);
+                    return { success: silenceResult.success, segments: silenceResult.clips.length, markers: 0 };
+                }
+
                 const markerResult = await splitAudioByMarkers({
-                    audioFile: firstAudioPath,
+                    audioFile: audioPath,
+                    outputDir: timelineAudioDir,
                     markerPhrase: 'next slide please',
                     whisperModel: 'base',
                     expectedParts: expectedSegments
                 });
 
-                detectedSegments = markerResult.slideFiles.length;
-                markerDetectionSuccess = markerResult.success;
-                steps.push(`🔍 Whisper detected ${markerResult.markerCount} markers, created ${detectedSegments} segments`);
-            } else {
-                // Fallback to silence detection if Whisper not available
-                steps.push(`⚠️ Whisper not available, falling back to silence detection...`);
-                const timelineProcessor = new TimelineProcessor();
-                const silenceResult = await timelineProcessor.detectSilences(firstAudioPath, 2, -30);
-                detectedSegments = silenceResult.clips.length;
-                markerDetectionSuccess = silenceResult.success;
-                steps.push(`🔍 Silence detection found ${detectedSegments} audio segments`);
-            }
+                steps.push(`🔍 Take ${takeNumber}: Whisper detected ${markerResult.markerCount} markers, created ${markerResult.slideFiles.length} segments`);
+                return {
+                    success: markerResult.success && markerResult.slideFiles.length === expectedSegments,
+                    segments: markerResult.slideFiles.length,
+                    markers: markerResult.markerCount
+                };
+            };
+
+            // Try first audio
+            const firstResult = await runMarkerSplit(firstAudioPath, 1);
+            detectedSegments = firstResult.segments;
+            markerDetectionSuccess = firstResult.success;
 
             // Check if segment count matches
             if (markerDetectionSuccess && detectedSegments === expectedSegments) {
                 steps.push(`✅ Segment count matches! Skipping second audio generation.`);
             } else {
                 // Segment count mismatch - generate second audio
-                const reason = markerDetectionSuccess
-                    ? `Expected ${expectedSegments} segments, got ${detectedSegments}`
-                    : `Marker detection failed`;
+                const reason = `Expected ${expectedSegments} segments, got ${detectedSegments}`;
 
                 if (config.skipTTSGeneration) {
                     steps.push(`⚠️ ${reason}. Skipping regeneration because skipTTSGeneration=true.`);
@@ -294,7 +308,22 @@ export class AudioGenerator {
                     steps.push(`⚠️ ${reason}. Generating second audio take...`);
 
                     await this.browser.randomDelay(1000, 2000);
-                    await generateAudioFile(2);
+                    const secondAudioPath = await generateAudioFile(2);
+
+                    // Process second audio through marker split too
+                    steps.push(`🔍 Processing second audio through marker detection...`);
+                    const secondResult = await runMarkerSplit(secondAudioPath, 2);
+
+                    if (secondResult.success && secondResult.segments === expectedSegments) {
+                        steps.push(`✅ Second audio segment count matches!`);
+                        markerDetectionSuccess = true;
+                        detectedSegments = secondResult.segments;
+                    } else {
+                        // Both attempts failed
+                        const errorMsg = `Audio marker detection failed on both takes. Expected ${expectedSegments} segments, Take 1 got ${detectedSegments}, Take 2 got ${secondResult.segments}. Check that narration contains "next slide please" markers.`;
+                        steps.push(`❌ ${errorMsg}`);
+                        throw new Error(errorMsg);
+                    }
                 }
             }
 

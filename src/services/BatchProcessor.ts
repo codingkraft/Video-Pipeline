@@ -938,21 +938,38 @@ export class BatchProcessor {
                 continue;
             }
 
-            // 2. Identify Audio - prefer pre-split audio clips from MarkerSplitter
+            // 2. Identify Audio - prefer pre-split audio clips from timeline folder
             const audioPaths: string[] = [];
-            const audioDir = path.join(outputDir, 'audio');
             let usingPreSplitAudio = false;
 
-            if (fs.existsSync(audioDir)) {
-                // First, check for pre-split slide files from MarkerSplitter
-                // These are in narration_take_X_slides/slide_1.wav, slide_2.wav, etc.
+            // First, check for pre-split slide files in timeline/audio_clips (new location)
+            const timelineAudioDir = path.join(outputDir, 'timeline', 'audio_clips');
+            if (fs.existsSync(timelineAudioDir)) {
+                const slideFiles = fs.readdirSync(timelineAudioDir)
+                    .filter(f => f.startsWith('slide_') && f.endsWith('.wav'))
+                    .sort((a, b) => {
+                        const numA = parseInt(a.match(/slide_(\d+)/)?.[1] || '0');
+                        const numB = parseInt(b.match(/slide_(\d+)/)?.[1] || '0');
+                        return numA - numB;
+                    })
+                    .map(f => path.join(timelineAudioDir, f));
+
+                if (slideFiles.length > 0) {
+                    this.log(`${folderName}: Found ${slideFiles.length} pre-split audio clips in timeline folder`);
+                    audioPaths.push(...slideFiles);
+                    usingPreSplitAudio = true;
+                }
+            }
+
+            // Fall back to old location (audio/*_slides) for backwards compatibility
+            const audioDir = path.join(outputDir, 'audio');
+            if (audioPaths.length === 0 && fs.existsSync(audioDir)) {
                 const slideDirs = fs.readdirSync(audioDir)
                     .filter(d => d.endsWith('_slides'))
                     .map(d => path.join(audioDir, d))
                     .filter(p => fs.statSync(p).isDirectory());
 
                 if (slideDirs.length > 0) {
-                    // Use the first slides directory found
                     const slideDir = slideDirs[0];
                     const slideFiles = fs.readdirSync(slideDir)
                         .filter(f => f.startsWith('slide_') && f.endsWith('.wav'))
@@ -964,7 +981,7 @@ export class BatchProcessor {
                         .map(f => path.join(slideDir, f));
 
                     if (slideFiles.length > 0) {
-                        this.log(`${folderName}: Found ${slideFiles.length} pre-split audio slides`);
+                        this.log(`${folderName}: Found ${slideFiles.length} pre-split audio slides (legacy location)`);
                         audioPaths.push(...slideFiles);
                         usingPreSplitAudio = true;
                     }
