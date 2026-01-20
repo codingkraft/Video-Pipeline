@@ -1695,6 +1695,19 @@ window.updateAudioStartOptions = function (folderPath) {
 
 // ========== BATCH PROCESSING FUNCTIONS ==========
 
+// State to track which folders should skip TTS and only run Whisper check
+const folderSkipTTS = {};
+
+// Toggle skipTTS for a folder (by index)
+function toggleSkipTTS(index) {
+    const folderPath = selectedLocalFolders[index];
+    if (folderPath) {
+        const checkbox = document.getElementById(`skipTTS_${index}`);
+        folderSkipTTS[folderPath] = checkbox ? checkbox.checked : false;
+        console.log(`Skip TTS for ${folderPath}: ${folderSkipTTS[folderPath]}`);
+    }
+}
+
 // Load available profiles for batch processing
 async function loadBatchProfiles() {
     try {
@@ -1741,13 +1754,18 @@ function updateBatchFolderList() {
     } else {
         container.innerHTML = selectedLocalFolders.map((folder, index) => {
             const folderName = folder.split('\\').pop() || folder;
+            const skipTTS = folderSkipTTS[folder] || false;
             return `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border); gap: 0.5rem;">
-                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">📁 ${folderName}</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border); gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; min-width: 120px;">📁 ${folderName}</span>
                     <select id="startPoint_${index}" onchange="syncDropdowns(this)" class="batch-start-point" data-folder="${folder}" style="padding: 0.25rem; font-size: 0.8rem; min-width: 140px;">
                         <option value="">⏳ Loading options...</option>
                         <option value="start-fresh">Start Fresh</option>
                     </select>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; white-space: nowrap;" title="Skip TTS audio generation, only run Whisper check on existing audio">
+                        <input type="checkbox" id="skipTTS_${index}" onchange="toggleSkipTTS(${index})" ${skipTTS ? 'checked' : ''}>
+                        Skip TTS
+                    </label>
                     <button onclick="removeBatchFolder(${index})" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">✕</button>
                 </div>
             `;
@@ -1859,11 +1877,17 @@ async function startBatchProcessing() {
         return;
     }
 
-    // Collect folders with their start points
+    // Collect folders with their start points and skipTTS settings
     const folders = selectedLocalFolders.map((folderPath, index) => {
         const dropdown = document.getElementById(`startPoint_${index}`);
         const startPoint = dropdown ? dropdown.value : 'start-fresh';
-        return { path: folderPath, startPoint };
+
+        // Read skipTTS directly from checkbox element (more reliable than state object)
+        const skipCheckbox = document.getElementById(`skipTTS_${index}`);
+        const skipTTSGeneration = skipCheckbox ? skipCheckbox.checked : false;
+
+        console.log(`Folder ${index}: skipTTS checkbox checked = ${skipTTSGeneration}`);
+        return { path: folderPath, startPoint, skipTTSGeneration };
     });
 
     try {
@@ -1876,7 +1900,7 @@ async function startBatchProcessing() {
         const response = await fetch('/api/batch/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folders, selectedProfiles })
+            body: JSON.stringify({ folders, selectedProfiles, selectedProfile: selectedProfiles[0] })
         });
 
         const data = await response.json();
@@ -1912,7 +1936,7 @@ async function startFirePhase() {
         const response = await fetch('/api/batch/fire', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folders, selectedProfiles })
+            body: JSON.stringify({ folders, selectedProfiles, selectedProfile: selectedProfiles[0] })
         });
 
         const data = await response.json();

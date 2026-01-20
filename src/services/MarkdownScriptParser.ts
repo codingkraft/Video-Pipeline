@@ -258,8 +258,8 @@ export class MarkdownScriptParser {
     }
 
     /**
-     * Generate narration file content for a video (for NotebookLM source)
-     * Starts with narration directly, with slide markers between slides
+     * Generate narration file content for a video (for TTS)
+     * Uses spoken "MARKER" word between slides for Whisper-based splitting
      */
     static generateNarrationFile(video: VideoSection): string {
         const parts: string[] = [];
@@ -268,18 +268,19 @@ export class MarkdownScriptParser {
         for (const slide of video.slides) {
             if (slide.audio) {
                 if (isFirst) {
-                    // First slide: just the narration, no header
+                    // First slide: just the narration, no marker
                     parts.push(slide.audio);
                     isFirst = false;
                 } else {
-                    // Subsequent slides: add slide marker before narration
-                    parts.push(`[Slide ${slide.number}: ${slide.title}]`);
+                    // Subsequent slides: add spoken 'next slide please' before narration
+                    // This phrase will be detected by Whisper and used to split the audio
+                    parts.push('next slide please');
                     parts.push(slide.audio);
                 }
             }
         }
 
-        // Join with double newlines for paragraph separation
+        // Join with double newlines for natural pausing
         return parts.join('\n\n');
     }
 }

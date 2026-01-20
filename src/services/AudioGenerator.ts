@@ -1,6 +1,8 @@
 import { CaptiveBrowser } from '../browser/CaptiveBrowser';
 import { GoogleStudioTester, GoogleStudioConfig, SlideAudioConfig } from './GoogleStudioTester';
 import { ProgressTracker } from './ProgressTracker';
+import { TimelineProcessor } from '../processing/TimelineProcessor';
+import { splitAudioByMarkers, checkWhisperInstalled } from '../processing/MarkerSplitter';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
@@ -14,6 +16,7 @@ export interface AudioGeneratorConfig {
     googleStudioVoice?: string;
     googleStudioStyleInstructions?: string;
     profileId?: string;          // Browser profile to use
+    skipTTSGeneration?: boolean; // Skip TTS, only run Whisper check on existing audio
 }
 
 export interface AudioGeneratorResult {
@@ -61,15 +64,14 @@ export class AudioGenerator {
     public parseSlideText(narrationText: string): SlideData[] {
         const slides: SlideData[] = [];
 
-        // Split by [SLIDE N] markers
-        const slideRegex = /\[SLIDE\s*(\d+)\]/gi;
+        // Split by 'next slide please' markers (spoken phrase for Whisper detection)
+        const slideRegex = /next slide please/gi;
         const parts = narrationText.split(slideRegex);
 
-        // parts[0] is text before first slide marker (usually empty)
-        // parts[1] is slide number, parts[2] is text, parts[3] is slide number, parts[4] is text, etc.
-        for (let i = 1; i < parts.length; i += 2) {
-            const slideNumber = parseInt(parts[i], 10);
-            const text = (parts[i + 1] || '').trim();
+        // Each part is the text for one slide
+        for (let i = 0; i < parts.length; i++) {
+            const slideNumber = i;
+            const text = (parts[i] || '').trim();
 
             if (text) {
                 slides.push({
@@ -114,8 +116,9 @@ export class AudioGenerator {
     }
 
     /**
-     * Generate audio for entire narration (two files)
-     * Each audio file uses modular recovery: Open → Generate → Close
+     * Generate audio for narration with smart regeneration.
+     * Generates one audio file first, checks if segment count matches slide count,
+     * and only regenerates if there's a mismatch.
      */
     public async generateAudio(config: AudioGeneratorConfig): Promise<AudioGeneratorResult> {
         const steps: string[] = [];
@@ -171,13 +174,17 @@ export class AudioGenerator {
                 headless: config.headless
             };
 
-            // Generate TWO audio files - each as a separate module
-            for (let fileNumber = 1; fileNumber <= 2; fileNumber++) {
+            // Parse slides to know expected segment count
+            const slides = this.parseSlideText(narrationText);
+            const expectedSegments = slides.length;
+            steps.push(`📊 Expecting ${expectedSegments} audio segments (based on ${slides.length} slides)`);
+
+            // Helper to generate a single audio file
+            const generateAudioFile = async (fileNumber: number): Promise<string> => {
                 const outputPath = path.join(audioDir, `narration_take_${fileNumber}.wav`);
-                steps.push(`🎙️ Generating audio file ${fileNumber}/2...`);
+                steps.push(`🎙️ Generating audio file ${fileNumber}...`);
 
                 try {
-                    // Each audio file is its own modular recovery module
                     await this.browser.withModularRecovery(
                         `google-studio-audio-${fileNumber}`,
                         'https://aistudio.google.com/generate-speech',
@@ -197,29 +204,97 @@ export class AudioGenerator {
                                 localSteps
                             );
 
-                            // Add local steps to main steps
                             steps.push(...localSteps);
 
                             if (!success) {
                                 throw new Error(`Audio generation failed for file ${fileNumber}`);
                             }
-
                             return true;
                         }
                     );
 
                     audioFiles.push(outputPath);
                     steps.push(`✓ Audio file ${fileNumber} generated: ${path.basename(outputPath)}`);
+                    return outputPath;
                 } catch (error) {
                     const errorMsg = (error as Error).message;
                     steps.push(`✗ Audio file ${fileNumber} failed: ${errorMsg}`);
                     // Don't continue to next audio - stop processing on error
                     throw error;
                 }
+            };
 
-                // Small delay between generations
-                if (fileNumber < 2) {
+            let firstAudioPath: string;
+
+            // Check if we should skip TTS and use existing audio
+            if (config.skipTTSGeneration) {
+                steps.push(`⏭️ Skipping TTS generation (skipTTSGeneration=true)`);
+
+                // Find existing audio file
+                const existingAudio = fs.readdirSync(audioDir)
+                    .filter(f => f.endsWith('.wav') || f.endsWith('.mp3'))
+                    .sort()
+                    .find(f => f.includes('narration') || f.includes('take'));
+
+                if (existingAudio) {
+                    firstAudioPath = path.join(audioDir, existingAudio);
+                    audioFiles.push(firstAudioPath);
+                    steps.push(`✓ Using existing audio file: ${existingAudio}`);
+                } else {
+                    throw new Error(`No existing audio file found in ${audioDir}. Cannot skip TTS.`);
+                }
+            } else {
+                // Generate first audio file
+                firstAudioPath = await generateAudioFile(1);
+            }
+
+            // Use Whisper to detect 'next slide please' markers and count segments
+            steps.push(`🔍 Analyzing audio with Whisper to detect slide markers...`);
+
+            let detectedSegments = 0;
+            let markerDetectionSuccess = false;
+
+            // Check if Whisper is available
+            const whisperAvailable = await checkWhisperInstalled();
+
+            if (whisperAvailable) {
+                const markerResult = await splitAudioByMarkers({
+                    audioFile: firstAudioPath,
+                    markerPhrase: 'next slide please',
+                    whisperModel: 'base',
+                    expectedParts: expectedSegments
+                });
+
+                detectedSegments = markerResult.slideFiles.length;
+                markerDetectionSuccess = markerResult.success;
+                steps.push(`🔍 Whisper detected ${markerResult.markerCount} markers, created ${detectedSegments} segments`);
+            } else {
+                // Fallback to silence detection if Whisper not available
+                steps.push(`⚠️ Whisper not available, falling back to silence detection...`);
+                const timelineProcessor = new TimelineProcessor();
+                const silenceResult = await timelineProcessor.detectSilences(firstAudioPath, 2, -30);
+                detectedSegments = silenceResult.clips.length;
+                markerDetectionSuccess = silenceResult.success;
+                steps.push(`🔍 Silence detection found ${detectedSegments} audio segments`);
+            }
+
+            // Check if segment count matches
+            if (markerDetectionSuccess && detectedSegments === expectedSegments) {
+                steps.push(`✅ Segment count matches! Skipping second audio generation.`);
+            } else {
+                // Segment count mismatch - generate second audio
+                const reason = markerDetectionSuccess
+                    ? `Expected ${expectedSegments} segments, got ${detectedSegments}`
+                    : `Marker detection failed`;
+
+                if (config.skipTTSGeneration) {
+                    steps.push(`⚠️ ${reason}. Skipping regeneration because skipTTSGeneration=true.`);
+                    steps.push(`⚠️ Audio analysis check complete.`);
+                } else {
+                    steps.push(`⚠️ ${reason}. Generating second audio take...`);
+
                     await this.browser.randomDelay(1000, 2000);
+                    await generateAudioFile(2);
                 }
             }
 
@@ -229,7 +304,7 @@ export class AudioGenerator {
             });
 
             return {
-                success: audioFiles.length === 2,
+                success: audioFiles.length >= 1,
                 message: `Generated ${audioFiles.length} audio files from narration`,
                 details: {
                     steps,

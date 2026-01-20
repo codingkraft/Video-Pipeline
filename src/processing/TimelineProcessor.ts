@@ -81,6 +81,7 @@ export interface TimelineConfig {
     reducedPauseDuration?: number; // seconds, default 1
     projectName?: string;
     frameRate?: number;           // default 30
+    skipAudioSilenceDetection?: boolean; // If true, treat each audio file as a single clip (for pre-split files)
 }
 
 /**
@@ -1378,7 +1379,8 @@ ${tractorTracks.join('\n')}
             silenceThreshold = -30,
             reducedPauseDuration = 1,
             projectName = 'Slideshow Timeline',
-            frameRate = 30
+            frameRate = 30,
+            skipAudioSilenceDetection = false
         } = config;
 
         if (videoPaths.length === 0 && audioPaths.length === 0) {
@@ -1483,43 +1485,67 @@ ${tractorTracks.join('\n')}
                     continue;
                 }
 
-                const silenceResult = await this.detectSilences(audioPath, silenceDuration, silenceThreshold);
-
-                if (!silenceResult.success) {
-                    console.warn(`Silence detection failed for ${audioPath}: ${silenceResult.message}`);
-                    continue;
-                }
-
-                if (silenceResult.clips.length > 0) {
-                    console.log(`Cutting ${silenceResult.clips.length} audio clips with ${reducedPauseDuration}s pauses...`);
-
-                    // Create subfolder for this audio's clips
-                    const audioBaseName = path.basename(audioPath, path.extname(audioPath));
-                    const audioOutputDir = path.join(outputDir, `audio_${audioIndex + 1}_${audioBaseName}`);
-                    if (!fs.existsSync(audioOutputDir)) {
-                        fs.mkdirSync(audioOutputDir, { recursive: true });
-                    }
-
-                    await this.cutAudioClips(audioPath, silenceResult.clips, path.dirname(audioOutputDir), reducedPauseDuration);
-                    audioClipsDir = audioClipsDir || path.join(outputDir, 'audio_clips');
-
-                    // Build timeline clips for this audio
+                // Handle pre-split audio files (skip silence detection)
+                if (skipAudioSilenceDetection) {
+                    // Each audio file is already a single clip - use it as-is
+                    const duration = await this.getMediaDuration(audioPath);
                     const baseName = path.basename(audioPath, path.extname(audioPath));
-                    const audioTimelineClips = silenceResult.clips.map((clip, i) => ({
-                        index: clip.index,
-                        name: `${baseName}_clip_${String(clip.index).padStart(3, '0')}`,
+
+                    console.log(`Using pre-split audio clip: ${baseName} (${duration.toFixed(2)}s)`);
+
+                    timeline.audioClips.push({
+                        index: audioIndex + 1,
+                        name: baseName,
                         type: 'audio' as const,
                         sourcePath: audioPath,
-                        clipPath: clip.outputPath,
-                        startTime: clip.startTime,
-                        endTime: clip.endTime,
-                        duration: clip.duration + (i < silenceResult.clips.length - 1 ? reducedPauseDuration : 0),
+                        clipPath: audioPath,  // Already a clip, no cutting needed
+                        startTime: 0,
+                        endTime: duration,
+                        duration: duration,
                         track: trackNumber
-                    }));
+                    });
+                    totalAudioClips++;
+                    timeline.totalDuration = Math.max(timeline.totalDuration, duration);
+                } else {
+                    // Standard silence detection flow
+                    const silenceResult = await this.detectSilences(audioPath, silenceDuration, silenceThreshold);
 
-                    timeline.audioClips.push(...audioTimelineClips);
-                    totalAudioClips += silenceResult.clips.length;
-                    timeline.totalDuration = Math.max(timeline.totalDuration, silenceResult.totalDuration);
+                    if (!silenceResult.success) {
+                        console.warn(`Silence detection failed for ${audioPath}: ${silenceResult.message}`);
+                        continue;
+                    }
+
+                    if (silenceResult.clips.length > 0) {
+                        console.log(`Cutting ${silenceResult.clips.length} audio clips with ${reducedPauseDuration}s pauses...`);
+
+                        // Create subfolder for this audio's clips
+                        const audioBaseName = path.basename(audioPath, path.extname(audioPath));
+                        const audioOutputDir = path.join(outputDir, `audio_${audioIndex + 1}_${audioBaseName}`);
+                        if (!fs.existsSync(audioOutputDir)) {
+                            fs.mkdirSync(audioOutputDir, { recursive: true });
+                        }
+
+                        await this.cutAudioClips(audioPath, silenceResult.clips, path.dirname(audioOutputDir), reducedPauseDuration);
+                        audioClipsDir = audioClipsDir || path.join(outputDir, 'audio_clips');
+
+                        // Build timeline clips for this audio
+                        const baseName = path.basename(audioPath, path.extname(audioPath));
+                        const audioTimelineClips = silenceResult.clips.map((clip, i) => ({
+                            index: clip.index,
+                            name: `${baseName}_clip_${String(clip.index).padStart(3, '0')}`,
+                            type: 'audio' as const,
+                            sourcePath: audioPath,
+                            clipPath: clip.outputPath,
+                            startTime: clip.startTime,
+                            endTime: clip.endTime,
+                            duration: clip.duration + (i < silenceResult.clips.length - 1 ? reducedPauseDuration : 0),
+                            track: trackNumber
+                        }));
+
+                        timeline.audioClips.push(...audioTimelineClips);
+                        totalAudioClips += silenceResult.clips.length;
+                        timeline.totalDuration = Math.max(timeline.totalDuration, silenceResult.totalDuration);
+                    }
                 }
             }
 

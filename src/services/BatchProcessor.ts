@@ -25,6 +25,7 @@ export type FolderStatus =
 export interface FolderConfig {
     path: string;
     startPoint: StartPointKey;
+    skipTTSGeneration?: boolean;  // Skip audio generation, only run Whisper check
 }
 
 /**
@@ -32,7 +33,9 @@ export interface FolderConfig {
  */
 export interface BatchConfig {
     folders: FolderConfig[];            // Folders with their start points
-    selectedProfiles: string[];         // Profiles selected by user for rotation
+    selectedProfiles: string[];         // DEPRECATED: Use selectedProfile instead
+    selectedProfile?: string;           // Single profile to use for all processing
+    concurrencyLimit?: number;          // Max folders to process in parallel (default: 5)
     visualStyle?: string;               // Global visual style setting
     notebookLmChatSettings?: string;
     // NOTE: operation field removed - startPoint in FolderConfig is now the single source of truth
@@ -131,6 +134,52 @@ export class BatchProcessor {
     private log(message: string): void {
         console.log(`[BatchProcessor] ${message}`);
         this.onLog?.(message);
+    }
+
+    /**
+     * Process items in parallel with concurrency limit
+     */
+    private async processInParallel<T, R>(
+        items: T[],
+        processor: (item: T) => Promise<R>,
+        concurrencyLimit: number = 5
+    ): Promise<R[]> {
+        const results: R[] = [];
+        const executing: Promise<void>[] = [];
+
+        for (const item of items) {
+            if (this.abortRequested) break;
+
+            const promise = (async () => {
+                try {
+                    const result = await processor(item);
+                    results.push(result);
+                } catch (error) {
+                    // Error is already logged in processor, just continue
+                    console.error(`[BatchProcessor] Parallel task error:`, error);
+                }
+            })();
+
+            executing.push(promise);
+
+            // If we've reached concurrency limit, wait for one to complete
+            if (executing.length >= concurrencyLimit) {
+                await Promise.race(executing);
+                // Remove completed promises
+                for (let i = executing.length - 1; i >= 0; i--) {
+                    const p = executing[i];
+                    // Check if promise is settled by racing with immediate resolve
+                    const settled = await Promise.race([p.then(() => true), Promise.resolve(false)]);
+                    if (settled) {
+                        executing.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // Wait for remaining tasks
+        await Promise.all(executing);
+        return results;
     }
 
     /**
@@ -520,7 +569,8 @@ export class BatchProcessor {
     private async processFolderAudio(
         folderPath: string,
         startPoint: StartPointKey,
-        config: BatchConfig
+        config: BatchConfig,
+        folderConfig?: FolderConfig
     ): Promise<void> {
         const folderName = path.basename(folderPath);
         const spConfig = START_POINT_CONFIGS[startPoint] || START_POINT_CONFIGS['start-fresh'];
@@ -598,6 +648,17 @@ export class BatchProcessor {
                     hasNarration = true;
                     // Mark the audio narration step as complete
                     ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
+
+                    // Replace [PAUSE] markers with 'next slide please' for Whisper-based splitting
+                    const outputPath = path.join(outputDir, 'perplexity_audio_response.txt');
+                    if (fs.existsSync(outputPath)) {
+                        let content = fs.readFileSync(outputPath, 'utf-8');
+                        const originalLength = content.length;
+                        content = content.replace(/\[PAUSE\]/gi, 'next slide please');
+                        fs.writeFileSync(outputPath, content, 'utf-8');
+                        this.log(`${folderName}: Replaced [PAUSE] markers with 'next slide please' in narration file`);
+                    }
+
                     await this.sleep(2000);
                 } else {
                     throw new Error(`Narration generation failed: ${genResult.message}`);
@@ -620,13 +681,17 @@ export class BatchProcessor {
             const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
             const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
+            const skipTTS = folderConfig?.skipTTSGeneration ?? false;
+            this.log(`${folderName}: skipTTSGeneration=${skipTTS} (folderConfig=${JSON.stringify(folderConfig)})`);
+
             await audioGen.generateAudio({
                 sourceFolder: folderPath,
                 profileId: profileId,
                 narrationFilePath: finalNarrationPath,
                 googleStudioModel: settings.googleStudioModel,
                 googleStudioVoice: settings.googleStudioVoice,
-                googleStudioStyleInstructions: settings.googleStudioStyleInstructions
+                googleStudioStyleInstructions: settings.googleStudioStyleInstructions,
+                skipTTSGeneration: skipTTS
             });
 
             ProgressTracker.markStepComplete(folderPath, 'audio_generated');
@@ -642,7 +707,11 @@ export class BatchProcessor {
     }
 
     /**
-     * Full batch processing workflow: Sequential Folder Processing (Prompt -> Fire -> Audio) then Batch Collect
+     * Full batch processing workflow with parallel phases:
+     * 1. Generate prompts (sequential - lightweight)
+     * 2. Fire videos (parallel with concurrency limit)
+     * 3. Generate audio (parallel with concurrency limit)
+     * 4. Collect, Remove Logos, Create Timelines (batch operations)
      */
     public async processAll(config: BatchConfig): Promise<BatchResult> {
         if (this.isProcessing) {
@@ -652,47 +721,69 @@ export class BatchProcessor {
         this.isProcessing = true;
         this.abortRequested = false;
 
+        // Use single profile or first from array for backward compatibility
+        const profileId = config.selectedProfile || config.selectedProfiles?.[0] || 'default';
+        const concurrencyLimit = config.concurrencyLimit ?? 5;
+
+        this.log(`Starting parallel batch processing with profile: ${profileId}, concurrency: ${concurrencyLimit}`);
+
         this.currentBatch = config.folders.map(folder => ({
             folderPath: folder.path,
             folderName: path.basename(folder.path),
             status: 'pending' as FolderStatus,
-            profileId: ProgressTracker.getFolderProfile(folder.path) ?? undefined,
+            profileId: profileId,
             startPoint: folder.startPoint
         }));
         this.onStatusChange?.(this.currentBatch);
 
         try {
-            let profileIndex = 0;
-
-            // Process folders ONE BY ONE: Prompt -> Fire Videos -> Audio
+            // PHASE 1: Generate PROMPTS (sequential - quick operation)
+            this.log(`📄 Phase 1: Generating prompts for ${config.folders.length} folders...`);
             for (const folderConfig of config.folders) {
                 if (this.abortRequested) break;
-
-                const folderPath = folderConfig.path;
-
-                // 1. Generate PROMPT
-                profileIndex = await this.processFolderPrompts(folderConfig, config, profileIndex);
-
-                // 2. FIRE videos
-                profileIndex = await this.processFolderVideos(folderConfig, config, profileIndex);
-
-                // 3. Generate AUDIO
-                await this.processFolderAudio(folderPath, folderConfig.startPoint, config);
-
-                this.log(`Completed primary processing for folder: ${path.basename(folderPath)}`);
+                await this.processFolderPrompts(folderConfig, config, 0);
             }
 
-            // Final Phase: COLLECT all videos that were fired
+            // PHASE 2: FIRE all videos in parallel
             if (!this.abortRequested) {
+                this.log(`🚀 Phase 2: Firing videos in parallel (${concurrencyLimit} at a time)...`);
+                await this.processInParallel(
+                    config.folders,
+                    async (folderConfig) => {
+                        await this.processFolderVideos(folderConfig, config, 0);
+                        return folderConfig.path;
+                    },
+                    concurrencyLimit
+                );
+            }
+
+            // PHASE 3: Generate AUDIO in parallel
+            if (!this.abortRequested) {
+                this.log(`🎙️ Phase 3: Generating audio in parallel (${concurrencyLimit} at a time)...`);
+                await this.processInParallel(
+                    config.folders,
+                    async (folderConfig) => {
+                        await this.processFolderAudio(folderConfig.path, folderConfig.startPoint, config, folderConfig);
+                        return folderConfig.path;
+                    },
+                    concurrencyLimit
+                );
+            }
+
+            // PHASE 4: COLLECT all videos that were fired
+            if (!this.abortRequested) {
+                this.log(`📥 Phase 4: Collecting completed videos...`);
                 await this.collectAllVideos();
 
-                // Final Phase part 2: Remove Logos
+                // PHASE 5: Remove Logos
                 if (!this.abortRequested) {
+                    this.log(`✨ Phase 5: Removing logos...`);
                     await this.removeLogosForAll();
                 }
 
-                // Final Phase part 3: Create Timelines
+                // PHASE 6: Create Timelines
                 if (!this.abortRequested) {
+                    this.log(`🎬 Phase 6: Creating timelines...`);
                     await this.createTimelinesForAll();
                 }
             }
@@ -847,17 +938,46 @@ export class BatchProcessor {
                 continue;
             }
 
-            // 2. Identify Audio
+            // 2. Identify Audio - prefer pre-split audio clips from MarkerSplitter
             const audioPaths: string[] = [];
             const audioDir = path.join(outputDir, 'audio');
+            let usingPreSplitAudio = false;
 
             if (fs.existsSync(audioDir)) {
-                // Look for narration_take_1.wav and narration_take_2.wav
-                const a1 = path.join(audioDir, 'narration_take_1.wav');
-                const a2 = path.join(audioDir, 'narration_take_2.wav');
+                // First, check for pre-split slide files from MarkerSplitter
+                // These are in narration_take_X_slides/slide_1.wav, slide_2.wav, etc.
+                const slideDirs = fs.readdirSync(audioDir)
+                    .filter(d => d.endsWith('_slides'))
+                    .map(d => path.join(audioDir, d))
+                    .filter(p => fs.statSync(p).isDirectory());
 
-                if (fs.existsSync(a1)) audioPaths.push(a1);
-                if (fs.existsSync(a2)) audioPaths.push(a2);
+                if (slideDirs.length > 0) {
+                    // Use the first slides directory found
+                    const slideDir = slideDirs[0];
+                    const slideFiles = fs.readdirSync(slideDir)
+                        .filter(f => f.startsWith('slide_') && f.endsWith('.wav'))
+                        .sort((a, b) => {
+                            const numA = parseInt(a.match(/slide_(\d+)/)?.[1] || '0');
+                            const numB = parseInt(b.match(/slide_(\d+)/)?.[1] || '0');
+                            return numA - numB;
+                        })
+                        .map(f => path.join(slideDir, f));
+
+                    if (slideFiles.length > 0) {
+                        this.log(`${folderName}: Found ${slideFiles.length} pre-split audio slides`);
+                        audioPaths.push(...slideFiles);
+                        usingPreSplitAudio = true;
+                    }
+                }
+
+                // Fall back to raw narration files if no pre-split slides found
+                if (audioPaths.length === 0) {
+                    const a1 = path.join(audioDir, 'narration_take_1.wav');
+                    const a2 = path.join(audioDir, 'narration_take_2.wav');
+
+                    if (fs.existsSync(a1)) audioPaths.push(a1);
+                    if (fs.existsSync(a2)) audioPaths.push(a2);
+                }
             }
 
             if (audioPaths.length === 0) {
@@ -875,7 +995,8 @@ export class BatchProcessor {
                     exportFormat: 'xml',
                     sceneThreshold: 0.02, // Optimized for slideshows
                     reducedPauseDuration: 1,
-                    projectName: folderName
+                    projectName: folderName,
+                    skipAudioSilenceDetection: usingPreSplitAudio  // Skip silence detection for pre-split audio
                 });
 
                 if (result.success) {

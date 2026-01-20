@@ -1028,7 +1028,11 @@ app.post('/api/batch/start', async (req: Request, res: Response) => {
             if (typeof f === 'string') {
                 return { path: f, startPoint: 'start-fresh' as const };
             }
-            return { path: f.path, startPoint: f.startPoint || 'start-fresh' };
+            return {
+                path: f.path,
+                startPoint: f.startPoint || 'start-fresh',
+                skipTTSGeneration: f.skipTTSGeneration
+            };
         });
 
         // Start processing in background
@@ -1041,9 +1045,11 @@ app.post('/api/batch/start', async (req: Request, res: Response) => {
 
         // Run the full batch process
         try {
+            const { selectedProfile } = req.body;
             const result = await batchProcessor.processAll({
                 folders: normalizedFolders,
                 selectedProfiles,
+                selectedProfile: selectedProfile || selectedProfiles[0],
                 visualStyle
             });
 
@@ -1161,9 +1167,11 @@ app.post('/api/batch/fire', async (req: Request, res: Response) => {
 
         // Run only fire phase
         try {
+            const { selectedProfile } = req.body;
             await batchProcessor.fireAllVideos({
                 folders,
                 selectedProfiles,
+                selectedProfile: selectedProfile || selectedProfiles[0],
                 visualStyle
             });
 
@@ -1498,6 +1506,49 @@ httpServer.listen(PORT, () => {
     console.log(`=================================`);
     console.log(`\n🌐 Open in browser: http://localhost:${PORT}`);
     console.log(`\nReady to process videos!\n`);
+});
+
+// API: Analyze audio with Whisper
+app.post('/api/audio/analyze', async (req: Request, res: Response) => {
+    try {
+        const { audioPath, markerPhrase = 'next slide please' } = req.body;
+
+        if (!audioPath) {
+            return res.status(400).json({ error: 'audioPath is required' });
+        }
+
+        if (!fs.existsSync(audioPath)) {
+            return res.status(400).json({ error: `Audio file not found: ${audioPath}` });
+        }
+
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+
+        // Find Python script and venv
+        const scriptPath = path.join(__dirname, '../scripts/audio_transcribe.py');
+        const venvPython = path.join(__dirname, '../scripts/venv/Scripts/python.exe');
+        const pythonCmd = fs.existsSync(venvPython) ? `"${venvPython}"` : 'python';
+
+        const command = `${pythonCmd} "${scriptPath}" "${audioPath}" -m "${markerPhrase}"`;
+        console.log(`[AudioAnalyze] Running: ${command}`);
+
+        const { stdout, stderr } = await execAsync(command, { maxBuffer: 50 * 1024 * 1024 });
+
+        try {
+            const result = JSON.parse(stdout);
+            res.json(result);
+        } catch (parseError) {
+            res.status(500).json({
+                error: 'Failed to parse Whisper output',
+                stdout,
+                stderr
+            });
+        }
+    } catch (error) {
+        console.error('[AudioAnalyze] Error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
 });
 
 // Graceful shutdown

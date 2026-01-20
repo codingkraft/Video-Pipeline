@@ -1,0 +1,14 @@
+# Python dependencies for Video Creator audio processing
+# Install with: pip install -r requirements.txt
+
+# OpenAI Whisper for speech-to-text and marker detection
+openai-whisper>=20231117
+
+# PyDub for audio manipulation (splitting, cutting)
+pydub>=0.25.1
+
+# NumPy (required by Whisper)
+numpy>=1.21.0
+
+# Torch (required by Whisper) - will auto-install appropriate version
+# torch>=2.0.0

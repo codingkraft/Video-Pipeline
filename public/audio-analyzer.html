@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Analyzer - Whisper</title>
+    <style>
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-card: #16213e;
+            --accent: #e94560;
+            --accent-light: #ff6b6b;
+            --text: #eee;
+            --text-muted: #888;
+            --border: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            color: var(--accent-light);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-dark);
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        input[type="file"] {
+            cursor: pointer;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .status {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .status.loading {
+            display: block;
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+        }
+
+        .status.success {
+            display: block;
+            background: rgba(40, 167, 69, 0.1);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+
+        .status.error {
+            display: block;
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-box {
+            background: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-box .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-light);
+        }
+
+        .stat-box .label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .transcription {
+            background: var(--bg-dark);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .marker-highlight {
+            background: var(--accent);
+            color: white;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .segment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .segment-item {
+            background: var(--bg-dark);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .segment-item .seg-num {
+            color: var(--accent-light);
+            font-weight: bold;
+        }
+
+        .segment-item .seg-time {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎙️ Audio Analyzer</h1>
+
+        <div class="card">
+            <h2>Input</h2>
+            <div class="form-group">
+                <label>Audio File Path</label>
+                <input type="text" id="audioPath" placeholder="F:\path\to\audio.wav">
+            </div>
+            <div class="form-group">
+                <label>Marker Phrase (to split by)</label>
+                <input type="text" id="markerPhrase" value="next slide please" placeholder="next slide please">
+            </div>
+            <div class="btn-row">
+                <button class="btn" id="analyzeBtn" onclick="analyzeAudio()">
+                    🔍 Analyze Audio
+                </button>
+            </div>
+
+            <div id="status" class="status"></div>
+        </div>
+
+        <div class="card results" id="results">
+            <h2>Results</h2>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="number" id="segmentCount">0</div>
+                    <div class="label">Segments</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="markerCount">0</div>
+                    <div class="label">Markers Found</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="duration">0s</div>
+                    <div class="label">Duration</div>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 0.75rem; color: var(--text-muted);">Segments</h3>
+            <div class="segment-list" id="segmentList"></div>
+        </div>
+
+        <div class="card results" id="transcriptCard">
+            <h2>Full Transcription</h2>
+            <div class="transcription" id="transcription"></div>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeAudio() {
+            const audioPath = document.getElementById('audioPath').value.trim();
+            const markerPhrase = document.getElementById('markerPhrase').value.trim();
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            const transcriptCard = document.getElementById('transcriptCard');
+            const btn = document.getElementById('analyzeBtn');
+
+            if (!audioPath) {
+                statusEl.className = 'status error';
+                statusEl.textContent = 'Please enter an audio file path';
+                return;
+            }
+
+            // Show loading
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+            statusEl.className = 'status loading';
+            statusEl.textContent = '⏳ Transcribing audio with Whisper... This may take a minute.';
+            resultsEl.classList.remove('show');
+            transcriptCard.classList.remove('show');
+
+            try {
+                const response = await fetch('/api/audio/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audioPath, markerPhrase })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    statusEl.className = 'status success';
+                    statusEl.textContent = '✅ Analysis complete!';
+
+                    // Update stats
+                    document.getElementById('segmentCount').textContent = data.segments?.length || 0;
+                    document.getElementById('markerCount').textContent = data.markerCount || 0;
+                    document.getElementById('duration').textContent = formatDuration(data.duration || 0);
+
+                    // Update segment list
+                    const segmentList = document.getElementById('segmentList');
+                    segmentList.innerHTML = '';
+
+                    if (data.segments && data.segments.length > 0) {
+                        data.segments.forEach((seg, i) => {
+                            const item = document.createElement('div');
+                            item.className = 'segment-item';
+                            item.innerHTML = `
+                                <span class="seg-num">Segment ${i + 1}</span>
+                                <span class="seg-time">${formatDuration(seg.start)} - ${formatDuration(seg.end)} (${formatDuration(seg.duration)})</span>
+                            `;
+                            segmentList.appendChild(item);
+                        });
+                    } else {
+                        segmentList.innerHTML = '<div class="segment-item">No segments found</div>';
+                    }
+
+                    // Update transcription with highlighted markers
+                    const transcription = data.transcription || '';
+                    const highlighted = transcription.replace(
+                        new RegExp(markerPhrase, 'gi'),
+                        `<span class="marker-highlight">${markerPhrase.toUpperCase()}</span>`
+                    );
+                    document.getElementById('transcription').innerHTML = highlighted;
+
+                    resultsEl.classList.add('show');
+                    transcriptCard.classList.add('show');
+                } else {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = '❌ ' + (data.error || data.message || 'Analysis failed');
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Error: ' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Analyze Audio';
+            }
+        }
+
+        function formatDuration(seconds) {
+            if (typeof seconds !== 'number') return '0s';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            if (mins > 0) {
+                return `${mins}m ${secs}s`;
+            }
+            return `${secs.toFixed(1)}s`;
+        }
+    </script>
+</body>
+
+</html>
