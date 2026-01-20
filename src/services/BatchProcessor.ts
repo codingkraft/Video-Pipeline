@@ -1141,11 +1141,12 @@ export class BatchProcessor {
             }
 
             if (result.success && result.cleanVideoPath) {
+                const method = result.message?.includes('local FFmpeg') ? 'Local FFmpeg' : 'Website Bypass';
                 ProgressTracker.updateStep(folderPath, stepName, {
                     completed: true,
                     cleanVideoPath: result.cleanVideoPath
                 });
-                this.log(`${folderName}: Logo removal for video ${i} successful`);
+                this.log(`${folderName}: Logo removal successful using ${method}`);
             } else {
                 this.log(`${folderName}: Logo removal for video ${i} failed: ${result.message}`);
                 this.updateFolderStatus(folderPath, { error: `Logo removal failed for video ${i}` });

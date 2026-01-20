@@ -367,7 +367,7 @@ export class NotebookLMRemoverTester {
 
                 return false;
             },
-            { maxRetries: 150, retryDelay: 3000 } // Up to ~7.5 minutes wait
+            { maxRetries: 60, retryDelay: 3000 } // Up to ~3 minutes wait
         );
 
         if (!successProcessing) {
