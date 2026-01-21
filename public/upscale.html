@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Upscaler - Video Creator</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 2rem;
+            background: var(--bg-alt);
+        }
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: var(--bg);
+        }
+        .upload-area.dragging {
+            border-color: var(--success);
+            background: rgba(40, 167, 69, 0.1);
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .preview-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .preview-img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background: #000;
+        }
+        .preview-info {
+            padding: 1rem;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .status-badge.success { background: rgba(40, 167, 69, 0.2); color: var(--success); }
+        .status-badge.failed { background: rgba(220, 53, 69, 0.2); color: var(--danger); }
+        .status-badge.pending { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--text-muted);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <a href="/" class="btn btn-secondary">← Back</a>
+                <h1>✨ AI Image Upscaler</h1>
+            </div>
+            <p class="subtitle">Upscale images by 1.5x (720p → 1080p) using Real-ESRGAN Anime 6B</p>
+        </header>
+
+        <main>
+            <section class="card">
+                <div class="upload-area" id="dropZone">
+                    <h3>📂 Drag & Drop Images Here</h3>
+                    <p style="color: var(--text-muted);">or click to select files (PNG, JPG)</p>
+                    <input type="file" id="fileInput" multiple accept="image/png, image/jpeg" style="display: none;">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end;">
+                    <button id="upscaleBtn" class="btn btn-success btn-large" disabled>
+                        🚀 Upscale Images
+                    </button>
+                </div>
+            </section>
+
+            <section class="card" id="resultsSection" style="display: none;">
+                <h2>Processing Results</h2>
+                <div class="preview-grid" id="resultsGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <h3 style="color: white; margin-top: 1rem;">Upscaling images with AI...</h3>
+        <p style="color: #ccc;">This runs on your GPU (RTX 4060)</p>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const upscaleBtn = document.getElementById('upscaleBtn');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsGrid = document.getElementById('resultsGrid');
+        
+        let selectedFiles = [];
+
+        // Drag & Drop Handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragging');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragging');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (selectedFiles.length > 0) {
+                dropZone.innerHTML = `<h3>✅ ${selectedFiles.length} Images Selected</h3><p>${selectedFiles.map(f => f.name).join(', ')}</p>`;
+                upscaleBtn.disabled = false;
+            }
+        }
+
+        upscaleBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+
+            loadingOverlay.style.display = 'flex';
+            
+            const formData = new FormData();
+            selectedFiles.forEach(file => formData.append('images', file));
+
+            try {
+                const response = await fetch('/api/manual-upscale', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.results) {
+                    renderResults(data.results);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+
+            } catch (error) {
+                alert('Request Failed: ' + error.message);
+            } finally {
+                loadingOverlay.style.display = 'none';
+            }
+        });
+
+        function renderResults(results) {
+            resultsSection.style.display = 'block';
+            resultsGrid.innerHTML = '';
+
+            results.forEach(res => {
+                const card = document.createElement('div');
+                card.className = 'preview-card';
+                
+                const imgSrc = res.status === 'success' ? res.upscaled : ''; // Placeholder if failed?
+                
+                card.innerHTML = `
+                    <div style="position: relative;">
+                        ${res.status === 'success' ? 
+                            `<a href="${imgSrc}" target="_blank"><img src="${imgSrc}" class="preview-img"></a>` : 
+                            `<div class="preview-img" style="display:flex;align-items:center;justify-content:center;color:white;">FAILED</div>`
+                        }
+                    </div>
+                    <div class="preview-info">
+                        <strong style="display:block; margin-bottom:0.5rem; overflow:hidden; text-overflow:ellipsis;">${res.original}</strong>
+                        <span class="status-badge ${res.status}">${res.status.toUpperCase()}</span>
+                        ${res.status === 'success' ? `<a href="${imgSrc}" download class="btn btn-secondary" style="display:block; margin-top:0.5rem; text-align:center;">Download</a>` : ''}
+                    </div>
+                `;
+                resultsGrid.appendChild(card);
+            });
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
