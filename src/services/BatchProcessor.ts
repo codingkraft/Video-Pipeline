@@ -727,7 +727,7 @@ export class BatchProcessor {
 
         // Use single profile or first from array for backward compatibility
         const profileId = config.selectedProfile || config.selectedProfiles?.[0] || 'default';
-        const concurrencyLimit = config.concurrencyLimit ?? 5;
+        const concurrencyLimit = config.concurrencyLimit ?? 1; // Default to 1 to avoid Chrome tab throttling
 
         this.log(`Starting parallel batch processing with profile: ${profileId}, concurrency: ${concurrencyLimit}`);
 
@@ -748,34 +748,26 @@ export class BatchProcessor {
                 await this.processFolderPrompts(folderConfig, config, 0);
             }
 
-            // PHASE 2: FIRE all videos in parallel
+            // PHASE 2: FIRE videos SEQUENTIALLY (one at a time to avoid Chrome tab throttling)
             if (!this.abortRequested) {
-                // Pre-initialize browser ONCE before parallel processing to avoid race conditions
+                // Pre-initialize browser ONCE before processing to avoid race conditions
                 this.log(`🔧 Pre-initializing browser with profile: ${profileId}...`);
                 await this.browser.initialize({ profileId });
 
-                this.log(`🚀 Phase 2: Firing videos in parallel (${concurrencyLimit} at a time)...`);
-                await this.processInParallel(
-                    config.folders,
-                    async (folderConfig) => {
-                        await this.processFolderVideos(folderConfig, config, 0);
-                        return folderConfig.path;
-                    },
-                    concurrencyLimit
-                );
+                this.log(`🚀 Phase 2: Firing videos sequentially (one folder at a time)...`);
+                for (const folderConfig of config.folders) {
+                    if (this.abortRequested) break;
+                    await this.processFolderVideos(folderConfig, config, 0);
+                }
             }
 
-            // PHASE 3: Generate AUDIO in parallel
+            // PHASE 3: Generate AUDIO SEQUENTIALLY (one at a time to avoid Chrome tab issues)
             if (!this.abortRequested) {
-                this.log(`🎙️ Phase 3: Generating audio in parallel (${concurrencyLimit} at a time)...`);
-                await this.processInParallel(
-                    config.folders,
-                    async (folderConfig) => {
-                        await this.processFolderAudio(folderConfig.path, folderConfig.startPoint, config, folderConfig);
-                        return folderConfig.path;
-                    },
-                    concurrencyLimit
-                );
+                this.log(`🎙️ Phase 3: Generating audio sequentially (one folder at a time)...`);
+                for (const folderConfig of config.folders) {
+                    if (this.abortRequested) break;
+                    await this.processFolderAudio(folderConfig.path, folderConfig.startPoint, config, folderConfig);
+                }
             }
 
             // PHASE 4: COLLECT all videos that were fired
@@ -885,10 +877,10 @@ export class BatchProcessor {
 
 
     /**
-     * PHASE 5: Remove logos from all collected videos (now runs in parallel)
+     * PHASE 5: Remove logos from all collected videos (runs sequentially to avoid browser conflicts)
      */
-    public async removeLogosForAll(config?: BatchConfig, concurrencyLimit: number = 3): Promise<void> {
-        this.log(`Starting PHASE 5: Remove logos (concurrency: ${concurrencyLimit})`);
+    public async removeLogosForAll(config?: BatchConfig): Promise<void> {
+        this.log(`Starting PHASE 5: Remove logos (sequential processing)`);
 
         // Create folder configs from current batch
         const folderConfigs = this.currentBatch.map(folderStatus => ({
@@ -896,19 +888,15 @@ export class BatchProcessor {
             startPoint: (folderStatus.startPoint as StartPointKey) || 'start-fresh'
         } as FolderConfig));
 
-        // Process in parallel with the specified concurrency limit
-        await this.processInParallel(
-            folderConfigs,
-            async (folderConfig) => {
-                await this.processFolderLogoRemoval(folderConfig, config || {
-                    folders: [],
-                    selectedProfiles: [],
-                    notebookLmChatSettings: ''
-                });
-                return folderConfig.path;
-            },
-            concurrencyLimit
-        );
+        // Process sequentially to avoid browser conflicts
+        for (const folderConfig of folderConfigs) {
+            if (this.abortRequested) break;
+            await this.processFolderLogoRemoval(folderConfig, config || {
+                folders: [],
+                selectedProfiles: [],
+                notebookLmChatSettings: ''
+            });
+        }
     }
 
     /**

@@ -212,7 +212,7 @@ export class VideoFolderCreator {
             fs.mkdirSync(outputFolder, { recursive: true });
         }
 
-        const filename = `video${video.videoNumber}_response.txt`;
+        const filename = `perplexity_video_response.txt`;
         const filePath = path.join(outputFolder, filename);
 
         // Build screenshot map by slide number
@@ -233,18 +233,26 @@ export class VideoFolderCreator {
         const lines: string[] = [];
 
         // Header and instructions
-        lines.push(`Create a Video Overview using the DOCX as the single source.`);
-        lines.push(`CRITICAL: SINGLE-VOICE NARRATION ONLY`);
-        lines.push(`The narration file (${narrationFilename}) is the SOLE source of all audio content. JACK is the only voice. There is NO second speaker, NO dialogue, NO host interruptions, NO banter.`);
+        const durationText = video.duration || '180 seconds';
+        lines.push(`Create a Video Overview (~${durationText}) using the DOCX as the single source.`);
+        lines.push(`CRITICAL CONTENT RULE:`);
+        lines.push(`The narration file (${narrationFilename}) is the SOLE source of all audio content.`);
+        lines.push(`Read ONLY the exact text in the narration file—verbatim, word-for-word.`);
+        lines.push(`Do NOT deviate, ad-lib, or add commentary.`);
+        lines.push(``);
         lines.push(`ABSOLUTE RULES:`);
         lines.push(``);
-        lines.push(`Read ONLY the exact text in the narration file—verbatim, word-for-word.`);
+        lines.push(`1. Read ONLY the exact text in the narration file—verbatim, word-for-word.`);
         lines.push(``);
-        lines.push(`JACK narrates every single line. Do NOT introduce a second voice, character, or host.`);
+        lines.push(`2. Do NOT add intro/outro, transitions, filler words ("So," "Okay," "Well"), definitions, or summaries.`);
         lines.push(``);
-        lines.push(`Do NOT add intro/outro, transitions, filler words ("So," "Okay," "Well"), definitions, or summaries.`);
+        lines.push(`3. ALWAYS complete full narration for every segment—even if images are missing.`);
         lines.push(``);
-        lines.push(`ALWAYS complete full narration for every segment—even if images are missing.`);
+        lines.push(`4. Narration and visuals must align perfectly.`);
+        lines.push(``);
+        lines.push(`5. Do not draw boxes over the code. If you want to point to something in code use an arrow`);
+        lines.push(``);
+        lines.push(`6. Do not draw anything on code that might cover the text or make it hard to read. drawing arrows is fine`);
         lines.push(``);
 
         // Slide timing section
@@ -258,6 +266,19 @@ export class VideoFolderCreator {
         }
         lines.push(`SLIDE TIMING (EXACT):`);
         lines.push(`${timingParts.join(', ')}. Total: ~${totalSeconds} seconds.`);
+
+        lines.push(``);
+        lines.push(`VISUAL MANDATE:`);
+        lines.push(`- GENERATE EVERY SINGLE SLIDE`);
+        lines.push(`- EVERY SLIDE MUST HAVE A VISUAL (no text-only slides)`);
+        lines.push(`- Code must be readable`);
+        lines.push(`- All slides must have dark backgrounds`);
+        lines.push(`- Do not skip or merge slides`);
+
+        lines.push(``);
+        lines.push(`THEME:`);
+        lines.push(`Apply hacker/cybersecurity aesthetic throughout. Use the NotebookLM Style Settings for visual design.`);
+        lines.push(``);
 
         // Visual assets section - only slides with images
         lines.push(`VISUAL ASSETS TO FEATURE:`);

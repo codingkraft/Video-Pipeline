@@ -139,6 +139,11 @@ export class CaptiveBrowser {
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding',
                 '--disable-background-networking',
+                // Disable tab freezing and discarding (critical for parallel tabs)
+                '--disable-features=TabDiscarding,FreezingOnEnergySaver',
+                '--disable-hang-monitor',
+                '--disable-ipc-flooding-protection',
+                '--disable-prompt-on-repost',
                 // Enable WebGL and WebAssembly (required by some sites like notebooklmremover)
                 '--enable-webgl',
                 '--enable-accelerated-2d-canvas',

@@ -186,6 +186,7 @@ export class NotebookLMTester {
 
         // Try loading from file
         const promptPaths = [
+            path.join(config.sourceFolder, 'output', 'perplexity_video_response.txt'),
             path.join(config.sourceFolder, 'perplexity_video_response.txt'),
             path.join(config.sourceFolder, 'perplexity_response.txt'),
             path.join(config.sourceFolder, 'output', 'perplexity_response.txt')
