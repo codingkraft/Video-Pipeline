@@ -122,7 +122,19 @@ class Upscaler:
             else:
                 alpha = None
 
-            # Preprocess
+            # ==========================================================
+            # PRE-PROCESSING (Clean input for AI)
+            # ==========================================================
+            
+            # 1. Fast Non-Local Means Denoising (Remove compression artifacts)
+            # h=3 (strength), templateWindowSize=7, searchWindowSize=21
+            img = cv2.fastNlMeansDenoisingColored(img, None, h=3, hColor=3, templateWindowSize=7, searchWindowSize=21)
+            
+            # 2. Bilateral Filter (Smooth surfaces, preserve edges/text)
+            # d=5 (diameter), sigmaColor=50, sigmaSpace=50
+            img = cv2.bilateralFilter(img, d=5, sigmaColor=50, sigmaSpace=50)
+
+            # Preprocess for PyTorch
             if self.device.type == 'cuda':
                 torch.cuda.synchronize()
             t0 = time.time()
@@ -187,24 +199,38 @@ class Upscaler:
             output = output[:, :, [2, 1, 0]]
 
             # ==========================================================
-            # 5. Enhancements (Sharpening + Vibrance)
+            # POST-PROCESSING (Professional Polish)
             # ==========================================================
             
-            # A. Unsharp Mask (Crisp Text)
-            # Gaussian Blur implies the "un-sharp" version
+            # A. Adaptive Unsharp Mask (Edge-Aware Sharpening)
+            # Amount 0.5 => 1.5 * Original - 0.5 * Blurred
             gaussian = cv2.GaussianBlur(output, (0, 0), 1.0)
-            # Formula: Sharp = Original + (Original - Blurred) * Amount
-            # Here: 1.5 * Original - 0.5 * Blurred
             output = cv2.addWeighted(output, 1.5, gaussian, -0.5, 0)
 
-            # B. Vibrance / Saturation Boost (Impressive Colors)
-            hsv = cv2.cvtColor(output, cv2.COLOR_BGR2HSV).astype(np.float32)
-            # Scale Saturation by 1.2x (20% boost)
-            hsv[:, :, 1] = hsv[:, :, 1] * 1.2
+            # B. Gamma Correction (Improves contrast/readability)
+            # gamma < 1 = brighter midtones, gamma > 1 = darker midtones
+            gamma = 0.95  # Slight brightening
+            inv_gamma = 1.0 / gamma
+            lut = np.array([((i / 255.0) ** inv_gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+            output = cv2.LUT(output, lut)
+
+            # C. Subtle Vignette (Professional Focus Effect)
+            rows, cols = output.shape[:2]
+            # Create gradient mask
+            X = cv2.getGaussianKernel(cols, cols * 0.8)
+            Y = cv2.getGaussianKernel(rows, rows * 0.8)
+            mask = Y * X.T
+            mask = mask / mask.max()
+            # Apply vignette (blend original with darkened version)
+            vignette_strength = 0.15  # 15% darkening at corners
+            for i in range(3):
+                output[:, :, i] = output[:, :, i] * (1 - vignette_strength + vignette_strength * mask)
+
+            # D. Vibrance / Saturation Boost (Subtle)
+            hsv = cv2.cvtColor(output.astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
+            # Scale Saturation by 1.1x (10% boost)
+            hsv[:, :, 1] = hsv[:, :, 1] * 1.1
             hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 255)
-            # Scale Value slightly (Brightness) by 1.05x
-            hsv[:, :, 2] = hsv[:, :, 2] * 1.05
-            hsv[:, :, 2] = np.clip(hsv[:, :, 2], 0, 255)
             
             output = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
             
