@@ -1499,6 +1499,65 @@ io.on('connection', (socket) => {
     });
 });
 
+// API: Manual Upscale (Batch)
+app.post('/api/manual-upscale', upload.array('images', 50), async (req: Request, res: Response) => {
+    try {
+        const files = req.files as Express.Multer.File[];
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'No images uploaded' });
+        }
+
+        const { UpscaleService } = await import('./services/UpscaleService');
+
+        // Ensure service is running
+        const started = await UpscaleService.instance.ensureStarted();
+        if (!started) {
+            return res.status(500).json({ error: 'Failed to start Upscale Service' });
+        }
+
+        const results: { original: string, upscaled: string, status: string }[] = [];
+        const scale = 1.5; // Fixed for now, or get from req.body
+
+        for (const file of files) {
+            const inputPath = file.path;
+            const originalName = file.originalname;
+            const ext = path.extname(originalName);
+            const baseName = path.basename(originalName, ext);
+
+            // Output path: suffix usually attached
+            const outputPath = path.join(path.dirname(inputPath), `${baseName}_upscaled${ext}`);
+
+            const success = await UpscaleService.instance.upscale(inputPath, outputPath, scale);
+
+            if (success) {
+                // Return relative path for frontend access (assuming served from temp_uploads?)
+                // Actually server static is public. Temp uploads aren't served by default unless we add a route.
+                // We should serve temp_uploads via a specific route for preview.
+                results.push({
+                    original: originalName,
+                    upscaled: `/uploads/${path.basename(outputPath)}`, // We need to serve this
+                    status: 'success'
+                });
+            } else {
+                results.push({
+                    original: originalName,
+                    upscaled: '',
+                    status: 'failed'
+                });
+            }
+        }
+
+        res.json({ results });
+
+    } catch (error) {
+        console.error('Upscale error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Serve temp_uploads for previewing upscaled images
+app.use('/uploads', express.static(path.join(process.cwd(), 'temp_uploads')));
+
 // Start server
 httpServer.listen(PORT, () => {
     console.log(`\n=================================`);

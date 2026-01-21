@@ -57,3 +57,11 @@ desktop.ini
 
 # Uploaded documents (temporary)
 uploads/
+
+# Python Environment
+scripts/venv/
+__pycache__/
+*.pyc
+
+# AI Model Weights
+tools/weights/

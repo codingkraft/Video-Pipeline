@@ -311,7 +311,42 @@ export class TimelineProcessor {
     }
 
     /**
+     * Upscale using the persistent service
+     */
+    private async upscaleWithService(imagePath: string): Promise<boolean> {
+        const { UpscaleService } = await import('../services/UpscaleService');
+        const outputPath = imagePath.replace('.png', '_upscaled.png');
+
+        try {
+            // -s 1.5 scales 720p -> 1080p
+            const success = await UpscaleService.instance.upscale(imagePath, outputPath, 1.5);
+
+            if (success && fs.existsSync(outputPath)) {
+                // Check size
+                const stats = fs.statSync(outputPath);
+                if (stats.size < 1000) {
+                    console.error(`[RealESRGAN] Upscaled file too small: ${path.basename(outputPath)}`);
+                    return false;
+                }
+
+                // Replace original
+                try {
+                    fs.unlinkSync(imagePath);
+                    fs.renameSync(outputPath, imagePath);
+                    return true;
+                } catch (e) {
+                    console.error(`[RealESRGAN] Failed to replace file: ${e}`);
+                }
+            }
+        } catch (error) {
+            console.error(`[RealESRGAN] Service error: ${error}`);
+        }
+        return false;
+    }
+
+    /**
      * Extract a representative image (thumbnail) for each clip
+     * Uses Persistent AI Service for lightning fast upscaling
      */
     public async extractClipImages(
         videoPath: string,
@@ -321,33 +356,48 @@ export class TimelineProcessor {
         const outputPaths: string[] = [];
         const baseName = path.basename(videoPath, path.extname(videoPath));
 
+        // Ensure service is started/warm BEFORE we verify images
+        // This hides the ~2s startup time during ffmpeg operations
+        const { UpscaleService } = await import('../services/UpscaleService');
+        UpscaleService.instance.ensureStarted().catch(e => console.error("Failed to pre-warm upscaler:", e));
+
         for (const clip of clips) {
-            const outputPath = path.join(outputDir, `${baseName}_clip_${String(clip.index).padStart(3, '0')}.jpg`);
+            const outputPath = path.join(outputDir, `${baseName}_clip_${String(clip.index).padStart(3, '0')}.png`);
 
-            // Capture frame at start time + small offset (e.g. 0.5s) to avoid black frames at cut points
-            // But ensure we don't go past end time
+            // Timestamp selection
             const timestamp = Math.min(clip.startTime + 0.5, clip.endTime - 0.1);
+            console.log(`Processing clip ${clip.index}: Extracting at ${timestamp.toFixed(2)}s`);
 
-            console.log(`Extracting image for clip ${clip.index} at ${timestamp.toFixed(2)}s`);
-
-            await new Promise<void>((resolve, reject) => {
+            // Step 1: Extract at native resolution
+            await new Promise<void>((resolve) => {
                 ffmpeg(videoPath)
                     .seekInput(timestamp)
                     .frames(1)
-                    .outputOptions(['-q:v', '2']) // High quality JPEG
+                    .outputOptions(['-compression_level', '6'])
                     .output(outputPath)
                     .on('end', () => {
                         outputPaths.push(outputPath);
                         resolve();
                     })
                     .on('error', (err) => {
-                        console.error(`Failed to extract image for clip ${clip.index}: ${err.message}`);
-                        // Don't fail the whole process, just log
+                        console.error(`Extract failed clip ${clip.index}: ${err.message}`);
                         resolve();
                     })
                     .run();
             });
+
+            // Step 2: Upscale immediately using service
+            if (fs.existsSync(outputPath)) {
+                // Upscale
+                const upscaled = await this.upscaleWithService(outputPath);
+                if (upscaled) {
+                    console.log(`[RealESRGAN] Upscaled: ${path.basename(outputPath)}`);
+                } else {
+                    console.warn(`[RealESRGAN] Failed to upscale ${path.basename(outputPath)}, keeping original`);
+                }
+            }
         }
+
         return outputPaths;
     }
 
