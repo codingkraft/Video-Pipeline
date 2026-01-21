@@ -183,7 +183,30 @@ class Upscaler:
                      alpha = cv2.resize(alpha, (output.shape[1], output.shape[0]), interpolation=cv2.INTER_LINEAR)
                 output = np.dstack((output, alpha))
             
+            # Convert RGB to BGR for OpenCV
             output = output[:, :, [2, 1, 0]]
+
+            # ==========================================================
+            # 5. Enhancements (Sharpening + Vibrance)
+            # ==========================================================
+            
+            # A. Unsharp Mask (Crisp Text)
+            # Gaussian Blur implies the "un-sharp" version
+            gaussian = cv2.GaussianBlur(output, (0, 0), 1.0)
+            # Formula: Sharp = Original + (Original - Blurred) * Amount
+            # Here: 1.5 * Original - 0.5 * Blurred
+            output = cv2.addWeighted(output, 1.5, gaussian, -0.5, 0)
+
+            # B. Vibrance / Saturation Boost (Impressive Colors)
+            hsv = cv2.cvtColor(output, cv2.COLOR_BGR2HSV).astype(np.float32)
+            # Scale Saturation by 1.2x (20% boost)
+            hsv[:, :, 1] = hsv[:, :, 1] * 1.2
+            hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 255)
+            # Scale Value slightly (Brightness) by 1.05x
+            hsv[:, :, 2] = hsv[:, :, 2] * 1.05
+            hsv[:, :, 2] = np.clip(hsv[:, :, 2], 0, 255)
+            
+            output = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
             
             if self.device.type == 'cuda':
                 torch.cuda.synchronize()
