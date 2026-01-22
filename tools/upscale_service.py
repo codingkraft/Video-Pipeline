@@ -124,7 +124,7 @@ class Upscaler:
             print(f"[Service] CRITICAL: Failed to load model: {e}")
             sys.exit(1)
 
-    def tile_process(self, img, tile_size=1024, tile_pad=10):
+    def tile_process(self, img, tile_size=800, tile_pad=10):
         """
         Process image in tiles to save VRAM.
         img: (1, 3, H, W) tensor
@@ -173,8 +173,6 @@ class Upscaler:
                 # Run inference on tile
                 with torch.no_grad():
                     if hasattr(self.model, 'half') and img.dtype == torch.float16:
-                         # Force empty cache if memory is tight
-                        # torch.cuda.empty_cache() 
                         output_tile = self.model(input_tile)
                     else:
                         output_tile = self.model(input_tile)
@@ -202,6 +200,12 @@ class Upscaler:
 
                 output[:, :, output_start_y:output_end_y, output_start_x:output_end_x] = \
                     output_tile[:, :, tile_idx_y:tile_idx_y + tile_idx_h, tile_idx_x:tile_idx_x + tile_idx_w]
+                
+                # Free memory immediately
+                del input_tile
+                del output_tile
+                if self.device.type == 'cuda':
+                    torch.cuda.empty_cache()
 
         return output
 
@@ -249,8 +253,8 @@ class Upscaler:
 
             # Inference (Tiled to prevent OOM/Hang)
             with torch.no_grad():
-                # Tile size 400 fits comfortably in 4GB-6GB VRAM
-                output = self.tile_process(img, tile_size=400, tile_pad=10)
+                # Tile size 600 is safe for 6-8GB VRAM
+                output = self.tile_process(img, tile_size=600, tile_pad=10)
             
             if self.device.type == 'cuda':
                 torch.cuda.synchronize()
@@ -295,14 +299,18 @@ class Upscaler:
             # ==========================================================
             
             # A. Adaptive Unsharp Mask (Edge-Aware Sharpening)
+            # Increased strength for crisp text (1.5 -> 1.7)
             gaussian = cv2.GaussianBlur(output, (0, 0), 1.0)
-            output = cv2.addWeighted(output, 1.5, gaussian, -0.5, 0)
+            output = cv2.addWeighted(output, 1.7, gaussian, -0.7, 0)
 
-            # B. Gamma Correction (Improves contrast/readability)
-            gamma = 0.95
-            inv_gamma = 1.0 / gamma
-            lut = np.array([((i / 255.0) ** inv_gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
-            output = cv2.LUT(output, lut)
+            # A2. Dynamic Range & Contrast ("Blacker Blacks")
+            # Alpha > 1.0 (Contrast), Beta < 0 (Black Point Shift)
+            # This crushes dark grays to black and expands luminance
+            output = cv2.convertScaleAbs(output, alpha=1.12, beta=-12)
+
+            # B. Gamma Correction (Skipped as Levels adjustment handles contrast better)
+            # gamma = 1.0 
+            # (Skipping explicit gamma if 1.0 to save time, unless dark)
 
             # C. Bloom / Glow Effect (Optimized)
             # Calculate glow on smaller image (Much faster)
@@ -311,25 +319,25 @@ class Upscaler:
             small = cv2.resize(output, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
             
             gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-            # Threshold
-            thresh = cv2.threshold(gray, 210, 255, cv2.THRESH_BINARY)[1]
+            # Threshold (Higher threshold = only brightest parts glow)
+            thresh = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)[1]
             # Blur
-            blur = cv2.GaussianBlur(thresh, (0, 0), 11) # Smaller kernel for smaller image
+            blur = cv2.GaussianBlur(thresh, (0, 0), 11)
             blur_color = cv2.cvtColor(blur, cv2.COLOR_GRAY2BGR)
             
             # Resize bloom map back up
             bloom = cv2.resize(blur_color, (output.shape[1], output.shape[0]), interpolation=cv2.INTER_LINEAR)
             
-            # Add bloom
-            output = cv2.addWeighted(output, 1.0, bloom, 0.4, 0)
+            # Add bloom (Reduced intensity 0.4 -> 0.3 for cleaner look)
+            output = cv2.addWeighted(output, 1.0, bloom, 0.3, 0)
 
-            # D. Subtle Vignette
+            # D. Subtle Vignette (Reduced 0.15 -> 0.10)
             rows, cols = output.shape[:2]
             X = cv2.getGaussianKernel(cols, cols * 0.8)
             Y = cv2.getGaussianKernel(rows, rows * 0.8)
             mask = Y * X.T
             mask = mask / mask.max()
-            vignette_strength = 0.15
+            vignette_strength = 0.10
             for i in range(3):
                 output[:, :, i] = output[:, :, i] * (1 - vignette_strength + vignette_strength * mask)
 
