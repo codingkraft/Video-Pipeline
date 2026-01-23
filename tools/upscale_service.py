@@ -298,19 +298,21 @@ class Upscaler:
             # POST-PROCESSING (Professional Polish)
             # ==========================================================
             
+            # ==========================================================
+            # POST-PROCESSING (Professional Polish)
+            # ==========================================================
+            
             # A. Adaptive Unsharp Mask (Edge-Aware Sharpening)
-            # Increased strength for crisp text (1.5 -> 1.7)
+            # Reduced to 0.8 to prevent ringing on small code text
             gaussian = cv2.GaussianBlur(output, (0, 0), 1.0)
-            output = cv2.addWeighted(output, 1.7, gaussian, -0.7, 0)
+            output = cv2.addWeighted(output, 1.8, gaussian, -0.8, 0)
 
             # A2. Dynamic Range & Contrast ("Blacker Blacks")
-            # Alpha > 1.0 (Contrast), Beta < 0 (Black Point Shift)
-            # This crushes dark grays to black and expands luminance
-            output = cv2.convertScaleAbs(output, alpha=1.12, beta=-12)
+            # Minimal shift (-2) to preserve anti-aliased font edges
+            output = cv2.convertScaleAbs(output, alpha=1.05, beta=-2)
 
             # B. Gamma Correction (Skipped as Levels adjustment handles contrast better)
-            # gamma = 1.0 
-            # (Skipping explicit gamma if 1.0 to save time, unless dark)
+            # ...
 
             # C. Bloom / Glow Effect (Optimized)
             # Calculate glow on smaller image (Much faster)
@@ -319,8 +321,8 @@ class Upscaler:
             small = cv2.resize(output, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
             
             gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-            # Threshold (Higher threshold = only brightest parts glow)
-            thresh = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)[1]
+            # Threshold (Higher threshold = pickier glow)
+            thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)[1]
             # Blur
             blur = cv2.GaussianBlur(thresh, (0, 0), 11)
             blur_color = cv2.cvtColor(blur, cv2.COLOR_GRAY2BGR)
@@ -328,22 +330,16 @@ class Upscaler:
             # Resize bloom map back up
             bloom = cv2.resize(blur_color, (output.shape[1], output.shape[0]), interpolation=cv2.INTER_LINEAR)
             
-            # Add bloom (Reduced intensity 0.4 -> 0.3 for cleaner look)
-            output = cv2.addWeighted(output, 1.0, bloom, 0.3, 0)
+            # Add bloom (Ultra subtle 8% opacity)
+            output = cv2.addWeighted(output, 1.0, bloom, 0.08, 0)
 
-            # D. Subtle Vignette (Reduced 0.15 -> 0.10)
-            rows, cols = output.shape[:2]
-            X = cv2.getGaussianKernel(cols, cols * 0.8)
-            Y = cv2.getGaussianKernel(rows, rows * 0.8)
-            mask = Y * X.T
-            mask = mask / mask.max()
-            vignette_strength = 0.10
-            for i in range(3):
-                output[:, :, i] = output[:, :, i] * (1 - vignette_strength + vignette_strength * mask)
+            # D. Vignette - DISABLED for code readability
+            # rows, cols = output.shape[:2]
+            # ...
 
             # E. Vibrance
             hsv = cv2.cvtColor(output.astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
-            hsv[:, :, 1] = hsv[:, :, 1] * 1.15 # Slightly richer
+            hsv[:, :, 1] = hsv[:, :, 1] * 1.30 # Richer Colors (+30%)
             hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 255)
             output = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
             
