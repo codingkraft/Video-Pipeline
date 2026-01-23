@@ -75,9 +75,21 @@ export class CodeScreenshotService {
                 success: true
             };
         } catch (error: any) {
+            // Sanitize error messages to replace temp file path with C:/main.py
+            let stderrText = error.stderr?.trim() || error.message;
+
+            // Replace all variations of the temp file path
+            const tempFileNormalized = tempFile.replace(/\\/g, '/');
+            const tempFileBackslash = tempFile.replace(/\//g, '\\');
+
+            stderrText = stderrText
+                .replace(new RegExp(tempFileNormalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), 'C:/main.py')
+                .replace(new RegExp(tempFileBackslash.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), 'C:/main.py')
+                .replace(/File ".*?temp_script\.py"/g, 'File "C:/main.py"');
+
             return {
                 stdout: error.stdout?.trim() || '',
-                stderr: error.stderr?.trim() || error.message,
+                stderr: stderrText,
                 success: false
             };
         } finally {
@@ -127,8 +139,8 @@ export class CodeScreenshotService {
 
     /**
      * Execute Python code and capture screenshots.
-     * If code has <= 15 lines AND has output: captures combined screenshot
-     * If code has > 15 lines OR no output: captures code-only (and output separately if exists)
+     * If code has <= 15 lines AND has output (or error): captures combined screenshot
+     * If code has > 15 lines OR no output: captures code-only (and output/error separately if exists)
      */
     async executeAndCapture(
         code: string,
@@ -138,17 +150,36 @@ export class CodeScreenshotService {
     ): Promise<{ codePath: string; outputPath?: string; combinedPath?: string }> {
         // Execute the Python code
         const result = await this.executePython(code);
+
+        // Check for output OR error
         const hasOutput = result.success && result.stdout.trim().length > 0;
-        const output = result.success
-            ? (result.stdout || '')
-            : `Error: ${result.stderr}`;
+        const hasError = !result.success && result.stderr.trim().length > 0;
+        const hasAnyOutput = hasOutput || hasError;
+
+        // Format the output string with ||| separator for proper color rendering
+        // Format: stdout|||stderr (HTML will parse this and color appropriately)
+        let output = '';
+        if (result.success) {
+            output = result.stdout || '';
+        } else {
+            // Error case: combine stdout (if any) with stderr using ||| separator
+            const stdout = result.stdout?.trim() || '';
+            const stderr = result.stderr?.trim() || '';
+            if (stdout && stderr) {
+                output = `${stdout}|||Error: ${stderr}`;
+            } else if (stderr) {
+                output = `|||Error: ${stderr}`;
+            } else {
+                output = stdout;
+            }
+        }
 
         const codeLines = code.split('\n').length;
         const codeTooBig = codeLines > CodeScreenshotService.MAX_LINES_WITH_OUTPUT;
 
         // Decide whether to combine or separate
-        if (hasOutput && !codeTooBig) {
-            // Small code with output: capture combined screenshot
+        if (hasAnyOutput && !codeTooBig) {
+            // Small code with output/error: capture combined screenshot
             const combinedPath = path.join(outputDir, `${baseName}.png`);
             await this.captureCodeWithOutput(code, output, combinedPath, config);
             return { codePath: combinedPath, combinedPath };
@@ -157,8 +188,8 @@ export class CodeScreenshotService {
             const codePath = path.join(outputDir, `${baseName}.png`);
             await this.captureCode(code, codePath, config);
 
-            if (hasOutput) {
-                // Capture output separately
+            if (hasAnyOutput) {
+                // Capture output/error separately
                 const outputPath = path.join(outputDir, `${baseName}_OUTPUT.png`);
                 await this.captureOutput(output, outputPath, config);
                 console.log(`[CodeScreenshot] Code too big (${codeLines} lines), generated output separately`);

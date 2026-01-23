@@ -569,6 +569,9 @@ export class BatchProcessor {
 
     /**
      * Process audio generation for a single folder
+     * For batched folders:
+     * 1. Runs Perplexity narration per original video
+     * 2. Generates chunked TTS audio per video
      */
     private async processFolderAudio(
         folderPath: string,
@@ -603,100 +606,221 @@ export class BatchProcessor {
             await this.browser.initialize({ profileId });
 
             const outputDir = path.join(folderPath, 'output');
-            const narrationPath = path.join(outputDir, 'perplexity_audio_response.txt');
-            const legacyPath1 = path.join(outputDir, 'audio_narration.txt');
-            const legacyPath2 = path.join(outputDir, 'audio_narration.md');
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
 
-            let hasNarration = fs.existsSync(narrationPath) || fs.existsSync(legacyPath1) || fs.existsSync(legacyPath2);
-            const shouldGenerateNarration = spConfig.forceRegenerateNarration || (!hasNarration && !spConfig.skipNarrationGeneration);
+            // Read settings
+            const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
 
-            if (shouldGenerateNarration) {
-                const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
-                const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+            // Check if this is a batched folder (folder name contains commas like "Video 1,2,3")
+            const isBatchedFolder = folderName.includes(',');
 
-                // Find narration input file in source folder
-                let contextFile = '';
-                try {
+            // Import AudioGenerator
+            const { AudioGenerator } = await import('./AudioGenerator');
+            const audioGen = new AudioGenerator();
+            const skipTTS = folderConfig?.skipTTSGeneration ?? false;
+
+            if (isBatchedFolder) {
+                // BATCHED FOLDER: Two-phase processing
+                // Phase 1: Generate all Perplexity prompts
+                // Phase 2: Generate all TTS audio (with parallel chunks)
+                this.log(`${folderName}: Batched folder detected - two-phase processing`);
+
+                // Find individual narration input files in audio_narration subfolder
+                const audioNarrationDir = path.join(folderPath, 'audio_narration');
+                if (!fs.existsSync(audioNarrationDir)) {
+                    throw new Error(`No audio_narration folder found in batched folder.`);
+                }
+
+                const individualNarrationInputFiles = fs.readdirSync(audioNarrationDir)
+                    .filter(f => f.match(/video\d+_narration_individual\.txt$/))
+                    .sort((a, b) => {
+                        const numA = parseInt(a.match(/video(\d+)/)?.[1] || '0');
+                        const numB = parseInt(b.match(/video(\d+)/)?.[1] || '0');
+                        return numA - numB;
+                    });
+
+                if (individualNarrationInputFiles.length === 0) {
+                    throw new Error(`No individual narration files found in audio_narration/. Expected video{N}_narration_individual.txt files.`);
+                }
+
+                this.log(`${folderName}: Found ${individualNarrationInputFiles.length} videos to process`);
+
+                // Build video info array
+                const videoInfos = individualNarrationInputFiles.map((fileName, idx) => {
+                    const videoNumMatch = fileName.match(/video(\d+)/);
+                    const videoNum = videoNumMatch ? videoNumMatch[1] : String(idx + 1);
+                    return {
+                        videoNum,
+                        inputFilePath: path.join(audioNarrationDir, fileName),
+                        perplexityOutputPath: path.join(outputDir, `perplexity_audio_response_v${videoNum}.txt`),
+                        perplexityDoneKey: `audio_v${videoNum}_perplexity` as any,
+                        audioDoneKey: `audio_v${videoNum}_generated` as any
+                    };
+                });
+
+                // ========================
+                // PHASE 1: All Perplexity prompts
+                // ========================
+                this.log(`\n${folderName}: === PHASE 1: Generating Perplexity narrations ===`);
+
+                for (const info of videoInfos) {
+                    const hasPerplexityOutput = fs.existsSync(info.perplexityOutputPath);
+                    const isPerplexityDone = ProgressTracker.isStepComplete(folderPath, info.perplexityDoneKey);
+                    const shouldGenerate = spConfig.forceRegenerateNarration || (!hasPerplexityOutput && !spConfig.skipNarrationGeneration && !isPerplexityDone);
+
+                    if (!shouldGenerate) {
+                        this.log(`${folderName}: V${info.videoNum} - Perplexity already done, skipping`);
+                        continue;
+                    }
+
+                    this.log(`${folderName}: V${info.videoNum} - Generating Perplexity narration...`);
+
+                    const audioNarrationUrl = settings.profiles?.[profileId]?.audioNarrationPerplexityUrl || settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/';
+
+                    const genResult = await this.perplexityTester.testWorkflow({
+                        chatUrl: audioNarrationUrl,
+                        files: [info.inputFilePath],
+                        prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
+                        sourceFolder: folderPath,
+                        headless: settings.headlessMode,
+                        shouldDeleteConversation: settings.deleteConversation,
+                        model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
+                        profileId: profileId,
+                        outputFilename: `perplexity_audio_response_v${info.videoNum}`
+                    });
+
+                    if (!genResult.success) {
+                        throw new Error(`Perplexity narration failed for video ${info.videoNum}: ${genResult.message}`);
+                    }
+
+                    // Replace [PAUSE] markers with 'next slide please'
+                    if (fs.existsSync(info.perplexityOutputPath)) {
+                        let content = fs.readFileSync(info.perplexityOutputPath, 'utf-8');
+                        content = content.replace(/\[PAUSE\]/gi, 'next slide please');
+                        fs.writeFileSync(info.perplexityOutputPath, content, 'utf-8');
+                    }
+
+                    // Mark this video's Perplexity as done
+                    ProgressTracker.markStepComplete(folderPath, info.perplexityDoneKey);
+                    this.log(`${folderName}: V${info.videoNum} - Perplexity narration complete`);
+
+                    await this.sleep(2000);
+                }
+
+                // ========================
+                // PHASE 2: All TTS audio generation
+                // ========================
+                this.log(`\n${folderName}: === PHASE 2: Generating TTS audio ===`);
+
+                for (const info of videoInfos) {
+                    const isAudioDone = ProgressTracker.isStepComplete(folderPath, info.audioDoneKey);
+
+                    if (isAudioDone && !spConfig.forceRegenerateNarration) {
+                        this.log(`${folderName}: V${info.videoNum} - Audio already done, skipping`);
+                        continue;
+                    }
+
+                    if (!fs.existsSync(info.perplexityOutputPath)) {
+                        throw new Error(`Perplexity output not found for video ${info.videoNum}: ${info.perplexityOutputPath}`);
+                    }
+
+                    this.log(`${folderName}: V${info.videoNum} - Generating TTS audio...`);
+
+                    await audioGen.generateAudio({
+                        sourceFolder: folderPath,
+                        profileId: profileId,
+                        narrationFilePath: info.perplexityOutputPath,
+                        googleStudioModel: settings.googleStudioModel,
+                        googleStudioVoice: settings.googleStudioVoice,
+                        googleStudioStyleInstructions: settings.googleStudioStyleInstructions,
+                        skipTTSGeneration: skipTTS
+                    });
+
+                    // Mark this video's audio as done
+                    ProgressTracker.markStepComplete(folderPath, info.audioDoneKey);
+                    this.log(`${folderName}: V${info.videoNum} - Audio generation complete`);
+
+                    // Delay between videos
+                    await this.sleep(this.delays.betweenAudioSlidesMs);
+                }
+            } else {
+                // NON-BATCHED FOLDER: Single video processing
+                const narrationPath = path.join(outputDir, 'perplexity_audio_response.txt');
+                const legacyPath1 = path.join(outputDir, 'audio_narration.txt');
+                const legacyPath2 = path.join(outputDir, 'audio_narration.md');
+
+                let hasNarration = fs.existsSync(narrationPath) || fs.existsSync(legacyPath1) || fs.existsSync(legacyPath2);
+                const shouldGenerateNarration = spConfig.forceRegenerateNarration || (!hasNarration && !spConfig.skipNarrationGeneration);
+
+                if (shouldGenerateNarration) {
+                    // Find narration input file
                     const filesInFolder = fs.readdirSync(folderPath);
                     const narrationFile = filesInFolder.find(f =>
                         f.toLowerCase().includes('narration') && f.toLowerCase().endsWith('.txt')
                     );
 
-                    if (narrationFile) {
-                        contextFile = path.join(folderPath, narrationFile);
-                        this.log(`${folderName}: Found narration input file: ${narrationFile}`);
+                    if (!narrationFile) {
+                        throw new Error(`No narration input file found in folder.`);
+                    }
+
+                    const contextFile = path.join(folderPath, narrationFile);
+                    this.log(`${folderName}: Found narration input: ${narrationFile}`);
+
+                    const audioNarrationUrl = settings.profiles?.[profileId]?.audioNarrationPerplexityUrl || settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/';
+
+                    const genResult = await this.perplexityTester.testWorkflow({
+                        chatUrl: audioNarrationUrl,
+                        files: [contextFile],
+                        prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
+                        sourceFolder: folderPath,
+                        headless: settings.headlessMode,
+                        shouldDeleteConversation: settings.deleteConversation,
+                        model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
+                        profileId: profileId,
+                        outputFilename: 'perplexity_audio_response'
+                    });
+
+                    if (genResult.success) {
+                        hasNarration = true;
+                        ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
+
+                        // Replace [PAUSE] markers
+                        const outputPath = path.join(outputDir, 'perplexity_audio_response.txt');
+                        if (fs.existsSync(outputPath)) {
+                            let content = fs.readFileSync(outputPath, 'utf-8');
+                            content = content.replace(/\[PAUSE\]/gi, 'next slide please');
+                            fs.writeFileSync(outputPath, content, 'utf-8');
+                        }
+
+                        await this.sleep(2000);
                     } else {
-                        throw new Error(`No narration input file found in folder. Expected a .txt file with "narration" in the filename.`);
+                        throw new Error(`Narration generation failed: ${genResult.message}`);
                     }
-                } catch (error) {
-                    // Re-throw the error to stop execution
-                    throw new Error(`Failed to find narration input file: ${(error as Error).message}`);
                 }
 
-                // Get profile-specific audio narration URL
-                const audioNarrationUrl = settings.profiles?.[profileId]?.audioNarrationPerplexityUrl || settings.audioNarrationPerplexityUrl || 'https://www.perplexity.ai/';
+                if (!hasNarration) {
+                    throw new Error(`No narration file found.`);
+                }
 
-                const genResult = await this.perplexityTester.testWorkflow({
-                    chatUrl: audioNarrationUrl,
-                    files: [contextFile],
-                    prompt: settings.audioNarrationPrompt || 'Create a voiceover script based on this.',
+                // Generate TTS audio
+                let finalNarrationPath = narrationPath;
+                if (!fs.existsSync(finalNarrationPath)) {
+                    finalNarrationPath = fs.existsSync(legacyPath1) ? legacyPath1 : legacyPath2;
+                }
+
+                await audioGen.generateAudio({
                     sourceFolder: folderPath,
-                    headless: settings.headlessMode,
-                    shouldDeleteConversation: settings.deleteConversation,
-                    model: (settings.audioNarrationPerplexityModel || settings.perplexityModel) || undefined,
                     profileId: profileId,
-                    outputFilename: 'perplexity_audio_response'
+                    narrationFilePath: finalNarrationPath,
+                    googleStudioModel: settings.googleStudioModel,
+                    googleStudioVoice: settings.googleStudioVoice,
+                    googleStudioStyleInstructions: settings.googleStudioStyleInstructions,
+                    skipTTSGeneration: skipTTS
                 });
-
-                if (genResult.success) {
-                    hasNarration = true;
-                    // Mark the audio narration step as complete
-                    ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
-
-                    // Replace [PAUSE] markers with 'next slide please' for Whisper-based splitting
-                    const outputPath = path.join(outputDir, 'perplexity_audio_response.txt');
-                    if (fs.existsSync(outputPath)) {
-                        let content = fs.readFileSync(outputPath, 'utf-8');
-                        const originalLength = content.length;
-                        content = content.replace(/\[PAUSE\]/gi, 'next slide please');
-                        fs.writeFileSync(outputPath, content, 'utf-8');
-                        this.log(`${folderName}: Replaced [PAUSE] markers with 'next slide please' in narration file`);
-                    }
-
-                    await this.sleep(2000);
-                } else {
-                    throw new Error(`Narration generation failed: ${genResult.message}`);
-                }
             }
-
-            if (!hasNarration) {
-                throw new Error(`No narration file found. Cannot proceed with audio generation.`);
-            }
-
-            // Generate audio from narration
-            const { AudioGenerator } = await import('./AudioGenerator');
-            const audioGen = new AudioGenerator();
-            let finalNarrationPath = narrationPath;
-            if (!fs.existsSync(finalNarrationPath)) {
-                finalNarrationPath = fs.existsSync(legacyPath1) ? legacyPath1 : legacyPath2;
-            }
-
-            // Read settings for Google Studio configuration
-            const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
-            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-
-            const skipTTS = folderConfig?.skipTTSGeneration ?? false;
-            this.log(`${folderName}: skipTTSGeneration=${skipTTS} (folderConfig=${JSON.stringify(folderConfig)})`);
-
-            await audioGen.generateAudio({
-                sourceFolder: folderPath,
-                profileId: profileId,
-                narrationFilePath: finalNarrationPath,
-                googleStudioModel: settings.googleStudioModel,
-                googleStudioVoice: settings.googleStudioVoice,
-                googleStudioStyleInstructions: settings.googleStudioStyleInstructions,
-                skipTTSGeneration: skipTTS
-            });
 
             ProgressTracker.markStepComplete(folderPath, 'audio_generated');
             this.updateFolderStatus(folderPath, { status: 'complete' });
@@ -709,6 +833,7 @@ export class BatchProcessor {
 
         await this.sleep(this.delays.betweenAudioSlidesMs);
     }
+
 
     /**
      * Full batch processing workflow with parallel phases:

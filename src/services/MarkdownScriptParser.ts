@@ -10,6 +10,7 @@ export interface CodeBlock {
     slideNumber: number;
     slideTitle: string;
     expectedOutput?: string;
+    produceOutput?: boolean;  // Whether this code block should produce output (default: true)
 }
 
 /**
@@ -18,11 +19,13 @@ export interface CodeBlock {
 export interface Slide {
     number: number;
     title: string;
-    visual?: string;
+    visual?: string;              // Visual Main content (code or text from Visual Main:)
+    supportingVisual?: string;    // Supporting Visuals content (descriptive text as-is)
     audio: string;
     codeBlocks: CodeBlock[];
     expectedOutput?: string;
     duration?: number;  // in seconds
+    originalVideoNumber?: string; // For batching: original video this slide belonged to
 }
 
 /**
@@ -36,6 +39,7 @@ export interface VideoSection {
     slides: Slide[];
     allCodeBlocks: CodeBlock[];
     fullNarration: string;  // Combined audio from all slides
+    originalVideos?: VideoSection[];  // Original videos before batching (for per-video audio generation)
 }
 
 /**
@@ -163,16 +167,23 @@ export class MarkdownScriptParser {
         const audioMatch = content.match(/\*\*Audio:*\*\*:*[\s\*"]+(.*?)["\*]*\n/);
         const audio = audioMatch ? this.cleanNarration(audioMatch[1]) : '';
 
-        // Extract visual description
-        const visualMatch = content.match(/\*\*Visual:*\*\*:*\s*([^\n]+(?:\n(?!\*\*).*)*)/);
-        const visual = visualMatch ? visualMatch[1].trim() : undefined;
+        // Extract Visual Main (the primary visual, may contain code)
+        // Matches **Visual Main:** or **Visual Main** followed by content until next ** section
+        const visualMainMatch = content.match(/\*\*Visual Main:*\*\*:*\s*([\s\S]*?)(?=\*\*Supporting Visuals|\*\*Audio|$)/i);
+        const visual = visualMainMatch ? visualMainMatch[1].trim() : undefined;
+
+        // Extract Supporting Visuals (text to include as-is in DOCX)
+        // Matches **Supporting Visuals (Static):** or **Supporting Visuals (anything):** or just **Supporting Visuals:**
+        const supportingVisualMatch = content.match(/\*\*Supporting Visuals[^*]*\*\*:*\s*([\s\S]*?)(?=\*\*Audio|$)/i);
+        const supportingVisual = supportingVisualMatch ? supportingVisualMatch[1].trim() : undefined;
 
         // Extract duration
         const durationMatch = content.match(/\*\*\[(\d+)\s*seconds?\]\*\*/);
         const duration = durationMatch ? parseInt(durationMatch[1]) : undefined;
 
-        // Extract code blocks
-        const codeBlockRegex = /```(python\s*?)\n([\s\S]*?)```/g;
+        // Extract code blocks with their PRODUCE OUTPUT flags
+        // Find all code blocks and their following PRODUCE OUTPUT lines
+        const codeBlockRegex = /```(python|text)\s*?\n([\s\S]*?)```(?:\s*\n\s*PRODUCE OUTPUT:\s*(TRUE|FALSE))?/gi;
         let codeMatch;
         while ((codeMatch = codeBlockRegex.exec(content)) !== null) {
             const language = codeMatch[1] || 'python';
@@ -183,11 +194,21 @@ export class MarkdownScriptParser {
                 continue;
             }
 
+            // Skip text blocks that are just titles/headers (non-code visuals)
+            if (language.toLowerCase() === 'text') {
+                continue;
+            }
+
+            // Parse PRODUCE OUTPUT flag (default to true if not specified)
+            const produceOutputStr = codeMatch[3];
+            const produceOutput = produceOutputStr ? produceOutputStr.toUpperCase() !== 'FALSE' : true;
+
             codeBlocks.push({
                 code,
                 language,
                 slideNumber: number,
-                slideTitle: title
+                slideTitle: title,
+                produceOutput
             });
         }
 
@@ -204,6 +225,7 @@ export class MarkdownScriptParser {
             number,
             title,
             visual,
+            supportingVisual,
             audio,
             codeBlocks,
             expectedOutput,
@@ -258,8 +280,29 @@ export class MarkdownScriptParser {
     }
 
     /**
-     * Generate narration file content for a video (for TTS)
-     * Uses spoken "MARKER" word between slides for Whisper-based splitting
+     * Generate narration file content for NotebookLM upload (combined narration)
+     * Uses [slide_number] markers between slides for easy reference
+     */
+    static generateNarrationFileForNotebookLM(video: VideoSection): string {
+        const parts: string[] = [];
+        let slideNumber = 1;
+
+        for (const slide of video.slides) {
+            if (slide.audio) {
+                // Add slide number marker for reference
+                parts.push(`[${slideNumber}]`);
+                parts.push(slide.audio);
+                slideNumber++;
+            }
+        }
+
+        // Join with double newlines for readability
+        return parts.join('\n\n');
+    }
+
+    /**
+     * Generate narration file content for TTS audio generation
+     * Uses spoken "next slide please" word between slides for Whisper-based splitting
      */
     static generateNarrationFile(video: VideoSection): string {
         const parts: string[] = [];

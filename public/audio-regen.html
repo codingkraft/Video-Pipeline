@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Regeneration - Video Creator</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .folder-card {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .folder-card h3 {
+            margin: 0 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .video-list {
+            margin-top: 0.75rem;
+        }
+
+        .video-item {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .video-item h4 {
+            margin: 0 0 0.5rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chunk-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .chunk-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            border-radius: 4px;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            background: var(--success);
+            color: white;
+        }
+
+        .status-badge.pending {
+            background: var(--warning);
+        }
+
+        .status-badge.error {
+            background: var(--danger);
+        }
+
+        .log-section {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Back to Main</a>
+            <h1>🔄 Audio Regeneration</h1>
+            <p class="subtitle">Selectively regenerate audio for specific videos or chunks</p>
+        </header>
+
+        <main>
+            <!-- Folder Selection -->
+            <section class="card">
+                <h2>📁 Select Processed Folder</h2>
+                <div class="input-group" style="gap: 0.5rem;">
+                    <button onclick="selectFolder()" class="btn btn-primary" id="selectFolderBtn">
+                        📂 Browse Folder
+                    </button>
+                    <div id="selectedFolder" class="folder-name"
+                        style="flex: 1; padding: 0.5rem; background: var(--bg); border-radius: 0.25rem;">
+                        No folder selected
+                    </div>
+                </div>
+                <small class="hint">Select a folder that has already been processed with audio files</small>
+            </section>
+
+            <!-- Folder Contents -->
+            <section class="card" id="folderContents" style="display: none;">
+                <h2>🎬 Videos & Audio Chunks</h2>
+                <p class="hint" style="margin-bottom: 1rem;">Click on a video or chunk to regenerate its audio</p>
+
+                <div id="videoList">
+                    <!-- Populated dynamically -->
+                </div>
+            </section>
+
+            <!-- Regeneration Status -->
+            <section class="card" id="statusSection" style="display: none;">
+                <h2>⚙️ Regeneration Status</h2>
+                <div id="regenerationLog" class="log-section">
+                    <!-- Log entries appear here -->
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Status: <span id="status" class="status-idle">Idle</span></p>
+        </footer>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentFolder = null;
+        let folderData = null;
+
+        socket.on('connect', () => console.log('Connected to server'));
+
+        socket.on('audio-regen-log', (data) => {
+            appendLog(data.message);
+        });
+
+        socket.on('audio-regen-complete', (data) => {
+            appendLog(`✅ ${data.message}`);
+            document.getElementById('status').textContent = 'Complete';
+            document.getElementById('status').className = 'status-success';
+            // Refresh folder data
+            if (currentFolder) loadFolderData(currentFolder);
+        });
+
+        socket.on('audio-regen-error', (data) => {
+            appendLog(`❌ Error: ${data.message}`);
+            document.getElementById('status').textContent = 'Error';
+            document.getElementById('status').className = 'status-error';
+        });
+
+        function appendLog(message) {
+            const log = document.getElementById('regenerationLog');
+            const entry = document.createElement('div');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            document.getElementById('statusSection').style.display = 'block';
+        }
+
+        async function selectFolder() {
+            try {
+                const response = await fetch('/api/browse-folder', { method: 'POST' });
+                const data = await response.json();
+                if (data.path) {
+                    currentFolder = data.path;
+                    document.getElementById('selectedFolder').textContent = data.path;
+                    await loadFolderData(data.path);
+                }
+            } catch (error) {
+                console.error('Error selecting folder:', error);
+            }
+        }
+
+        async function loadFolderData(folderPath) {
+            try {
+                const response = await fetch('/api/audio-regen/folder-info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folderPath })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    folderData = data;
+                    renderVideoList(data);
+                    document.getElementById('folderContents').style.display = 'block';
+                } else {
+                    alert(data.message || 'Failed to load folder data');
+                }
+            } catch (error) {
+                console.error('Error loading folder data:', error);
+                alert('Error loading folder data');
+            }
+        }
+
+        function renderVideoList(data) {
+            const container = document.getElementById('videoList');
+            container.innerHTML = '';
+
+            if (!data.videos || data.videos.length === 0) {
+                container.innerHTML = '<p class="hint">No processed videos found in this folder</p>';
+                return;
+            }
+
+            data.videos.forEach(video => {
+                const videoDiv = document.createElement('div');
+                videoDiv.className = 'video-item';
+
+                const hasAudio = video.audioFiles && video.audioFiles.length > 0;
+                const statusClass = hasAudio ? '' : 'pending';
+
+                videoDiv.innerHTML = `
+                    <h4>
+                        <span>📹 Video ${video.videoNum}</span>
+                        <span class="status-badge ${statusClass}">${hasAudio ? 'Has Audio' : 'No Audio'}</span>
+                    </h4>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button onclick="regenerateVideo('${video.videoNum}')" class="btn btn-primary">
+                            🔄 Regenerate All
+                        </button>
+                        ${video.chunks && video.chunks.length > 0 ? `
+                            <span style="padding: 0.5rem; color: var(--text-muted);">or select chunk:</span>
+                            ${video.chunks.map(chunk => `
+                                <button onclick="regenerateChunk('${video.videoNum}', ${chunk.num})" 
+                                    class="btn btn-secondary chunk-btn">
+                                    Chunk ${chunk.num} (${chunk.slides} slides)
+                                </button>
+                            `).join('')}
+                        ` : ''}
+                    </div>
+                    ${video.slideFiles && video.slideFiles.length > 0 ? `
+                        <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                            📊 ${video.slideFiles.length} slide audio files
+                        </div>
+                    ` : ''}
+                `;
+
+                container.appendChild(videoDiv);
+            });
+        }
+
+        async function regenerateVideo(videoNum) {
+            if (!confirm(`Regenerate all audio for Video ${videoNum}?`)) return;
+
+            document.getElementById('status').textContent = 'Regenerating...';
+            document.getElementById('status').className = 'status-processing';
+            document.getElementById('regenerationLog').innerHTML = '';
+            document.getElementById('statusSection').style.display = 'block';
+            appendLog(`Starting regeneration for Video ${videoNum}...`);
+
+            try {
+                const response = await fetch('/api/audio-regen/regenerate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        folderPath: currentFolder,
+                        videoNum: videoNum,
+                        chunkNum: null // All chunks
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    appendLog(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                appendLog(`Error: ${error.message}`);
+            }
+        }
+
+        async function regenerateChunk(videoNum, chunkNum) {
+            if (!confirm(`Regenerate Chunk ${chunkNum} for Video ${videoNum}?`)) return;
+
+            document.getElementById('status').textContent = 'Regenerating...';
+            document.getElementById('status').className = 'status-processing';
+            document.getElementById('regenerationLog').innerHTML = '';
+            document.getElementById('statusSection').style.display = 'block';
+            appendLog(`Starting regeneration for Video ${videoNum}, Chunk ${chunkNum}...`);
+
+            try {
+                const response = await fetch('/api/audio-regen/regenerate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        folderPath: currentFolder,
+                        videoNum: videoNum,
+                        chunkNum: chunkNum
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    appendLog(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                appendLog(`Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+
+</html>

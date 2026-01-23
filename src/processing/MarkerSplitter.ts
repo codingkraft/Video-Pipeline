@@ -21,9 +21,10 @@ export interface MarkerSplitResult {
 export interface MarkerSplitConfig {
     audioFile: string;           // Path to input audio file
     outputDir?: string;          // Output directory (default: audioFile_slides)
-    markerPhrase?: string;       // Marker to detect (default: "next slide please")
+    markerPhrases?: string[];    // Markers to detect (default: ["next slide please"])
     whisperModel?: string;       // Whisper model size (default: "base")
     expectedParts?: number;      // Expected number of segments for verification
+    slidePrefix?: string;        // Prefix for slide files (e.g., "v1_" for video 1)
 }
 
 /**
@@ -43,9 +44,10 @@ export async function splitAudioByMarkers(config: MarkerSplitConfig): Promise<Ma
     const {
         audioFile,
         outputDir,
-        markerPhrase = 'next slide please',
+        markerPhrases = ['next slide please'],
         whisperModel = 'base',
-        expectedParts
+        expectedParts,
+        slidePrefix = ''
     } = config;
 
     // Validate input file
@@ -75,9 +77,13 @@ export async function splitAudioByMarkers(config: MarkerSplitConfig): Promise<Ma
 
     const args: string[] = [
         `"${audioFile}"`,
-        `-m "${markerPhrase}"`,
         `--model ${whisperModel}`
     ];
+
+    // Add multiple markers
+    for (const phrase of markerPhrases) {
+        args.push(`-m "${phrase}"`);
+    }
 
     if (outputDir) {
         args.push(`-o "${outputDir}"`);
@@ -85,6 +91,11 @@ export async function splitAudioByMarkers(config: MarkerSplitConfig): Promise<Ma
 
     if (expectedParts !== undefined) {
         args.push(`-e ${expectedParts}`);
+    }
+
+    // Add slide prefix for per-video naming in batched folders
+    if (slidePrefix) {
+        args.push(`--prefix "${slidePrefix}"`);
     }
 
     const command = `${pythonCmd} "${scriptPath}" ${args.join(' ')}`;

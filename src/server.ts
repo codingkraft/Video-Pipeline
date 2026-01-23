@@ -1406,7 +1406,7 @@ app.post('/api/parse-script', async (req: Request, res: Response) => {
 app.post('/api/generate-video-folders', async (req: Request, res: Response) => {
     try {
         const { getVideoFolderCreator } = await import('./services/VideoFolderCreator');
-        const { scriptPath, outputBaseDir } = req.body;
+        const { scriptPath, outputBaseDir, batchSize } = req.body;
 
         if (!scriptPath) {
             return res.status(400).json({ error: 'scriptPath is required' });
@@ -1450,7 +1450,8 @@ app.post('/api/generate-video-folders', async (req: Request, res: Response) => {
                 chapterPrefix: 'chapter',
                 generateScreenshots: true,
                 generateDocx: true,
-                generateNarration: true
+                generateNarration: true,
+                batchSize: batchSize || 3 // Default to 3 if not provided
             });
 
             await browser.close();
@@ -1606,6 +1607,213 @@ app.post('/api/audio/analyze', async (req: Request, res: Response) => {
         }
     } catch (error) {
         console.error('[AudioAnalyze] Error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// API: Get folder info for audio regeneration
+app.post('/api/audio-regen/folder-info', async (req: Request, res: Response) => {
+    try {
+        const { folderPath } = req.body;
+
+        if (!folderPath) {
+            return res.status(400).json({ error: 'folderPath is required' });
+        }
+
+        if (!fs.existsSync(folderPath)) {
+            return res.status(400).json({ error: `Folder not found: ${folderPath}` });
+        }
+
+        const outputDir = path.join(folderPath, 'output');
+        const timelineDir = path.join(outputDir, 'timeline');
+        const audioClipsDir = path.join(timelineDir, 'audio_clips');
+
+        // Detect if this is a batched folder (contains "Video X,Y,Z" naming)
+        const folderName = path.basename(folderPath);
+        const batchMatch = folderName.match(/Video\s*([\d,\s]+)/i);
+        let videoCount = 1;
+        let videoIndices: number[] = [0];
+
+        if (batchMatch) {
+            // Parse the video numbers from folder name like "Video 1,2,3"
+            const numbers = batchMatch[1].split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+            videoCount = numbers.length;
+            videoIndices = numbers.map((_, i) => i); // Use 0-indexed
+        }
+
+        // Check for per-video narration files in audio_narration subfolder
+        const audioNarrationDir = path.join(outputDir, 'audio_narration');
+        if (fs.existsSync(audioNarrationDir)) {
+            const narrationFiles = fs.readdirSync(audioNarrationDir)
+                .filter(f => f.match(/video\d+_narration_individual\.txt/i));
+            if (narrationFiles.length > 0) {
+                videoCount = Math.max(videoCount, narrationFiles.length);
+                videoIndices = narrationFiles.map((_, i) => i);
+            }
+        }
+
+        // Build video info
+        const videos: any[] = [];
+
+        for (const videoIdx of videoIndices) {
+            const videoInfo: any = {
+                videoIndex: videoIdx,
+                label: `Video ${videoIdx + 1}`,
+                hasAudio: false,
+                chunks: [],
+                audioFiles: []
+            };
+
+            // Check for audio clips for this video
+            if (fs.existsSync(audioClipsDir)) {
+                const clipPattern = new RegExp(`^v${videoIdx}_chunk(\\d+)_slide(\\d+)\\.mp3$`, 'i');
+                const allClips = fs.readdirSync(audioClipsDir).filter(f => f.endsWith('.mp3'));
+
+                // Find clips for this video
+                const videoClips = allClips.filter(f => f.startsWith(`v${videoIdx}_`));
+                videoInfo.hasAudio = videoClips.length > 0;
+                videoInfo.audioFiles = videoClips;
+
+                // Group by chunk
+                const chunkMap: Record<number, string[]> = {};
+                for (const clip of videoClips) {
+                    const match = clip.match(clipPattern);
+                    if (match) {
+                        const chunkIdx = parseInt(match[1]);
+                        if (!chunkMap[chunkIdx]) chunkMap[chunkIdx] = [];
+                        chunkMap[chunkIdx].push(clip);
+                    }
+                }
+
+                // Build chunks array
+                for (const [chunkIdxStr, clips] of Object.entries(chunkMap)) {
+                    videoInfo.chunks.push({
+                        chunkIndex: parseInt(chunkIdxStr),
+                        slideCount: clips.length,
+                        files: clips.sort()
+                    });
+                }
+                videoInfo.chunks.sort((a: any, b: any) => a.chunkIndex - b.chunkIndex);
+            }
+
+            videos.push(videoInfo);
+        }
+
+        res.json({
+            success: true,
+            folderPath,
+            folderName,
+            isBatched: videoCount > 1,
+            videoCount,
+            videos,
+            outputDir,
+            audioClipsDir
+        });
+    } catch (error) {
+        console.error('[AudioRegen] Folder info error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// API: Regenerate audio for a specific video or chunk
+app.post('/api/audio-regen/regenerate', async (req: Request, res: Response) => {
+    try {
+        const { AudioGenerator } = await import('./services/AudioGenerator');
+        const { folderPath, videoIndex, chunkIndex, profileId } = req.body;
+
+        if (!folderPath) {
+            return res.status(400).json({ error: 'folderPath is required' });
+        }
+
+        if (videoIndex === undefined) {
+            return res.status(400).json({ error: 'videoIndex is required' });
+        }
+
+        if (!fs.existsSync(folderPath)) {
+            return res.status(400).json({ error: `Folder not found: ${folderPath}` });
+        }
+
+        const outputDir = path.join(folderPath, 'output');
+        const audioNarrationDir = path.join(outputDir, 'audio_narration');
+
+        // Find the narration file for this video
+        let narrationPath = '';
+        if (fs.existsSync(audioNarrationDir)) {
+            narrationPath = path.join(audioNarrationDir, `video${videoIndex}_narration_individual.txt`);
+        }
+
+        // Fallback to single narration file for non-batched folders
+        if (!fs.existsSync(narrationPath)) {
+            narrationPath = path.join(outputDir, 'audio_narration.txt');
+        }
+
+        if (!fs.existsSync(narrationPath)) {
+            return res.status(400).json({ error: `Narration file not found for video ${videoIndex}` });
+        }
+
+        console.log(`[AudioRegen] Regenerating audio for video ${videoIndex}${chunkIndex !== undefined ? `, chunk ${chunkIndex}` : ''}`);
+        io.emit('audio-regen-progress', {
+            folderPath,
+            videoIndex,
+            chunkIndex,
+            status: 'starting',
+            message: `Starting audio regeneration for Video ${videoIndex + 1}${chunkIndex !== undefined ? `, Chunk ${chunkIndex + 1}` : ''}...`
+        });
+
+        // Load settings
+        const settingsPath = path.join(process.cwd(), 'config', 'settings.json');
+        let googleStudioModel = '';
+        let googleStudioVoice = '';
+        let googleStudioStyleInstructions = '';
+
+        if (fs.existsSync(settingsPath)) {
+            try {
+                const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+                googleStudioModel = settings.googleStudioModel || '';
+                googleStudioVoice = settings.googleStudioVoice || '';
+                googleStudioStyleInstructions = settings.googleStudioStyleInstructions || '';
+            } catch (e) {
+                console.warn('Could not read settings for audio regeneration:', e);
+            }
+        }
+
+        const generator = new AudioGenerator();
+        await generator.initialize({ headless: false, profileId: profileId || 'audio' });
+
+        try {
+            const result = await generator.generateAudioForVideo({
+                narrationPath,
+                outputDir,
+                videoIndex,
+                chunkIndex: chunkIndex !== undefined ? chunkIndex : undefined,
+                model: googleStudioModel,
+                voice: googleStudioVoice,
+                styleInstructions: googleStudioStyleInstructions
+            });
+
+            io.emit('audio-regen-progress', {
+                folderPath,
+                videoIndex,
+                chunkIndex,
+                status: result.success ? 'completed' : 'failed',
+                message: result.success
+                    ? `Audio regeneration complete for Video ${videoIndex + 1}`
+                    : `Audio regeneration failed: ${result.error || 'Unknown error'}`
+            });
+
+            res.json(result);
+        } finally {
+            await generator.shutdown();
+        }
+    } catch (error) {
+        console.error('[AudioRegen] Regeneration error:', error);
+        io.emit('audio-regen-progress', {
+            folderPath: req.body.folderPath,
+            videoIndex: req.body.videoIndex,
+            chunkIndex: req.body.chunkIndex,
+            status: 'failed',
+            message: `Error: ${(error as Error).message}`
+        });
         res.status(500).json({ error: (error as Error).message });
     }
 });

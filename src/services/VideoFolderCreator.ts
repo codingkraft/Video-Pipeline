@@ -23,6 +23,7 @@ export interface VideoFolderConfig {
     generateDocx?: boolean;     // Whether to generate DOCX files
     generateNarration?: boolean; // Whether to generate narration TXT files
     generateVideoResponse?: boolean; // Whether to generate video_response.txt with image mappings
+    batchSize?: number; // Number of videos to batch together (default: 3)
 }
 
 /**
@@ -32,6 +33,7 @@ export interface VideoFolderResult {
     videoNumber: string;
     folderPath: string;
     narrationPath?: string;
+    perVideoNarrationPaths?: string[];  // Individual narration files for batched videos
     docxPath?: string;
     videoResponsePath?: string;
     screenshotPaths: string[];
@@ -96,14 +98,14 @@ export class VideoFolderCreator {
         }
         console.log(`[VideoFolderCreator] Found ${parseResult.totalVideos} videos`);
 
-        // Filter videos by number range if specified (commented out - videoNumber is now string)
         let videos = parseResult.videos;
-        // if (config.startVideoNumber !== undefined) {
-        //     videos = videos.filter(v => parseFloat(v.videoNumber) >= config.startVideoNumber!);
-        // }
-        // if (config.endVideoNumber !== undefined) {
-        //     videos = videos.filter(v => parseFloat(v.videoNumber) <= config.endVideoNumber!);
-        // }
+        const batchSize = config.batchSize ?? 3;
+
+        if (batchSize > 1) {
+            console.log(`[VideoFolderCreator] Batching videos (size: ${batchSize})...`);
+            videos = this.consolidateVideos(videos, batchSize);
+            console.log(`[VideoFolderCreator] Created ${videos.length} batched videos`);
+        }
 
         console.log(`[VideoFolderCreator] Generating ${videos.length} video folders`);
 
@@ -141,6 +143,87 @@ export class VideoFolderCreator {
     }
 
     /**
+     * Consolidate multiple videos into batched videos
+     */
+    private consolidateVideos(videos: VideoSection[], batchSize: number): VideoSection[] {
+        const batchedVideos: VideoSection[] = [];
+
+        for (let i = 0; i < videos.length; i += batchSize) {
+            const batch = videos.slice(i, i + batchSize);
+            const firstVideo = batch[0];
+            const lastVideo = batch[batch.length - 1];
+
+            // Create combined video number string "1,2,3"
+            const videoNumbers = batch.map(v => v.videoNumber).join(',');
+
+            // Calculate total duration (if available) - parse "180 seconds" -> 180
+            let totalSeconds = 0;
+
+            // Collect all slides with renumbering
+            const allSlides: any[] = [];
+            const allCodeBlocks: CodeBlock[] = [];
+            let currentSlideNumber = 1;
+
+            const narrationParts: string[] = [];
+
+            for (const v of batch) {
+                // Add separator between videos in narration (except first)
+                if (batchedVideos.length > 0 || v !== batch[0]) {
+                    // This "next video please" separates distinct videos within the batch
+                    // note: logic check - do we want this separator even for first video of valid batch? 
+                    // No, only between videos *within* the batch.
+                }
+
+                // Append full narration of this video
+                /* 
+                   Logic:
+                   Video 1 Narration: "Slide 1 Audio. [next slide please] Slide 2 Audio."
+                   If we just join Video 1 and Video 2 with "next video please", 
+                   we get: "...Slide 2 Audio. [next video please] Slide 1 Audio (Video 2)..."
+                   This works with the splitter logic if splitter treats 'next video please' as a cut.
+                */
+                narrationParts.push(v.fullNarration);
+
+                // Process slides
+                for (const slide of v.slides) {
+                    // Update slide number
+                    const newSlide = { ...slide, number: currentSlideNumber, originalVideoNumber: v.videoNumber };
+
+                    // Update code blocks
+                    for (const block of newSlide.codeBlocks) {
+                        block.slideNumber = currentSlideNumber;
+                        allCodeBlocks.push(block);
+                    }
+
+                    allSlides.push(newSlide);
+                    currentSlideNumber++;
+
+                    // Add duration
+                    if (slide.duration) {
+                        totalSeconds += slide.duration;
+                    }
+                }
+            }
+
+            const combinedNarration = narrationParts.join('\n\nnext video please\n\n');
+            const totalDurationStr = `${totalSeconds} seconds`;
+
+            batchedVideos.push({
+                videoNumber: videoNumbers,
+                title: firstVideo.title, // Use title of first video as metadata base
+                duration: totalDurationStr,
+                concept: firstVideo.concept,
+                slides: allSlides,
+                allCodeBlocks: allCodeBlocks,
+                fullNarration: combinedNarration,
+                originalVideos: batch  // Store original videos for per-video audio generation
+            });
+        }
+
+        return batchedVideos;
+    }
+
+    /**
      * Generate a single video folder
      */
     async generateVideoFolder(video: VideoSection, config: VideoFolderConfig): Promise<VideoFolderResult> {
@@ -165,9 +248,13 @@ export class VideoFolderCreator {
             result.screenshotPaths = await this.generateScreenshots(video, folderPath, prefix);
         }
 
-        // Generate narration TXT
+        // Generate narration TXT (combined narration for batched videos)
         if (config.generateNarration !== false) {
             result.narrationPath = await this.generateNarrationFile(video, folderPath);
+
+            // For batched videos, also generate individual narration files per original video
+            // This enables per-video audio generation to stay within Google Studio's 10-minute limit
+            result.perVideoNarrationPaths = await this.generatePerVideoNarrationFiles(video, folderPath);
         }
 
         // Generate DOCX with embedded screenshots
@@ -184,17 +271,58 @@ export class VideoFolderCreator {
         return result;
     }
 
+
     /**
-     * Generate narration TXT file
+     * Generate narration TXT file (combined narration for NotebookLM upload)
+     * Uses [slide_number] markers for easy reference
      */
     private async generateNarrationFile(video: VideoSection, folderPath: string): Promise<string> {
         const filename = `video${video.videoNumber}_narration.txt`;
         const filePath = path.join(folderPath, filename);
 
-        const content = MarkdownScriptParser.generateNarrationFile(video);
+        // Use NotebookLM format with [slide_number] markers for the combined narration
+        const content = MarkdownScriptParser.generateNarrationFileForNotebookLM(video);
         fs.writeFileSync(filePath, content, 'utf-8');
 
         return filePath;
+    }
+
+    /**
+     * Generate individual narration files for each original video in a batch.
+     * These go to a separate 'audio_narration' folder to avoid being uploaded to NotebookLM.
+     * Uses 'next slide please' markers for TTS/Whisper processing.
+     * @returns Array of generated narration file paths
+     */
+    private async generatePerVideoNarrationFiles(video: VideoSection, folderPath: string): Promise<string[]> {
+        const filePaths: string[] = [];
+
+        // Only generate individual files if this is a batched video with originalVideos
+        if (!video.originalVideos || video.originalVideos.length <= 1) {
+            console.log(`[VideoFolderCreator] Single video, skipping per-video narration generation`);
+            return filePaths;
+        }
+
+        // Create separate folder for audio narration files (won't be uploaded to NotebookLM)
+        const audioNarrationDir = path.join(folderPath, 'audio_narration');
+        if (!fs.existsSync(audioNarrationDir)) {
+            fs.mkdirSync(audioNarrationDir, { recursive: true });
+        }
+
+        console.log(`[VideoFolderCreator] Generating ${video.originalVideos.length} per-video narration files in audio_narration/`);
+
+        for (const originalVideo of video.originalVideos) {
+            const filename = `video${originalVideo.videoNumber}_narration_individual.txt`;
+            const filePath = path.join(audioNarrationDir, filename);
+
+            // Use TTS format with 'next slide please' markers
+            const content = MarkdownScriptParser.generateNarrationFile(originalVideo);
+            fs.writeFileSync(filePath, content, 'utf-8');
+            filePaths.push(filePath);
+
+            console.log(`[VideoFolderCreator] Generated: audio_narration/${filename}`);
+        }
+
+        return filePaths;
     }
 
     /**
@@ -232,8 +360,22 @@ export class VideoFolderCreator {
         // Build content with full prompt template
         const lines: string[] = [];
 
+        // Slide timing section - calculate total from slides
+        const timingParts: string[] = [];
+        let totalSeconds = 0;
+        for (const slide of video.slides) {
+            // Use slide duration if available, otherwise default to 15s
+            const duration = slide.duration ?? 15;
+            totalSeconds += duration;
+            timingParts.push(`Slide ${slide.number} (${duration}s)`);
+        }
+
         // Header and instructions
-        const durationText = video.duration || '180 seconds';
+        // Use calculated totalSeconds if video.duration is missing or "0 seconds"
+        let durationText = video.duration || '';
+        if (!durationText || durationText === '0 seconds' || durationText.startsWith('0 ')) {
+            durationText = `${totalSeconds} seconds`;
+        }
         lines.push(`Create a Video Overview (~${durationText}) using the DOCX as the single source.`);
         lines.push(`CRITICAL CONTENT RULE:`);
         lines.push(`The narration file (${narrationFilename}) is the SOLE source of all audio content.`);
@@ -255,15 +397,6 @@ export class VideoFolderCreator {
         lines.push(`6. Do not draw anything on code that might cover the text or make it hard to read. drawing arrows is fine`);
         lines.push(``);
 
-        // Slide timing section
-        const timingParts: string[] = [];
-        let totalSeconds = 0;
-        for (const slide of video.slides) {
-            // Use slide duration if available, otherwise default to 15s
-            const duration = slide.duration ?? 15;
-            totalSeconds += duration;
-            timingParts.push(`Slide ${slide.number} (${duration}s)`);
-        }
         lines.push(`SLIDE TIMING (EXACT):`);
         lines.push(`${timingParts.join(', ')}. Total: ~${totalSeconds} seconds.`);
 
@@ -274,6 +407,7 @@ export class VideoFolderCreator {
         lines.push(`- Code must be readable`);
         lines.push(`- All slides must have dark backgrounds`);
         lines.push(`- Do not skip or merge slides`);
+        lines.push(`- Use visual metaphors to explain Python concepts—for example, use a literal 'box' to represent a variable or a 'loop' graphic for iteration.`);
 
         lines.push(``);
         lines.push(`THEME:`);
@@ -355,9 +489,24 @@ export class VideoFolderCreator {
         }
 
         // ===== SLIDES =====
+        let currentOriginalVideo = ''; // Track video changes
+
         for (const slide of video.slides) {
             const slideScreenshots = screenshotsBySlide.get(slide.number) || [];
             let screenshotIndex = 0;
+
+            // Video Demarcation Check
+            if (slide.originalVideoNumber && slide.originalVideoNumber !== currentOriginalVideo) {
+                currentOriginalVideo = slide.originalVideoNumber;
+
+                // Add explicit Video Header (Visual Demarcation)
+                children.push(new Paragraph({
+                    text: `Video: ${currentOriginalVideo}`,
+                    heading: HeadingLevel.HEADING_1,
+                    spacing: { before: 400, after: 200 }
+                    // Border removed to avoid TS issues with specific docx version
+                }));
+            }
 
             // Slide Header with duration
             const slideHeader = slide.duration
@@ -384,6 +533,26 @@ export class VideoFolderCreator {
                     visualRuns.push(new TextRun({ text: line || ' ' }));
                 });
                 children.push(new Paragraph({ children: visualRuns }));
+                children.push(new Paragraph({ text: '' }));
+            }
+
+            // Supporting Visuals (if present) - output as-is in DOCX
+            if (slide.supportingVisual) {
+                children.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Supporting Visuals: ', bold: true })
+                    ]
+                }));
+                // Split by newlines to preserve formatting
+                const supportingLines = slide.supportingVisual.split('\n');
+                const supportingRuns: any[] = [];
+                supportingLines.forEach((line, idx) => {
+                    if (idx > 0) {
+                        supportingRuns.push(new TextRun({ break: 1 }));
+                    }
+                    supportingRuns.push(new TextRun({ text: line || ' ' }));
+                });
+                children.push(new Paragraph({ children: supportingRuns }));
                 children.push(new Paragraph({ text: '' }));
             }
 
@@ -610,8 +779,30 @@ export class VideoFolderCreator {
                         { filename: 'main.py' }
                     );
                     screenshotPaths.push(codePath);
+                } else if (block.produceOutput === false) {
+                    // PRODUCE OUTPUT: FALSE - capture code-only screenshot
+                    // If there's an error, we only show the code (no console/output)
+                    const codePath = path.join(folderPath, `${baseName}.png`);
+
+                    // Try executing to see if there's an error
+                    const result = await this.screenshotService.executePython(block.code);
+
+                    if (!result.success) {
+                        // Error case with PRODUCE OUTPUT: FALSE - capture code-only
+                        console.log(`[VideoFolderCreator] PRODUCE OUTPUT: FALSE with error, capturing code-only for ${baseName}`);
+                        await this.screenshotService.captureCode(block.code, codePath, { filename: 'main.py' });
+                    } else {
+                        // Success case - capture code with output normally
+                        await this.screenshotService.captureCodeWithOutput(
+                            block.code,
+                            result.stdout || '',
+                            codePath,
+                            { filename: 'main.py' }
+                        );
+                    }
+                    screenshotPaths.push(codePath);
                 } else {
-                    // Try to execute and capture
+                    // Normal case: Try to execute and capture (produceOutput is true or undefined)
                     const result = await this.screenshotService.executeAndCapture(
                         block.code,
                         folderPath,

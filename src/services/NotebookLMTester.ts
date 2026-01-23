@@ -663,7 +663,7 @@ export class NotebookLMTester {
                     });
                     return !isProcessing;
                 },
-                { maxRetries: 20, retryDelay: 3000 } // Extended poll
+                { maxRetries: 30, retryDelay: 3000 } // Extended poll
             );
 
             if (!successProcess) steps.push('⚠ Timed out waiting for file processing (continuing anyway)');

@@ -613,4 +613,51 @@ export class GoogleStudioTester {
     public async closePage(serviceKey: string = 'google-studio'): Promise<void> {
         await this.browser.closePage(serviceKey);
     }
+
+    /**
+     * Generate audio for text - convenience method that handles page setup.
+     * Used by the audio regeneration UI endpoint.
+     */
+    public async generateAudio(config: GoogleStudioConfig & {
+        text: string;
+        outputPath: string;
+    }): Promise<{ success: boolean; audioPath?: string; message?: string }> {
+        const steps: string[] = [];
+
+        try {
+            // Get or create Google Studio page
+            const page = await this.browser.getPage('google-studio', GOOGLE_STUDIO_URL);
+            await this.browser.randomDelay(1500, 2500);
+
+            // Create slide config
+            const slideConfig: SlideAudioConfig = {
+                slideNumber: 1, // For regeneration, we use slide 1 as placeholder
+                text: config.text,
+                textHash: this.hashText(config.text),
+                outputPath: config.outputPath
+            };
+
+            // Generate audio
+            const success = await this.generateSlideAudio(page, slideConfig, config, steps);
+
+            if (success && fs.existsSync(config.outputPath)) {
+                return {
+                    success: true,
+                    audioPath: config.outputPath,
+                    message: steps.join('\n')
+                };
+            }
+
+            return {
+                success: false,
+                message: steps.join('\n') || 'Audio generation failed'
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                message: (error as Error).message
+            };
+        }
+    }
 }

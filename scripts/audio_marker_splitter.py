@@ -32,13 +32,13 @@ def get_audio_duration(audio_file: str) -> float:
     return 0.0
 
 
-def find_slide_markers(audio_file: str, marker_phrase: str = "next slide please", model_name: str = "base") -> list[dict]:
+def find_slide_markers(audio_file: str, marker_phrases: list[str] = ["next slide please"], model_name: str = "base") -> list[dict]:
     """
     Find spoken markers in audio file using Whisper.
     
     Args:
         audio_file: Path to audio file
-        marker_phrase: The spoken marker to find (e.g., "next slide please")
+        marker_phrases: List of spoken markers to find (e.g., ["next slide please", "next video please"])
         model_name: Whisper model size ("tiny", "base", "small", "medium", "large")
     
     Returns:
@@ -52,42 +52,64 @@ def find_slide_markers(audio_file: str, marker_phrase: str = "next slide please"
     
     # Search for the marker phrase in transcribed segments
     markers = []
-    target_words = marker_phrase.lower().split()
+    # Flatten target words for all phrases [["next", "slide", "please"], ["next", "video", "please"]]
+    target_phrases_words = [phrase.lower().split() for phrase in marker_phrases]
     
     for segment in result["segments"]:
         segment_text = segment.get("text", "").lower()
-        # Normalize: remove punctuation for matching
         import re
         normalized_text = re.sub(r'[.,!?;:\'\"]', '', segment_text)
         print(f"  [DEBUG] Segment: '{segment_text}' -> normalized: '{normalized_text}'")
         
-        # Check if the marker phrase appears in this segment (after normalization)
-        if marker_phrase.lower() in normalized_text:
+        # Check if ANY marker phrase appears in this segment
+        matched_phrase_words = None
+        matched_phrase_str = ""
+        
+        for phrase_str, phrase_words in zip(marker_phrases, target_phrases_words):
+             if phrase_str.lower() in normalized_text:
+                 matched_phrase_words = phrase_words
+                 matched_phrase_str = phrase_str
+                 break
+        
+        if matched_phrase_words:
             # Find the word-level timestamps for the marker
             if "words" in segment:
                 for i, word_info in enumerate(segment["words"]):
                     word = word_info["word"].lower().strip(".,!?")
                     
                     # Check if this word starts the marker phrase
-                    if target_words[0] in word:
+                    if matched_phrase_words[0] in word:
                         # Try to find the complete phrase
                         phrase_start = word_info['start']
                         phrase_end = word_info['end']
                         
+                        match_found = True
+                        current_end_idx = i
+                        
                         # Look ahead for remaining words in the phrase
-                        for j, target in enumerate(target_words[1:], 1):
+                        for j, target in enumerate(matched_phrase_words[1:], 1):
                             if i + j < len(segment["words"]):
                                 next_word = segment["words"][i + j]["word"].lower().strip(".,!?")
                                 if target in next_word:
                                     phrase_end = segment["words"][i + j]['end']
+                                    current_end_idx = i + j
+                                else:
+                                    match_found = False
+                                    break
+                            else:
+                                match_found = False
+                                break
                         
-                        print(f"  Found marker at {phrase_start:.2f}s - {phrase_end:.2f}s")
-                        markers.append({
-                            'start': phrase_start,
-                            'end': phrase_end,
-                            'text': marker_phrase
-                        })
-                        break
+                        if match_found:
+                            print(f"  Found marker '{matched_phrase_str}' at {phrase_start:.2f}s - {phrase_end:.2f}s")
+                            markers.append({
+                                'start': phrase_start,
+                                'end': phrase_end,
+                                'text': matched_phrase_str
+                            })
+                            # Fast forward outer loop? complex in python foreach, but we just break to next segment usually
+                            # Assuming one marker per segment for simplicity (or we break inner loop and move on)
+                            break
     
     print(f"\nTotal markers found: {len(markers)}")
     return markers
@@ -97,7 +119,8 @@ def split_audio_with_ffmpeg(
     audio_file: str,
     markers: list[dict],
     output_dir: str,
-    buffer_sec: float = 0.1
+    buffer_sec: float = 0.1,
+    prefix: str = ""
 ) -> list[str]:
     """
     Split audio file into segments using FFmpeg, removing the marker phrases.
@@ -141,7 +164,7 @@ def split_audio_with_ffmpeg(
     print(f"Creating {len(segments)} segments...")
     
     for i, (start, end) in enumerate(segments, 1):
-        output_filename = f"slide_{i}.wav"
+        output_filename = f"{prefix}slide_{i}.wav"
         output_path = os.path.join(output_dir, output_filename)
         temp_path = os.path.join(output_dir, f"temp_slide_{i}.wav")
         
@@ -192,9 +215,10 @@ def split_audio_with_ffmpeg(
 def process_audio(
     audio_file: str,
     output_dir: str = None,
-    marker_phrase: str = "next slide please",
+    marker_phrases: list[str] = ["next slide please"],
     model_name: str = "base",
-    expected_parts: int = None
+    expected_parts: int = None,
+    prefix: str = ""
 ) -> dict:
     """
     Main function to detect markers and split audio.
@@ -202,7 +226,7 @@ def process_audio(
     Args:
         audio_file: Path to input audio file
         output_dir: Output directory (default: same as input with '_slides' suffix)
-        marker_phrase: Spoken marker to detect
+        marker_phrases: List of spoken markers to detect
         model_name: Whisper model size
         expected_parts: If provided, verify the number of segments matches
     
@@ -221,17 +245,17 @@ def process_audio(
     print(f"{'='*60}")
     print(f"Input: {audio_file}")
     print(f"Output: {output_dir}")
-    print(f"Marker: '{marker_phrase}'")
+    print(f"Markers: {marker_phrases}")
     print(f"Model: {model_name}")
     if expected_parts:
         print(f"Expected parts: {expected_parts}")
     print(f"{'='*60}\n")
     
     # Step 1: Find markers
-    markers = find_slide_markers(audio_file, marker_phrase, model_name)
+    markers = find_slide_markers(audio_file, marker_phrases, model_name)
     
     # Step 2: Split audio (even if no markers - will create single file)
-    output_files = split_audio_with_ffmpeg(audio_file, markers, output_dir)
+    output_files = split_audio_with_ffmpeg(audio_file, markers, output_dir, prefix=prefix)
     
     # Step 3: Verify expected parts if provided
     success = len(output_files) > 0
@@ -263,19 +287,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Split audio by spoken markers using Whisper")
     parser.add_argument("audio_file", help="Path to audio file")
     parser.add_argument("-o", "--output", help="Output directory", default=None)
-    parser.add_argument("-m", "--marker", help="Marker phrase to detect", default="next slide please")
+    parser.add_argument("-m", "--marker", action='append', help="Marker phrase to detect (can reuse flag for multiple)", default=[])
     parser.add_argument("--model", help="Whisper model (tiny/base/small/medium/large)", default="base")
     parser.add_argument("-e", "--expected", type=int, help="Expected number of parts (for verification)", default=None)
+    parser.add_argument("--prefix", help="Prefix for output slide files (e.g., 'v1_')", default="")
     
     args = parser.parse_args()
     
     try:
+        # Handle default if no markers provided
+        markers = args.marker if args.marker else ["next slide please"]
+        
         result = process_audio(
             args.audio_file,
             args.output,
-            args.marker,
+            markers,
             args.model,
-            args.expected
+            args.expected,
+            args.prefix
         )
         # Always exit 0 if script ran effectively, success checked by output parsing
         sys.exit(0)
