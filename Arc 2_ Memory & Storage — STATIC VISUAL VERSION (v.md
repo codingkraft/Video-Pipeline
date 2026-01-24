@@ -1,6 +1,6 @@
 <img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
 
-# Arc 2: Memory \& Storage — STATIC VISUAL VERSION (v2.0)[1]
+# Arc 2: Memory & Storage — STATIC VISUAL VERSION (v2.0)
 
 _All visuals below are specified for **single static images** per slide, with simple, uncluttered compositions suitable for NotebookLM-style generation. No video or slide numbers appear inside the visuals themselves._
 
@@ -21,6 +21,8 @@ _All visuals below are specified for **single static images** per slide, with si
 Video 6: Storing Data in Memory
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Central icon of a simple computer chip or brain with small labeled drawers: "score", "username", "level".
@@ -29,6 +31,8 @@ Video 6: Storing Data in Memory
 
 **Audio:**
 "You're building a game and need to remember the player's username, score, and level. Print them once? They're gone. You need to store data so you can use it throughout your code. That's what variables do—Python's little memory system."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -47,6 +51,8 @@ print("Shadow_Blade's score: 1000")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Code editor pane showing exactly this snippet.
@@ -56,9 +62,11 @@ PRODUCE OUTPUT: TRUE
 **Audio:**
 "Imagine you hardcode your character's name everywhere in your game: welcome messages, level-up notifications, boss defeats—and imagine 50 more lines like this. This works… until you change your mind. And you will. Because naming a character is a sacred ritual: you pick something cool, then immediately regret it. Without variables, you have to hunt down every single mention and change it manually. Miss even one line and your game becomes inconsistent."
 
+**Audio Duration:** 24 seconds
+
 ***
 
-### [SLIDE 3: The “Missed One” Bug]
+### [SLIDE 3: The "Missed One" Bug]
 
 **Visual Main:**
 
@@ -72,6 +80,8 @@ print("Dragon_Slayer's score: 1000")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor view with `"Shadow_Blade leveled up!"` highlighted and a small "OOPS" label.
@@ -81,9 +91,11 @@ PRODUCE OUTPUT: TRUE
 **Audio:**
 "This is the classic bug: you update most lines, miss one, and now your game has identity issues. It's not broken in a dramatic way—it's broken in an embarrassing way."
 
+**Audio Duration:** 12 seconds
+
 ***
 
-### [SLIDE 4: The Variable Fix (Solution \& Power)]
+### [SLIDE 4: The Variable Fix (Solution & Power)]
 
 **Visual Main:**
 
@@ -102,6 +114,8 @@ print(character_name, "defeated the boss!")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Top half: "Before" snippet, `"Shadow_Blade"` occurrences highlighted.
@@ -110,6 +124,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "With variables, you store the name once, then reuse it everywhere. Now changing the character name is one edit, not a scavenger hunt. Change one line at the top, and the whole game updates. That's the real power of variables: update in one place, affect everything."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -124,6 +140,8 @@ Birthday: 12 Jan
 Fav snack: ?
 ```
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Smartphone contacts screen showing one contact called "Best Friend" with a phone number, birthday, and favorite snack field.
@@ -131,6 +149,8 @@ Fav snack: ?
 
 **Audio:**
 "Variables are like saving your best friend's contact. You don't memorize their phone number—because you'd get it wrong, call the wrong person, and have an awkward conversation. You save it once as 'Best Friend' and use it forever. When they change their number, you update it once and every call uses the new number. Same idea: store important information once, reference it everywhere."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -144,6 +164,8 @@ favorite_snack = "Kale Chips"
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Code line centered in a code editor mockup.
@@ -152,6 +174,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Creating a variable is simple. Pick a name—like favorite_snack—use the equals sign, then provide the value. This is called assignment. You're telling Python: 'Whenever I say favorite_snack, I mean Kale Chips.' We're definitely lying to ourselves, but Python trusts us."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -168,6 +192,8 @@ is_multiplayer = True         # Boolean
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Large backpack cutaway with four labeled pockets:
@@ -179,6 +205,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Variables can store different kinds of data, like pockets in a backpack. Phone in one pocket, laptop in another, water bottle on the side, and that mystery sandwich from last week in the hidden pocket—we're not opening that. Each pocket just holds what you put in. Variables do the same thing."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -192,6 +220,8 @@ level = 5
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Big equals sign `=` between "level" and "5" with arrows showing: "Look right first (5) → store into left (level)".
@@ -199,6 +229,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Important: the equals sign isn't saying 'level IS 5' like a math fact. It's an instruction. Here's what Python does: First, it looks at the right side and grabs the value 5. Then it stores that 5 into the variable called level. Right side first, then store in the left side. That's the pattern every time."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -219,6 +251,8 @@ print(channel_message)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Left margin tag "One-off" next to first print.
@@ -227,6 +261,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Printing a value directly is like a Snapchat message. It appears once, then vanishes. Variables are like saving it to your camera roll—you store it once, then reuse it anywhere. We stored the message in channel_message, and now we can print it three times without retyping."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -242,6 +278,8 @@ variable_name = value
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Two-column annotation: left box "Name (label)", right box "Value (data)".
@@ -249,6 +287,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Variables are named storage containers. Store a value once, then reuse it by name anywhere in your program. Update it in one place, and everything that uses it updates too."
+
+**Audio Duration:** 10 seconds
+
+***
+
+### Video 6 Summary
+
+| **TOTAL** | | **~150–160 seconds** |
 
 ***
 
@@ -267,6 +313,8 @@ PRODUCE OUTPUT: FALSE
 Video 7: Changing Stored Values
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -274,6 +322,8 @@ Video 7: Changing Stored Values
 
 **Audio:**
 "Real data changes constantly. Your score changes, your battery changes, your mood changes after 'one more video.' Variables aren't permanent—you can update them whenever you want."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -288,6 +338,8 @@ score = 200  # What happened to 100?
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Two-step panel:
@@ -297,6 +349,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Key rule: when you assign a new value to a variable, the old value is replaced. Not saved. Not archived. Gone. Variables don't keep memories—ironic, I know. That's actually why they're called variables—because the value inside can vary. It's not locked forever. The old value gets deleted like you never existed. Dramatic, but true."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -309,6 +363,8 @@ TODO: Study Python  (crossed out)
 TODO: Watch Cat Videos
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Whiteboard illustration: "Study Python" written and crossed out, "Watch Cat Videos" written below in fresh ink.
@@ -316,6 +372,8 @@ TODO: Watch Cat Videos
 
 **Audio:**
 "Think of a variable like a whiteboard. You write 'Study Python' on it with determination. Then reality hits. You erase it and write 'Watch Cat Videos' because priorities shift. The old text disappears, new text takes its place. Variables work exactly like that: assign a new value, the old one vanishes."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -336,6 +394,8 @@ print(youtube_tabs)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 22–26 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: code as above.
@@ -344,6 +404,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Let's track something we all understand: YouTube tabs. Start with 1 tab open—you're being responsible. Print shows 1. Then 'just one more video' happens. We assign youtube_tabs = 5. That overwrites the 1—it's gone. Print shows 5. An hour later? We assign youtube_tabs = 23 and your browser is crying for mercy. The 5 gets replaced. Print shows 23. Same variable, but each new assignment completely overwrites what was there before. Python doesn't judge your tab addiction."
+
+**Audio Duration:** 26 seconds
 
 ***
 
@@ -361,6 +423,8 @@ print(followers)  # 150
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left, terminal output (`100` then `150`) on right.
@@ -368,6 +432,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Here's where it gets powerful: you can use a variable's current value to calculate its new value. Followers starts at 100. Then we say: followers equals followers plus 50. Python reads the RIGHT side first—looks up followers, sees 100, adds 50, gets 150. Then it stores that 150 back into followers. The old 100? Replaced. Now when we print, we see 150. It's the same variable, just updated with math."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -388,6 +454,8 @@ print(xp)  # 20
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with comments as above.
@@ -396,6 +464,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "This pattern is everywhere in games. You start with 0 XP. You defeat an enemy. We do: xp equals xp plus 10. Python evaluates the right side first—0 plus 10 equals 10—then shoves that back into xp. Print shows 10. Defeat another enemy, same code runs again. Python reads xp—now 10—adds 10, gets 20, stores it back. The 10 gets overwritten. We're not getting a new XP bar each time; the old value just keeps getting replaced."
+
+**Audio Duration:** 24 seconds
 
 ***
 
@@ -407,6 +477,8 @@ PRODUCE OUTPUT: TRUE
 Battery: 100% → 50% → 20% → 1%
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Four battery icons in a row with levels 100%, 50%, 20%, 1%.
@@ -414,6 +486,8 @@ Battery: 100% → 50% → 20% → 1%
 
 **Audio:**
 "Your phone battery is basically a variable. Same battery icon, different value inside—and somehow it always drops faster when you need it most."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -429,6 +503,8 @@ x = x + 1   # Now 11
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple timeline: "5 → 10 → 11" above a variable box labeled `x`.
@@ -436,6 +512,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Variables update constantly. New values replace old ones. And you can use the current value to compute the next value. That's how programs track a changing world."
+
+**Audio Duration:** 10 seconds
+
+***
+
+### Video 7 Summary
+
+| **TOTAL** | |  **~135 seconds** |
 
 ***
 
@@ -454,6 +538,8 @@ PRODUCE OUTPUT: FALSE
 Video 8: Naming Rules
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -461,6 +547,8 @@ Video 8: Naming Rules
 
 **Audio:**
 "You want variables for score, username, level, and everything else. But Python is picky about names. Use the wrong format and your code crashes instantly. Let's learn the rules so Python doesn't have a meltdown."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -472,6 +560,8 @@ Video 8: Naming Rules
 Python = Strict Bouncer
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Cartoon Python snake dressed as a bouncer holding a clipboard labeled "Valid names only".
@@ -479,6 +569,8 @@ Python = Strict Bouncer
 
 **Audio:**
 "Python is like a strict nightclub bouncer. It has a guest list. Your variable name shows up wearing sandals and a hyphen? Not getting in."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -499,6 +591,8 @@ my score = 50           # NO
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Code panel with good lines highlighted green, bad lines red.
@@ -508,9 +602,11 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "Rule one: only letters, numbers, and underscores. A hyphen looks like subtraction, so Python thinks you're doing math. A space looks like two separate names. Underscores are the safe connector."
 
+**Audio Duration:** 14 seconds
+
 ***
 
-### [SLIDE 4: Rule 2 — Don’t Start With a Number]
+### [SLIDE 4: Rule 2 — Don't Start With a Number]
 
 **Visual Main:**
 
@@ -521,6 +617,8 @@ place_1 = "Me"     # OK
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with `1st_place` underlined red and `place_1` green.
@@ -528,6 +626,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Rule two: don't start with a number. Python sees a leading number and assumes you're doing math, not naming something."
+
+**Audio Duration:** 8 seconds
 
 ***
 
@@ -543,6 +643,8 @@ SCORE = 9000
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Three labeled boxes: `score`, `Score`, `SCORE`, each with its different value.
@@ -550,6 +652,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Rule three: Python is case-sensitive—these are three different variables. It's like three people with the same name who get mad if you call them the wrong version. Python convention is to use lowercase_with_underscores, so names like player_score are the usual style."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -566,6 +670,8 @@ for = "never"   # NO
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Two mini panels:
@@ -574,7 +680,9 @@ PRODUCE OUTPUT: FALSE
 - Caption: "Some words are already taken by Python."
 
 **Audio:**
-"Rule four: some words are already taken—print, if, for, while. Python called dibs on these. These are words that Python uses, so you shouldn’t use them. You have already learned about the print command. The others you will learn soon."
+"Rule four: some words are already taken—print, if, for, while. Python called dibs on these. These are words that Python uses, so you shouldn't use them. You have already learned about the print command. The others you will learn soon."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -592,6 +700,8 @@ n = 3
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Left column titled "Clear": `player_score`, `lives_remaining`.
@@ -599,7 +709,9 @@ PRODUCE OUTPUT: FALSE
 - Future-you character holding head in hands next to the right column.
 
 **Audio:**
-"Beyond the rules: use descriptive names. player_score is clear. But 'x'? Is that a coordinate? A score? The number of times you’ve rage-quit today? Future you will open this code and whisper: 'Who wrote this?' Spoiler: it was you."
+"Beyond the rules: use descriptive names. player_score is clear. But 'x'? Is that a coordinate? A score? The number of times you've rage-quit today? Future you will open this code and whisper: 'Who wrote this?' Spoiler: it was you."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -613,13 +725,17 @@ vs
 math_assignment_jan_2024.pdf
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Two file icons side by side: one with the chaotic long name, one with the clean structured name.
 - Caption: "Good names save time later."
 
 **Audio:**
-"It’s like naming computer files. Ever seen a folder full of files named ‘homework_final_FINAL_v3_REAL_actually_final.pdf’? Chaos. Or clear names like ‘math_assignment_jan_2024.pdf’? You find it instantly. Good variable names are self-explanatory—you know what’s inside without guessing."
+"It's like naming computer files. Ever seen a folder full of files named 'homework_final_FINAL_v3_REAL_actually_final.pdf'? Chaos. Or clear names like 'math_assignment_jan_2024.pdf'? You find it instantly. Good variable names are self-explanatory—you know what's inside without guessing."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -635,6 +751,8 @@ Avoid reserved words
 Use clear, readable names
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple checklist with these five bullets and checkmarks.
@@ -643,9 +761,17 @@ Use clear, readable names
 **Audio:**
 "Letters, numbers, underscores. Start with a letter or underscore. Case-sensitive. Avoid reserved words. And choose names that make your code readable."
 
+**Audio Duration:** 10 seconds
+
 ***
 
-## Video 9.1: Understanding Strings (Why “String”?)
+### Video 8 Summary
+
+| **TOTAL** | | **~135 seconds** |
+
+***
+
+## Video 9.1: Understanding Strings (Why "String"?)
 
 **Duration:** ~125 seconds
 **Concept:** Strings are text in quotes
@@ -660,6 +786,8 @@ Use clear, readable names
 Video 9.1: Understanding Strings
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -668,9 +796,11 @@ Video 9.1: Understanding Strings
 **Audio:**
 "In Python, text data is called a String. But why? Let's break down what strings are, why they have that name, and why you'll use them constantly."
 
+**Audio Duration:** 10 seconds
+
 ***
 
-### [SLIDE 2: What’s a String?]
+### [SLIDE 2: What's a String?]
 
 **Visual Main:**
 
@@ -682,6 +812,8 @@ item = "Health Potion"    # Actually just water
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with comments visible but slightly faded to keep focus on quoted text.
@@ -690,9 +822,11 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "Strings are text wrapped in quotes. Usernames, messages, item names—anything made of characters is a string. Python doesn't judge what you type. It just stores it."
 
+**Audio Duration:** 12 seconds
+
 ***
 
-### [SLIDE 3: Why “String”? (Beads Metaphor)]
+### [SLIDE 3: Why "String"? (Beads Metaphor)]
 
 **Visual Main:**
 
@@ -702,6 +836,8 @@ greeting = "HELLO"
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Central visual: beads labeled H‑E‑L‑L‑O on a single necklace string.
@@ -709,6 +845,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "It's called a string because it's a string of characters—like beads on a necklace. HELLO is five characters in order. Somebody way back thought that's how it looked, and we've been living with it ever since. Kind of like how we call it a pineapple even though it's neither a pine nor an apple."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -723,6 +861,8 @@ username = "Player1"
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet shown.
@@ -731,6 +871,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Quotes tell Python: 'Take a time-out—don't think, just remember exactly what you see.' The moment Python sees an opening quote, it stops trying to understand or execute anything. It just collects every character—letters, spaces, symbols, whatever—until it sees the closing quote. Then it stores all of that as frozen text. No interpretation. No commands. Just pure text, saved exactly as written."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -745,6 +887,8 @@ print(calculation)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with `"10 + 5"` clearly inside quotes.
@@ -753,6 +897,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Here's the weird part: even if you put math inside quotes, Python won't calculate it. It just stores the characters '1', '0', ' ', '+', ' ', '5'. You get the text '10 + 5', not the answer 15. Quotes freeze everything into text."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -767,6 +913,8 @@ name = Alex     # ERROR
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 10–13 seconds
+
 **Supporting Visuals (Static):**
 
 - Second line highlighted red with a small "NameError" bubble.
@@ -774,6 +922,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Without quotes, Python assumes you're referring to a variable named Alex. If Alex doesn't exist, Python complains. Quotes make it literal text."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -788,6 +938,8 @@ Hello    # Not a string, just a mysterious word to Python
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Code-style box with comments exactly as above.
@@ -796,9 +948,17 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "Strings are text in quotes. Quotes freeze text so Python stores it exactly."
 
+**Audio Duration:** 8 seconds
+
 ***
 
-## Video 9.2: Understanding Numbers (Integers \& Floats)
+### Video 9.1 Summary
+
+| **TOTAL** | | **~125 seconds** |
+
+***
+
+## Video 9.2: Understanding Numbers (Integers & Floats)
 
 **Duration:** ~115 seconds
 **Concept:** Integers vs floats, and why mixing types breaks things
@@ -813,6 +973,8 @@ PRODUCE OUTPUT: FALSE
 Video 9.2: Understanding Numbers
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -820,6 +982,8 @@ Video 9.2: Understanding Numbers
 
 **Audio:**
 "Now let's talk about actual numbers. Python has integers for whole numbers and floats for decimals. Mixing numbers with strings is where the comedy—and the errors—begin."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -836,6 +1000,8 @@ players_online = 100
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Game HUD elements: hearts with "3", big score "1000", level badge "42", player count "100".
@@ -843,6 +1009,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Integers are whole numbers. Great for counting: lives, scores, levels, number of players. You can't have 2.5 lives. That's not how games—or life—works."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -858,6 +1026,8 @@ success_rate = 0.75
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 11–14 seconds
+
 **Supporting Visuals (Static):**
 
 - Price tag "₹9.99" or "9.99".
@@ -867,9 +1037,11 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "Floats are decimals. Great for prices, percentages, and anything that needs precision. That dot is the clue: decimal point equals float."
 
+**Audio Duration:** 11 seconds
+
 ***
 
-### [SLIDE 4: Numbers Don’t Use Quotes]
+### [SLIDE 4: Numbers Don't Use Quotes]
 
 **Visual Main:**
 
@@ -882,6 +1054,8 @@ print(25 + 5)  # OK: 30
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: `age = 25` boxed with label "number".
@@ -891,6 +1065,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Critical difference: numbers have no quotes. Put quotes around a number and you've turned it into text. Without quotes, 25 plus 5 gives you 30. With quotes, '25' is frozen text—you can't do math with it. Quotes change everything."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -905,6 +1081,8 @@ print("hello" / 2)  # ERROR
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Small blender illustration:
@@ -914,6 +1092,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Think of math like a blender. Numbers are fruit—blend smoothly. Strings are rocks—blend that and something breaks. Python doesn't know what 'divide text' means, so it throws a TypeError and stops instead of guessing."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -929,6 +1109,8 @@ username = "Neo" # string
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 11–14 seconds
+
 **Supporting Visuals (Static):**
 
 - Three icons: heart (lives), star rating (4.5 stars), user avatar ("Neo").
@@ -936,6 +1118,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Simple rule: text in quotes equals string. Whole numbers equal int. Decimals equal float. Match the type to the job and your code behaves."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -951,6 +1135,8 @@ PRODUCE OUTPUT: FALSE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Three boxes side by side labeled "int", "float", "string".
@@ -958,6 +1144,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Two number types: integers and floats. Don't put quotes around numbers unless you want text."
+
+**Audio Duration:** 8 seconds
+
+***
+
+### Video 9.2 Summary
+
+| **TOTAL** | | **~115 seconds** |
 
 ***
 
@@ -976,6 +1170,8 @@ PRODUCE OUTPUT: FALSE
 Video 10: Working with Multiple Variables
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -983,6 +1179,8 @@ Video 10: Working with Multiple Variables
 
 **Audio:**
 "One variable is lonely. Real programs juggle lots of variables at once: username, score, level, settings, inventory—everything. Let's build a character profile to see how variables work together."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -1000,6 +1198,8 @@ runs_from_combat = True
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple character sheet layout:
@@ -1008,6 +1208,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Meet our hero. Great name… questionable stats. Notice we're using different types: text for names, numbers for stats, and True/False for behavior. That True/False type is called a Boolean—basically an on/off switch."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -1019,13 +1221,17 @@ PRODUCE OUTPUT: FALSE
 Each variable = its own pocket
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Backpack with clearly separated labeled pockets: `hero_name`, `hero_level`, `hero_speed`, `hero_weapon`, `runs_from_combat`.
-- Caption: "Changing one pocket doesn’t change the others."
+- Caption: "Changing one pocket doesn't change the others."
 
 **Audio:**
 "Think of each variable like its own pocket. Weapon pocket, speed pocket, name pocket. Changing one pocket doesn't magically change the others."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -1042,14 +1248,18 @@ print("Runs from combat:", runs_from_combat)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left, terminal output on right:
-`Hero: Swift_Shadow_Assassin` etc.
+    `Hero: Swift_Shadow_Assassin` etc.
 - Small note: "Commas add spaces between pieces automatically."
 
 **Audio:**
 "Use commas in print() to show labels and values together. print() handles spacing for you. Clean, readable output."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -1065,6 +1275,8 @@ print(full_name)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet as above.
@@ -1073,6 +1285,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "You can glue strings together with plus. Some people call this concatenation, but think of it as superglue for text. Here's how it works: Python takes hero_name—that's 'Swift_Shadow_Assassin'—adds a space, then adds 'The Legendary'. They stick together into one long string. Now our cowardly hero has a properly formatted title."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -1090,6 +1304,8 @@ print(enemy_speed)  # still 50.0
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code block.
@@ -1100,6 +1316,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Changing hero_speed doesn't change enemy_speed. Variables don't affect each other unless you explicitly connect them. They're separate containers."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -1117,6 +1335,8 @@ enemy_xp = 1000
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Two columns: "Player" vs "Enemy" with HP and XP under each.
@@ -1124,6 +1344,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Organization matters. Prefixes like player_ and enemy_ keep your variables from turning into a confusing soup. The player has 50 HP, the enemy has 500. Accidentally swapping those would make for a very short, very one-sided game."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -1137,6 +1359,8 @@ Different types
 One coherent system
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Full character sheet recap with all fields: name, level, speed, weapon, behavior flags, HP/XP.
@@ -1145,36 +1369,30 @@ One coherent system
 **Audio:**
 "Real programs coordinate many variables of different types. Name them clearly, keep them organized, and use them together to describe bigger systems."
 
+**Audio Duration:** 10 seconds
+
 ***
 
-_End of Arc 2 static visual specification._
-<span style="display:none">[^10][^11][^12][^13][^2][^3][^4][^5][^6][^7][^8][^9]</span>
+### Video 10 Summary
+
+| **TOTAL** | | **~130 seconds** |
+
+***
+
+## Arc 2 Complete Summary
+
+| Video | Title | Duration | Slides |
+|-------|-------|----------|--------|
+| 6 | Storing Data in Memory | 150–160s | 10 |
+| 7 | Changing Stored Values | 135s | 8 |
+| 8 | Naming Rules | 135s | 9 |
+| 9.1 | Understanding Strings | 125s | 7 |
+| 9.2 | Understanding Numbers | 115s | 7 |
+| 10 | Working with Multiple Variables | 130s | 8 |
+| **TOTAL** | **Arc 2: Memory & Storage** | **~790–800 seconds (13.2 min)** | **49 slides** |
+
+***
+
+_End of Arc 2 static visual specification with comprehensive timing information._
 
 <div align="center">⁂</div>
-
-: Arc2-V5.4-FINAL-1.md
-
-[^2]: __Arc 2_ Memory \& Storage - REVISED (Casual \& Humo.docx
-
-[^3]: Course Plan.docx
-
-[^4]: I-need-to-plan-videos-for-Chapter-X-of-the-pytho.pdf
-
-[^5]: Course-Plan.docx
-
-[^6]: Arc-1_-Basic-Commands-REVISED-Enhanced-Humor.docx
-
-[^7]: Arc-1_-Basic-Commands-COMPLETE-REVISED-VERSION.docx
-
-[^8]: Arc2-Final-REVISED-v3.1.docx
-
-[^9]: give-me-full-script-as-per-your-suggestions.docx
-
-[^10]: Arc2-V5.1.md
-
-[^11]: Arc-3_-Operations-Calculations-COMPLETE-SCRIPT.md
-
-[^12]: Arc3-FullScript-v5.0.md
-
-[^13]: Arc-1_-Basic-Commands-COMPLETE-REVISED-VERSION.md
-

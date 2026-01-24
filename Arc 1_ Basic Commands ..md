@@ -22,6 +22,8 @@ Welcome to Programming
 CyberStrike
 ```
 
+**Slide Duration:** 10–14 seconds
+
 **Supporting Visuals (Static):**
 
 - CyberStrike logo large in the center, with a warm, welcoming color palette.
@@ -30,6 +32,8 @@ CyberStrike
 
 **Audio:**
 "Welcome to CyberStrike. You're about to learn Python—and before you panic, no, you don't need to be good at math. You don't need four monitors and a hoodie. You just need to be willing to mess up a lot and laugh about it. If you've ever Googled 'why isn't this working' at 2 AM, congratulations—you're ready to be a programmer."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -41,6 +45,8 @@ CyberStrike
 What Is Programming, Really?
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Row or grid of large, recognizable app icons: Netflix, Spotify, Instagram, Google Maps, a generic banking app.
@@ -49,6 +55,8 @@ What Is Programming, Really?
 
 **Audio:**
 "Programming is giving instructions to a computer that's incredibly powerful but needs everything spelled out precisely. Every app you use—Netflix deciding what to recommend, Spotify creating that playlist that's weirdly accurate, Instagram filters that make your lunch look gourmet—all of that is someone's code. Someone sat there typing instructions. And yes, they probably had to Google how to do it."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -60,6 +68,8 @@ What Is Programming, Really?
 Programming = Superpower
 ```
 
+**Slide Duration:** 22–26 seconds
+
 **Supporting Visuals (Static):**
 
 - Split screen:
@@ -69,6 +79,8 @@ Programming = Superpower
 
 **Audio:**
 "Here's why programming is a superpower: you can make computers do boring stuff for you. Need to rename 500 files? A human would spend two hours and hate their life. Write code once, done in 3 seconds. Programming is like having a really fast, tireless assistant who follows instructions perfectly but takes everything you say absurdly literally. Tell it to 'check your email' and it'll stare at you blankly. Tell it to 'connect to mail server, authenticate with credentials, retrieve unread messages from inbox' and suddenly it's the best assistant you've ever had."
+
+**Audio Duration:** 26 seconds
 
 ***
 
@@ -80,6 +92,8 @@ Programming = Superpower
 Why Python?
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Python logo large at the top center.
@@ -88,6 +102,8 @@ Why Python?
 
 **Audio:**
 "Python is everywhere. YouTube's backend? Python. Instagram? Python. Spotify's recommendation engine that knows you better than your friends do? Python. It's powerful enough for billion-dollar companies but simple enough that you can learn it without a computer science degree or a mysterious past. If programming languages were coffee orders, Python is a regular coffee—straightforward, no weird jargon, gets the job done."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -99,6 +115,8 @@ Why Python?
 You Don't Need to Be a Genius
 ```
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Split comparison:
@@ -108,6 +126,8 @@ You Don't Need to Be a Genius
 
 **Audio:**
 "Here's what matters: you don't need to be a genius. Programming is just following a recipe. But imagine the chef is a literal genie who does exactly what you say with zero common sense. Normal recipe: 'Crack two eggs.' A human cracks eggs into a bowl. The computer? It cracks the eggs onto the floor because you didn't say where. That's the only difference between you and a programmer—programmers learned to be specific. 'Crack two eggs into the mixing bowl.' Now it works. You can learn that."
+
+**Audio Duration:** 24 seconds
 
 ***
 
@@ -119,14 +139,18 @@ You Don't Need to Be a Genius
 Watch → Try → Learn → Repeat
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Horizontal flow: four boxes with arrows:
-    - "Watch 2‑min video" → "Try challenge" → "Succeed or fail" → "Learn \& repeat".
+    - "Watch 2‑min video" → "Try challenge" → "Succeed or fail" → "Learn & repeat".
 - Simple icons for each step (play button, keyboard, check/X, brain/lightbulb).
 
 **Audio:**
 "Here's the deal: each video is about two minutes because nobody wants a lecture. You watch, you learn one thing, then you immediately try it. You'll learn by doing, not by taking notes and hoping your brain absorbed something. Every challenge you complete builds your skills. Every mistake you make teaches you something. Both are progress."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -138,18 +162,21 @@ Watch → Try → Learn → Repeat
 You WILL Break Things (Good)
 ```
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple 4-panel sequence:
-
-1. Red error message on screen.
-2. Person with confused face.
-3. Lightbulb above their head.
-4. Green checkmark on fixed code.
+    1. Red error message on screen.
+    2. Person with confused face.
+    3. Lightbulb above their head.
+    4. Green checkmark on fixed code.
 - Clean background, clear expressions.
 
 **Audio:**
 "Real talk: your code will break. A lot. You'll get error messages that look like Python is yelling at you in ancient hieroglyphics. That's not failure—that's Tuesday. Every programmer, from complete beginners to the ones making six figures at tech companies, spends half their day fixing broken code. The only difference? They've broken things more than you. Experience is just a fancy word for 'has made more mistakes.'"
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -163,6 +190,8 @@ Next Week: Real Logic
 Soon: Real Programs
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple left-to-right progression bar or timeline:
@@ -172,6 +201,8 @@ Soon: Real Programs
 
 **Audio:**
 "Today, you're going to make Python display text on the screen. Sounds boring? Maybe. But every programmer who's ever built anything started exactly here. You can't build Instagram before you can print 'Hello.' Think of it like learning guitar—you don't start with Stairway to Heaven. You start with three chords. This is your three chords."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -185,6 +216,8 @@ print("Hello, World!")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 6–8 seconds
+
 **Supporting Visuals (Static):**
 
 - Code editor or terminal mockup showing the above line.
@@ -193,6 +226,12 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Ready? Click the 'Run Code' button and watch the magic happen. Let's begin."
+
+**Audio Duration:** 4 seconds
+
+***
+
+| **TOTAL** | | **~130 seconds** |
 
 ***
 
@@ -211,6 +250,8 @@ PRODUCE OUTPUT: TRUE
 Video 1: Issuing Commands
 ```
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Big title text centered.
@@ -219,6 +260,8 @@ Video 1: Issuing Commands
 
 **Audio:**
 "Right now, Python is like a really capable assistant who refuses to do anything unless you ask in exactly the right way. The print() function is how you make it talk. Master this and you unlock the ability to see what your code is actually doing, which is surprisingly important when things go wrong—which they will."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -230,6 +273,8 @@ Video 1: Issuing Commands
 Meet the Terminal
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Split screen:
@@ -239,6 +284,8 @@ Meet the Terminal
 
 **Audio:**
 "This black screen is called the terminal. It looks intimidating, like you're hacking into the Matrix, but it's just your code's way of showing you results. You write code in the editor, Python executes it, and results appear here in the terminal. Think of it as your code's text messages to you. Except your code has perfect grammar, never uses emojis, and gets straight to the point. Honestly, kind of refreshing."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -252,6 +299,8 @@ print("Welcome to CyberStrike")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: code editor with the exact `print("Welcome to CyberStrike")` line.
@@ -260,6 +309,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "This is print(). You give it a message in quotes, and it displays that message in the terminal. That's it. It's Python's most basic function and also one of the most useful, because later when your code isn't working, you'll use print() to figure out what the heck is happening. Professional developers do this constantly."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -275,6 +326,8 @@ print("Ready!")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 11–14 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: stacked code lines as above in the editor.
@@ -283,6 +336,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Each print() creates one line of output. Stack them up and you get multiple lines. Simple. This is how apps show you loading screens, progress updates, basically any text you've ever seen in a program. Someone, somewhere, used print() or something like it."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -296,6 +351,8 @@ Loading user data...
 Ready!
 ```
 
+**Slide Duration:** 9–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Large terminal-style box showing exactly those three lines in monospace font.
@@ -303,6 +360,8 @@ Ready!
 
 **Audio:**
 "There's your output. Each command produced one line, in order, exactly as written. This is how you debug code—by printing stuff out to see what's happening at each step. It's like leaving breadcrumbs for yourself."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -317,6 +376,8 @@ print(Access granted)     # ✗ ERROR
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: correct line with green check.
@@ -325,6 +386,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Text needs quotes. Without them, Python thinks you're referring to something else—like a variable name or command it should already know about. Quotes tell Python, 'Hey, this is literally just text to display. Print it exactly as written.' Think of quotes as quotation marks in writing—they show you're displaying exact words, not referring to something technical."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -339,6 +402,8 @@ print('Mission complete')
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Two identical terminal outputs: `Mission complete`.
@@ -347,9 +412,11 @@ PRODUCE OUTPUT: TRUE
 **Audio:**
 "Single or double quotes—Python treats them identically. Pick one style and stick with it. Most programmers use double quotes because decades ago someone decided that was the standard, and now it's tradition. Programmers love tradition. And arguing endlessly about tradition. There are literal debates about tabs versus spaces that have lasted longer than some marriages. But I digress—use double quotes and move on with your life."
 
+**Audio Duration:** 20 seconds
+
 ***
 
-### [SLIDE 8: Mistake \#1: The Missing Parentheses]
+### [SLIDE 8: Mistake #1: The Missing Parentheses]
 
 **Visual Main:**
 
@@ -358,6 +425,8 @@ print "Access granted"
 ```
 
 PRODUCE OUTPUT: TRUE
+
+**Slide Duration:** 9–12 seconds
 
 **Supporting Visuals (Static):**
 
@@ -368,9 +437,11 @@ PRODUCE OUTPUT: TRUE
 **Audio:**
 "Beginner mistake number one: forgetting parentheses. print() needs those parentheses like you need oxygen. It's not negotiable. Forget them and Python immediately tells you what you did wrong. Which is nice of it, honestly."
 
+**Audio Duration:** 12 seconds
+
 ***
 
-### [SLIDE 9: Mistake \#2: The Runaway Quote]
+### [SLIDE 9: Mistake #2: The Runaway Quote]
 
 **Visual Main:**
 
@@ -380,6 +451,8 @@ print("Success!
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor showing the unterminated string line.
@@ -388,6 +461,12 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Mistake number two: forgetting to close your quotes. Open with a quote? Close with a quote. It's like parentheses in math, or starting a sentence without finishing—see how annoying that is? Python feels the same way. Every opening quote needs a closing quote, no exceptions. Python will sit there waiting for that closing quote forever, like someone holding a door open for you when you're still 50 feet away. Awkward for everyone."
+
+**Audio Duration:** 18 seconds
+
+***
+\
+| **TOTAL** | | **~110 seconds** |
 
 ***
 
@@ -406,6 +485,8 @@ PRODUCE OUTPUT: TRUE
 Video 2: Python's Strict Grammar Rules
 ```
 
+**Slide Duration:** 9–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -414,6 +495,8 @@ Video 2: Python's Strict Grammar Rules
 
 **Audio:**
 "Python is extremely precise. It doesn't guess what you meant. One typo and it stops immediately. And before you think that's frustrating—which, honestly, it can be—let me explain why this precision is actually protecting you."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -425,6 +508,8 @@ Video 2: Python's Strict Grammar Rules
 Why Computers Don't Guess
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: friendly phone texting conversation with typos that are still understood.
@@ -433,6 +518,8 @@ Why Computers Don't Guess
 
 **Audio:**
 "Your friends understand when you text 'helo' instead of 'hello.' Humans use context. Python is more like a bureaucrat at the DMV examining your form. 'You wrote primt instead of print? Application rejected. Come back when you can spell.' It's not being mean—it's refusing to guess because guessing causes disasters. It would rather make you fix the typo than silently do the wrong thing and ruin your day later."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -444,9 +531,11 @@ Why Computers Don't Guess
 send_payment(amount=10;00, friend="Alex")
 ```
 
+**Slide Duration:** 22–26 seconds
+
 **Supporting Visuals (Static):**
 
-- Top: scenario description in short lines ("Splitting pizza: \$10 each").
+- Top: scenario description in short lines ("Splitting pizza: $10 each").
 - Center: code snippet with `10;00` highlighted (semicolon error).
 - Bottom: three mini-scenes:
     - Alex with a gaming PC and confetti.
@@ -455,6 +544,8 @@ send_payment(amount=10;00, friend="Alex")
 
 **Audio:**
 "Imagine you're splitting a pizza with your friend Alex—ten bucks each. You're typing fast, and the period key is right next to the semicolon key. You hit the wrong one. If Python tried to be helpful and guess what you meant, it might interpret that semicolon as... well, anything. Maybe it thinks you meant one thousand dollars. Alex is suddenly buying a gaming PC with your money. Your bank account is empty. This is why programming languages never guess. Crashing immediately with 'syntax error' is way better than confidently sending your rent money to the wrong person."
+
+**Audio Duration:** 26 seconds
 
 ***
 
@@ -467,6 +558,8 @@ Set alarm for 6 AM
 → hears 6 PM
 ```
 
+**Slide Duration:** 12–16 seconds
+
 **Supporting Visuals (Static):**
 
 - Small dialogue bubble sequence:
@@ -478,6 +571,8 @@ Set alarm for 6 AM
 **Audio:**
 "You've definitely experienced this with Alexa or Siri. You ask for 6 AM, it hears 6 PM, and suddenly you're sleeping through something important. That's what happens when systems guess wrong. Python refuses to guess because crashing with an error message is way better than confidently doing the wrong thing."
 
+**Audio Duration:** 16 seconds
+
 ***
 
 ### [SLIDE 5: Computers Are Painfully Literal]
@@ -488,6 +583,8 @@ Set alarm for 6 AM
 Every. Single. Character. Matters.
 ```
 
+**Slide Duration:** 12–16 seconds
+
 **Supporting Visuals (Static):**
 
 - Code line: `print("hello")` with each character spaced and highlighted like tiles.
@@ -496,6 +593,8 @@ Every. Single. Character. Matters.
 
 **Audio:**
 "To Python, 'print' written in all lowercase and 'Print' starting with a capital P are completely different words. It's just like your password. 'Netflix' with a capital N and 'netflix' with a lowercase n are different passwords. One character wrong and you're locked out. That's how Python reads code. Character by character, no autocorrect, no second chances."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -507,18 +606,21 @@ Every. Single. Character. Matters.
 Python's 4 Non‑Negotiable Grammar Rules
 ```
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - List of four short bullets:
-
-1. Case matters.
-2. Quotes must match.
-3. Parentheses are required.
-4. Spelling must be exact.
+    1. Case matters.
+    2. Quotes must match.
+    3. Parentheses are required.
+    4. Spelling must be exact.
 - Simple rulebook icon.
 
 **Audio:**
 "Okay, enough philosophy. Here are the four rules you must follow. Break them and Python throws errors. Follow them and you're golden."
+
+**Audio Duration:** 8 seconds
 
 ***
 
@@ -534,6 +636,8 @@ PRINT("never heard of you")# ✗ NameError
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet as above in editor.
@@ -542,6 +646,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Rule one: lowercase matters. The command is print with a lowercase 'p.' Python is like that English teacher who docks points for missing commas. It's not that Python doesn't understand you—it knows you meant 'print.' It's just holding you to a higher standard. One uppercase letter and Python acts like you invented a word. Python reads every character exactly as typed."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -557,6 +663,8 @@ print("mismatched')       # ✗
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 10–13 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor showing three lines with the mismatched line highlighted in red.
@@ -565,6 +673,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Rule two: quotes must match. Start with double quotes? End with double quotes. Start with single? End with single. It's like shoes—you'd notice if you left the house wearing one sneaker and one flip-flop. Python notices mismatched quotes immediately."
+
+**Audio Duration:** 13 seconds
 
 ***
 
@@ -579,6 +689,8 @@ print "no parentheses"     # ✗
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Correct line with green check, wrong line with red X.
@@ -586,6 +698,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Rule three: print needs parentheses. Always. Think of parentheses as a wrapper—your message goes inside. No wrapper, no delivery. Non-negotiable."
+
+**Audio Duration:** 8 seconds
 
 ***
 
@@ -601,6 +715,8 @@ pront("what even is this") # ✗
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 10–13 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with `primt` and `pront` underlined in red.
@@ -609,6 +725,14 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Rule four: perfect spelling required. Python has zero autocorrect. Type 'primt' instead of 'print' and Python says 'I literally have no idea what that word means.' It's like emailing someone—one letter wrong in the address and your email vanishes into the void."
+
+**Audio Duration:** 13 seconds
+
+***
+
+### Video 2 Summary
+
+| **TOTAL** | | **~125 seconds** |
 
 ***
 
@@ -627,6 +751,8 @@ PRODUCE OUTPUT: TRUE
 Video 3: Commands Execute in Sequence
 ```
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -635,6 +761,8 @@ Video 3: Commands Execute in Sequence
 
 **Audio:**
 "Python doesn't read your whole program and figure out what makes sense. It starts at line 1, executes it, moves to line 2, executes that, then line 3. Top to bottom, no skipping, no rearranging. The order you write code is the order it runs."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -651,6 +779,8 @@ print("Step 4: Access granted")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Code block in editor with each line numbered.
@@ -658,6 +788,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Python reads code like you read a book—page 1, then page 2, then page 3. Not randomly. Not backward. Sequential. Always. Let's run this and watch what happens."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -672,6 +804,8 @@ Step 3: Launching exploit
 Step 4: Access granted
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Terminal-style box with the four lines in order.
@@ -679,6 +813,8 @@ Step 4: Access granted
 
 **Audio:**
 "Output appears in the exact order we wrote the code. This is sequential execution—commands happen one after another, in the order you wrote them. Pretty straightforward, right? Until you mess up the order."
+
+**Audio Duration:** 11 seconds
 
 ***
 
@@ -690,6 +826,8 @@ Step 4: Access granted
 Wrong Order = Disaster
 ```
 
+**Slide Duration:** 24–28 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: "Baking a Cake – WRONG ORDER" sequence with steps out of order (bake empty oven, preheat late, etc.) as short lines.
@@ -698,6 +836,8 @@ Wrong Order = Disaster
 
 **Audio:**
 "Think about baking a cake in the wrong order. Step one: bake for 30 minutes. Your oven is empty. Nothing is happening. Step two: preheat oven. Bit late for that. Step three: pour batter into pan. What batter? You haven't mixed anything yet. This is chaos. This is nonsense. This is what your code looks like when you write steps in the wrong order. Python will execute every step exactly as written, in order, even if that order makes absolutely no sense. The oven doesn't stop you from turning it on when it's empty. Python doesn't stop you from celebrating before you've downloaded anything."
+
+**Audio Duration:** 28 seconds
 
 ***
 
@@ -714,6 +854,8 @@ print("Attempting to connect...")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet as above.
@@ -722,6 +864,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "What if you write them backward? Python doesn't check your logic—it just does exactly what you said. Here you're throwing a victory party before you've even attempted to connect. Python executes it anyway because it assumes you know what you're doing. Narrator voice: you did not know what you were doing. It's like celebrating your birthday, then being born, then being conceived. Technically possible in time-travel movies, nonsensical everywhere else."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -738,6 +882,8 @@ print("Victory! We did it!")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 10–13 seconds
+
 **Supporting Visuals (Static):**
 
 - Correct code in editor with arrows showing logical order (connect → bypass → download → victory).
@@ -745,6 +891,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Fixed version: connect first, bypass security, download files, celebrate last. Now it makes sense. Before you write code, think about the order. What needs to happen first? What comes next? Plan the sequence before typing."
+
+**Audio Duration:** 13 seconds
 
 ***
 
@@ -756,6 +904,8 @@ PRODUCE OUTPUT: TRUE
 Line 1 → Line 2 → Line 3 → Line 4
 ```
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple flowchart arrows from top to bottom.
@@ -763,6 +913,14 @@ Line 1 → Line 2 → Line 3 → Line 4
 
 **Audio:**
 "Python executes top to bottom, always. Plan your steps in logical order, write them that way, and Python executes them perfectly. Mess up the order and you get nonsense. Order matters."
+
+**Audio Duration:** 8 seconds
+
+***
+
+### Video 3 Summary
+
+| **TOTAL** | | **~100 seconds** |
 
 ***
 
@@ -781,6 +939,8 @@ Line 1 → Line 2 → Line 3 → Line 4
 Video 4: Leaving Notes in Your Code
 ```
 
+**Slide Duration:** 12–16 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -788,6 +948,8 @@ Video 4: Leaving Notes in Your Code
 
 **Audio:**
 "You're going to write brilliant, elegant code today that makes perfect sense. Crystal clear logic. Then you'll look at it next Thursday and think, 'What does this even do? Why did I write this? Did someone else break into my computer and write this?' Spoiler: it was you. Past you. Who has betrayed future you by not leaving comments. Don't be like past you."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -812,6 +974,8 @@ print("admin")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Side-by-side panels: left shows the top half (no comments), right shows the commented version.
@@ -819,6 +983,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Look at the first version. Random numbers and words with zero context. What are these? Why are they here? Now look at the second version. Everything is instantly clear. Comments turn mystery code into understandable code. They're notes for your future self or anyone else who has to read this later—including future you, who has forgotten everything."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -833,6 +999,8 @@ print("But Python definitely runs this")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 9–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with the comment line faded slightly and the print line bold.
@@ -840,6 +1008,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Comments start with a hashtag. Everything after that hashtag on that line is a comment—Python skips right over it. Comments are only for humans. Python sees them and goes, 'Not my problem' and moves on to actual code."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -851,6 +1021,8 @@ PRODUCE OUTPUT: TRUE
 Comments = Sticky Notes for Future You
 ```
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with colorful sticky notes on the side (short phrases like "Connects to DB", "Don't touch").
@@ -858,6 +1030,8 @@ Comments = Sticky Notes for Future You
 
 **Audio:**
 "Think of comments as messages to your future self. Except future you has amnesia and remembers nothing about today. Comments are like leaving sticky notes that say 'This connects to the database—don't touch it unless you want everything to break' or 'I know this looks weird, but trust me, it's the only way that works.' You're basically time-traveling advice to yourself. And trust me, future you needs all the help they can get."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -874,6 +1048,8 @@ print("Accessing database")  # Comment at end of line
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 11–14 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor showing the snippet, with arrows pointing to "above-line comment" and "end-of-line comment".
@@ -881,6 +1057,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "You can put comments above code to explain what's about to happen. Or at the end of a line for a quick note. Both work. Use whichever makes your code clearer for the next person who reads it—even if that person is you in three days."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -896,6 +1074,8 @@ Good reasons to comment:
 - Leave reminders
 ```
 
+**Slide Duration:** 10–13 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple checklist with those four bullets and checkmarks.
@@ -903,6 +1083,8 @@ Good reasons to comment:
 
 **Audio:**
 "Add comments when your logic needs explaining. When code is tricky or might break. When you're doing something that isn't obvious. If you'll forget what this does next week, comment it now. Future you will be grateful."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -927,6 +1109,8 @@ print("Configuration loaded")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 13–16 seconds
+
 **Supporting Visuals (Static):**
 
 - Code shown with a subtle highlight on the header comment block and section comments.
@@ -934,6 +1118,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Here's well-commented code. The header explains the overall purpose. Each section is labeled. If you come back to this in six months, you'll instantly understand it. Comments are an investment in your future self who has forgotten literally everything."
+
+**Audio Duration:** 15 seconds
 
 ***
 
@@ -949,16 +1135,25 @@ print("This also runs")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor with the middle line faded and prefixed by `#`.
 - Terminal output box showing:
-`This runs`
-`This also runs`
+    `This runs`
+    `This also runs`
 - Arrow from `#` to label "Commented out".
 
 **Audio:**
 "Pro trick: if you want to temporarily disable a line of code without deleting it, put a hashtag in front. Now it's a comment—Python ignores it. This is called 'commenting out' code. Super useful when you're testing different versions and don't want to lose the original."
+
+**Audio Duration:** 15 seconds
+
+***
+
+### Video 4 Summary
+| **TOTAL** | | **~115 seconds** |
 
 ***
 
@@ -977,6 +1172,8 @@ PRODUCE OUTPUT: TRUE
 Video 5: Error Messages Are Clues
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Title centered.
@@ -984,6 +1181,8 @@ Video 5: Error Messages Are Clues
 
 **Audio:**
 "Your code just crashed. Red text everywhere. The terminal looks angry. Your first instinct is panic, maybe mild despair. Don't. That red text isn't Python yelling at you—it's Python handing you a crime scene report. Line number? That's where the crime happened. Error type? That's the weapon. The message? That's your first clue. You're not in trouble. You're a detective now."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -996,6 +1195,8 @@ Silent wrong ≠ Good
 Crash with error = Better
 ```
 
+**Slide Duration:** 12–16 seconds
+
 **Supporting Visuals (Static):**
 
 - Left panel: sad face next to "Code runs silently but does the wrong thing".
@@ -1004,6 +1205,8 @@ Crash with error = Better
 
 **Audio:**
 "Here's the counter-intuitive truth: errors are helpful. The worst bugs are the ones where your code runs without errors but does the wrong thing silently. Errors stop everything immediately and point to the problem. That's way better than finding out later that your code has been broken for days."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -1015,6 +1218,8 @@ Crash with error = Better
 Silent GPS vs "Recalculating..."
 ```
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Left: GPS map with no feedback while the car moves in the wrong direction.
@@ -1023,6 +1228,8 @@ Silent GPS vs "Recalculating..."
 
 **Audio:**
 "Imagine your GPS stays completely silent when you turn the wrong way. You're driving confidently, listening to music, thinking you're crushing it. Meanwhile you're heading in the exact opposite direction of your destination. Three hours later you're in a completely different city wondering what went wrong. That's silent failure. Instead, good GPS immediately says 'Recalculating'—annoying, but it catches mistakes instantly. Error messages are Python's 'recalculating.' Immediate, helpful, saves you from driving to the wrong city."
+
+**Audio Duration:** 24 seconds
 
 ***
 
@@ -1036,18 +1243,22 @@ print("Hello)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor showing the line with missing closing quote.
 - Terminal below showing:
-`File "hack.py", line 1`
-`print("Hello)`
-`          ^`
-`SyntaxError: unterminated string literal`
+    `File "hack.py", line 1`
+    `print("Hello)`
+    `          ^`
+    `SyntaxError: unterminated string literal`
 - Labels on the three parts: "Crime scene (line)", "Evidence (^)", "Diagnosis (error type)".
 
 **Audio:**
 "Let's decode this like a detective. First: line 1. That's where the crime happened—the crime scene. Second: the arrow pointing at the quote. That's your evidence—Python got confused right there. Third: 'SyntaxError: unterminated string literal.' That's the diagnosis—you forgot to close your quote. Every error message gives you these three things: location, evidence, diagnosis. Learn to read them and you'll solve errors faster than those TV detectives who somehow solve murders in 40 minutes."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -1061,6 +1272,8 @@ print "Firewall breached"
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 11–14 seconds
+
 **Supporting Visuals (Static):**
 
 - Code line without parentheses in editor.
@@ -1069,6 +1282,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Syntax errors mean you broke Python's grammar rules. Missing parentheses, mismatched quotes, typos in commands. Python is saying 'I can't even understand this code because the grammar is wrong. Fix that first before I try to run anything.'"
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -1082,6 +1297,8 @@ Print("Access granted")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Editor line with `Print` capitalized.
@@ -1090,6 +1307,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Name errors mean you used a word Python doesn't recognize. Usually it's a typo—capital P instead of lowercase p. Modern Python even suggests what you probably meant: 'Did you mean: print?' which is honestly the most helpful thing anyone's ever said when you make a mistake. It's like autocorrect, except it doesn't fix it for you—it just passive-aggressively points out your typo and makes you fix it yourself. Still appreciated, though."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -1104,6 +1323,8 @@ print("Starting process")
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code snippet with second line indented too far, leading spaces highlighted.
@@ -1112,6 +1333,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Indentation errors mean you have extra spaces at the beginning of a line that shouldn't be there. Python is really sensitive to spacing because later you'll learn that indentation actually controls how code works. For now, just remember: don't add random spaces at the start of lines. This error says 'unexpected indent'—just delete those extra spaces at the beginning of line 2."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -1126,6 +1349,8 @@ PRODUCE OUTPUT: TRUE
 4. Fix & run again
 ```
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Simple vertical flowchart with four boxes matching the steps.
@@ -1133,6 +1358,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Here's your error-fixing process. Step one: don't panic—every programmer gets dozens of errors daily. Step two: read the error systematically. Find the line number it mentions. Look at what type of error it is. Follow the arrow to see exactly where Python got confused. Step three: go to that line and fix that specific problem. Run your code again. If you get another error, repeat the process. This is normal. This is programming. Each error teaches you something."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -1148,6 +1375,8 @@ PRODUCE OUTPUT: TRUE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code-style box with those three comment lines.
@@ -1156,34 +1385,30 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "Change how you think about errors. They're not failures—they're Python filing a detailed bug report. 'Here's what broke, here's where it broke, here's why it broke.' That's incredibly useful information. Imagine if your car just stopped working with no explanation versus stopped with a display saying 'Out of gas, there's a station 2 miles north.' Error messages are the second one. Read them, decode them, fix them. Every error makes you better. Welcome to programming—errors are your slightly annoying but ultimately helpful partner."
 
+**Audio Duration:** 20 seconds
+
 ***
 
-_End of Arc 1 static visual specification._
-<span style="display:none">[^10][^11][^12][^2][^3][^4][^5][^6][^7][^8][^9]</span>
+### Video 5 Summary
+
+| **TOTAL** | | **~135 seconds** |
+
+***
+
+## Arc 1 Complete Summary
+
+| Video | Title | Duration | Slides |
+|-------|-------|----------|--------|
+| 0 | Welcome to Programming | 130s | 9 |
+| 1 | Issuing Commands | 110s | 9 |
+| 2 | Python's Strict Grammar Rules | 125s | 10 |
+| 3 | Commands Execute in Sequence | 100s | 7 |
+| 4 | Leaving Notes in Your Code | 115s | 8 |
+| 5 | Error Messages Are Clues | 135s | 9 |
+| **TOTAL** | **Arc 1: Basic Commands** | **~715 seconds (11.9 min)** | **52 slides** |
+
+***
+
+_End of Arc 1 static visual specification with comprehensive timing information._
 
 <div align="center">⁂</div>
-
-: Arc-1_-Basic-Commands-COMPLETE-REVISED-VERSION.md
-
-[^2]: __Arc 2_ Memory \& Storage - REVISED (Casual \& Humo.docx
-
-[^3]: Course Plan.docx
-
-[^4]: I-need-to-plan-videos-for-Chapter-X-of-the-pytho.pdf
-
-[^5]: Course-Plan.docx
-
-[^6]: Arc-1_-Basic-Commands-REVISED-Enhanced-Humor.docx
-
-[^7]: Arc-1_-Basic-Commands-COMPLETE-REVISED-VERSION.docx
-
-[^8]: Arc2-Final-REVISED-v3.1.docx
-
-[^9]: give-me-full-script-as-per-your-suggestions.docx
-
-[^10]: Arc2-V5.1.md
-
-[^11]: Arc-3_-Operations-Calculations-COMPLETE-SCRIPT.md
-
-[^12]: Arc3-FullScript-v5.0.md
-

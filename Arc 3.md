@@ -1,16 +1,6 @@
 <img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
 
-# This text is confusing as we are using max in different contexts - "min() finds the smallest value, max() finds the largest. Great for capping values, finding best scores, or picking extremes from a list. If damage is one-fifty but max is one hundred, min gives you one hundred. If damage is only fifty, min still gives fifty—because fifty is smaller than one hundred. min() returns the smallest, period."
-
-For video titles you must write like this Video [video number]: [Video Title]
-For visuals that do not have Code:  do not put them inside Python code block '''python  ''' Rename Visual (code): to just Visual Main:
-Under the code, if there is a code: add a line PRODUCE OUTPUT: FALSE if you want the output not to be shown in console and PRODUCE OUTPUT: TRUE if you want console output to be shown. I will use it for screenshot generation.  Give me the revised document as a markdown file.
-
-Here is the revised markdown document with clarified min/max audio, video titles in the requested format, `Visual Main:` labels, and `PRODUCE OUTPUT` flags after each Python code block.
-
-***
-
-# Arc 3: Operations \& Calculations — STATIC VISUAL VERSION (v6.2)
+# Arc 3: Operations & Calculations — STATIC VISUAL VERSION (v6.2)
 
 _All visuals below are specified for **single static images** per slide, with simple, uncluttered compositions suitable for NotebookLM image generation. No video or slide numbers appear in visuals._
 
@@ -38,6 +28,8 @@ Python Math Basics
 🔵 MAIN QUEST
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Central object: Large calculator or terminal window icon (single focal point).
@@ -47,6 +39,8 @@ Python Math Basics
 
 **Audio:**
 "You know how to do math. You've known since you were five. But now you need to tell a computer to do it. Python uses the same symbols you'd expect—except division, which has one tiny rule that might annoy you. We'll see it in a second."
+
+**Audio Duration:** 12 seconds
 
 ***
 
@@ -74,6 +68,8 @@ print(bill_split)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Two‑column layout: code block on the left (small font, clean).
@@ -86,6 +82,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Plus, minus, star for multiply, slash for divide. 100 plus 50 is 150. 100 minus 30 is 70. Twelve times three is thirty-six. One-twenty divided by four is thirty. Wait—thirty point zero? Why the decimal? Because Python doesn't trust you with division."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -101,6 +99,8 @@ print(100 / 10) # 10.0 (not 10)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Three boxes arranged horizontally, each showing one calculation.
@@ -111,6 +111,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "In Python 3, division ALWAYS gives you a decimal. Always. Ten divided by two? Five point zero. Eight divided by four? Two point zero. Python assumes you might need precision, so it slaps a decimal on everything. You can't stop it. You can only accept it. Get used to it—this is your life now."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -130,6 +132,8 @@ print(wallet)  # 115
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Code block on left (small, clean).
@@ -144,6 +148,8 @@ PRODUCE OUTPUT: TRUE
 **Audio:**
 "Real programs update values over time. Wallet starts at 100. Payday adds 50—now 150. Coffee costs 20—down to 130. Uber costs 15—down to 115. Each line grabs the current value, does one operation, stores it back. Your wallet is just a variable that goes up and down. Mostly down."
 
+**Audio Duration:** 20 seconds
+
 ***
 
 ### [SLIDE 5: The Math Order Trap]
@@ -157,6 +163,8 @@ print(result)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - **Minimal on-slide text.** Visual hierarchy does most of the work.
@@ -167,6 +175,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Quick warning. Ten plus five times two equals twenty. If you read text left-to-right—natural for reading—you'd get thirty. But mathematics has rules. Multiplication before addition. Python follows these rules. Not Python being difficult—Python being correct. This is a convention mathematicians set centuries ago, and it still rules today. So get used to it."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -181,6 +191,8 @@ PRODUCE OUTPUT: TRUE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 8–10 seconds
+
 **Supporting Visuals (Static):**
 
 - Four large operator icons in a row: `+  -  *  /` (each in its own box or badge).
@@ -189,6 +201,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Four operators. Python writes math exactly how you'd expect—except division gives decimals. Always. Get used to it."
+
+**Audio Duration:** 8 seconds
+
+***
+
+### Video 11 Summary
+
+| **TOTAL** | |  **~110–120 seconds** |
 
 ***
 
@@ -208,6 +228,8 @@ Order of Operations
 🔵 MAIN QUEST
 ```
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Central object: Large rulebook, gavel, or scroll icon (strong metaphor).
@@ -217,6 +239,8 @@ Order of Operations
 
 **Audio:**
 "Pop quiz: What's 5 plus 3 times 2? If you said 16, you failed the Python test. If you said 11, you remember algebra class. If you said 'I hate math,' don't panic—programming uses the same math rules, you just get a computer to do the hard part. Let's fix this before it breaks your code."
+
+**Audio Duration:** 15 seconds
 
 ***
 
@@ -231,6 +255,8 @@ print(result)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - **Minimal text, maximum visual clarity.**
@@ -241,6 +267,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Five plus three times two. Your brain goes left-to-right: five plus three is eight, times two is sixteen. Wrong. Python gives you eleven. Why? Multiplication before addition. That's the rule."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -257,6 +285,8 @@ A - Addition   +
 S - Subtraction -
 ```
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Large parchment-style scroll (central focal point).
@@ -267,6 +297,8 @@ S - Subtraction -
 
 **Audio:**
 "PEMDAS. Parentheses, exponents, multiply and divide, add and subtract. Python follows this order religiously. Mathematicians set these rules centuries ago. Python just enforces them like a strict teacher who doesn't accept excuses."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -280,6 +312,8 @@ result = 10 + 5 * 2
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - **Visual transformation sequence** (not text-heavy steps):
@@ -292,6 +326,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Ten plus five times two. Python scans for multiplication. Five times two is ten. Now the expression is ten plus ten, which is twenty. The multiplication happened first even though it was written second. This is the law."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -311,6 +347,8 @@ print(total)  # 30
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Side‑by‑side comparison (two equal panels).
@@ -321,6 +359,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Parentheses override all other rules. They're the VIP pass. Without them, ten plus five times two is twenty. WITH parentheses around ten plus five, that addition happens first—gives fifteen—then times two gives thirty. Parentheses let you control the order. Use them liberally. Python won't judge you."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -344,14 +384,18 @@ print(total)  # 30
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 22–26 seconds
+
 **Supporting Visuals (Static):**
 
-- Top half: "Wrong" scenario. T-shirt icon with "\$20". Math: "20 - 5 × 2 = 10". Confused/sad cash register face, red X.
+- Top half: "Wrong" scenario. T-shirt icon with "$20". Math: "20 - 5 × 2 = 10". Confused/sad cash register face, red X.
 - Bottom half: "Right" scenario. Same T-shirt. Math: "(20 - 5) × 2 = 30". Happy register face, green checkmark.
 - Minimal labels: "Wrong" / "Right".
 
 **Audio:**
 "Shopping cart. Each item is twenty dollars, five-dollar discount per item, buying two. Without parentheses, Python multiplies five times two first—ten—then subtracts from twenty, giving ten total. That's wrong. With parentheses, twenty minus five is fifteen, times two is thirty. Parentheses save your wallet from bad math."
+
+**Audio Duration:** 24 seconds
 
 ***
 
@@ -369,6 +413,8 @@ PRODUCE OUTPUT: TRUE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Large "( )" in center (power-up icon style, bright color).
@@ -378,6 +424,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Python follows the order of operations. Multiplication and division before addition and subtraction. Use parentheses to make your intentions crystal clear. Your code should read like instructions, not like a riddle."
+
+**Audio Duration:** 12 seconds
+
+***
+
+### Video 12 Summary
+
+| **TOTAL** | | **~130–140 seconds** |
 
 ***
 
@@ -397,6 +451,8 @@ Special Operators
 🔵 MAIN QUEST
 ```
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Central object: Three glowing symbols `//   %   **` (each in its own badge or orb).
@@ -405,6 +461,8 @@ Special Operators
 
 **Audio:**
 "Beyond the basic four, Python has three operators that look weird but solve very real problems: floor division for whole numbers, modulo for leftovers, and exponentiation for powers. Once you learn them, you'll see them everywhere."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -422,6 +480,8 @@ print(slices_each)  # 3
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code block on left.
@@ -432,6 +492,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Floor division uses two slashes. It divides, then CHOPS OFF the decimal. No rounding—just deletion. Ten slices among three people? Three each. It always rounds DOWN. The decimal lost a fair fight."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -449,6 +511,8 @@ leftover = pizza_slices % people      # 1
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
@@ -458,6 +522,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Modulo uses the percent sign. It gives you the REMAINDER after division. Ten divided by three leaves three slices per person and ONE leftover. Floor division tells you the shares. Modulo tells you what's left over."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -476,6 +542,8 @@ print(customer % 5)  # 0 — DISCOUNT!
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
@@ -487,6 +555,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Modulo creates cycles. Every fifth customer gets a discount? Use modulo five. Customers one through four give remainders one through four. Customer five? Remainder zero—discount time! The pattern repeats: 1, 2, 3, 4, 0, 1, 2, 3, 4, 0..."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -509,19 +579,23 @@ print(final)  # 115.76
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 24–28 seconds
+
 **Supporting Visuals (Static):**
 
 - Top: Three small visuals for `2 ** 3 = 8`, `5 ** 2 = 25`, `10 ** 3 = 1000` (simple cubes/grids).
 - Bottom: Piggy bank centered with **4-point timeline**:
-    - Year 0: "\$100".
-    - Year 1: "\$105".
-    - Year 2: "\$110.25".
-    - Year 3: "\$115.76" (highlighted).
+    - Year 0: "$100".
+    - Year 1: "$105".
+    - Year 2: "$110.25".
+    - Year 3: "$115.76" (highlighted).
 - Gently curving line above timeline, bending upward (exponential curve).
 - Minimal text.
 
 **Audio:**
 "Exponentiation uses two stars. Two to the power of three is eight. Five squared is twenty-five. Ten cubed is one thousand. Use it for growth over time: one hundred bucks growing five percent per year becomes one hundred times 1.05 to the third power—about one-fifteen-seventy-six. Each year, the growth itself grows. That's compound growth. Exponential."
+
+**Audio Duration:** 28 seconds
 
 ***
 
@@ -542,6 +616,8 @@ PRODUCE OUTPUT: TRUE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Left box: "2^3 = 8" (label "Textbook Math").
@@ -551,6 +627,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "In math class, you'd use a caret. Python already claimed that symbol for bitwise operations—obscure math you won't touch for years. So we're stuck with double-star. Welcome to programming: where symbols are limited and compromises are eternal."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -566,6 +644,8 @@ PRODUCE OUTPUT: FALSE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Three icons in a row, each in its own badge/box:
@@ -578,9 +658,16 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "Floor division gives whole numbers. Modulo gives leftovers. Exponentiation gives powers. Weird symbols, but you'll use them constantly."
 
+**Audio Duration:** 10 seconds
+
 ***
 
-## Video 14: Patterns \& Recap
+### Video 13 Summary
+| **TOTAL** | | **~140–150 seconds** |
+
+***
+
+## Video 14: Patterns & Recap
 
 **Duration:** ~100–110 seconds
 **Concept:** Common formulas and wrapping up
@@ -596,6 +683,8 @@ Patterns & Recap
 🔵 MAIN QUEST
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Central object: Clipboard or checklist icon with checkmarks.
@@ -604,6 +693,8 @@ Patterns & Recap
 
 **Audio:**
 "You've learned all the pieces. Now here's the speed round: the most common calculation patterns you'll copy-paste for the rest of your life. Then we'll wrap up."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -621,6 +712,8 @@ print(percent)  # 75.0
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
@@ -629,6 +722,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Percentage: divide current by total, times one hundred. Forty-five out of sixty is seventy-five percent. You'll write this formula constantly for progress bars, grades, storage, completion rates."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -649,6 +744,8 @@ print(average)  # 84.33
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
@@ -658,6 +755,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Average: add everything, divide by the count. Eighty, ninety, and seventy-eight total to two-fifty-three. Divide by three gives eighty-four point three three. Use this for grades, ratings, prices, any time you want the middle value."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -677,15 +776,19 @@ print(final_price)  # 40.0
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
-- Right: Price tag showing "\$50" crossed out and "\$40" as new price.
+- Right: Price tag showing "$50" crossed out and "$40" as new price.
 - Below (two lines): "20% of 50 = 10" and "50 – 10 = 40".
 - Clean, minimal retail style.
 
 **Audio:**
 "Discount: price times discount-over-one-hundred gives the discount amount. Subtract from original. Fifty bucks with twenty percent off means ten dollars off, leaving forty. Every sale uses this formula."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -707,15 +810,19 @@ print("Leftover:", leftover)
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
-- Right: Top-down table with 3 person icons and a "\$100 bill" icon in center.
+- Right: Top-down table with 3 person icons and a "$100 bill" icon in center.
 - Below (two lines): "100 // 3 = 33 each" and "100 % 3 = 1 leftover".
-- Small "\$1" coin highlighted in center.
+- Small "$1" coin highlighted in center.
 
 **Audio:**
 "Splitting bills: use floor division for whole dollars per person, modulo for leftovers. One hundred divided by three is thirty-three each, with one dollar remaining. Use both operators together to handle real-world messiness."
+
+**Audio Duration:** 16 seconds
 
 ***
 
@@ -732,6 +839,8 @@ PEMDAS
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - "Operations Complete!" title with trophy icon.
@@ -741,6 +850,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "You can now add, subtract, multiply, divide, floor-divide, find remainders, and use powers. You know PEMDAS controls the order. You can use parentheses to override everything. That's real programming math."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -758,6 +869,8 @@ clean = message.strip().upper()
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
@@ -769,6 +882,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Next up: text. You've conquered numbers. Now you'll learn how to manipulate text—changing case, cleaning up spaces, replacing words, splitting and joining strings. Variables store data. Operations handle numbers. Methods control text. See you next time."
+
+**Audio Duration:** 14 seconds
+
+***
+
+### Video 14 Summary
+
+| **TOTAL** | | **~100–110 seconds** |
 
 ***
 
@@ -794,6 +915,8 @@ Writing Like a Pro
 ⭐ SIDE QUEST
 ```
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Central object: Clean code editor window or document icon.
@@ -802,6 +925,8 @@ Writing Like a Pro
 
 **Audio:**
 "You know how to write code that works. Now let's learn how to write code that looks professional. Two techniques that separate beginners from pros: assignment shortcuts and the CONSTANTS convention."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -821,6 +946,8 @@ print(followers)  # 480
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Code shown with repeated variable names highlighted.
@@ -829,6 +956,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Look at this. Score equals score plus fifty. Followers equals followers minus twenty. We're typing the variable name TWICE every time. Once on the left, once on the right. It works, but it's repetitive. And professional programmers have a deep, personal hatred of repetition."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -848,6 +977,8 @@ score += 50
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Side-by-side: top `score = score + 50` (faded, longer), bottom `score += 50` (bright, shorter).
@@ -856,6 +987,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Here's the shortcut: plus-equals. Instead of 'score equals score plus fifty,' write 'score plus-equals fifty.' Python grabs the current value, adds fifty, stores it back. One variable name instead of two. This is an assignment operator. Professional code uses these everywhere."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -876,6 +1009,8 @@ x **= 2  # x = x ** 2
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Grid of six equal-sized boxes (2×3).
@@ -884,6 +1019,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Every operator has a shortcut version. Plus-equals, minus-equals, times-equals, divide-equals, floor-divide-equals, power-equals. They all work the same: take the variable, do the math, store the result back. Less typing, cleaner code, happier you."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -904,6 +1041,8 @@ print(savings)  # 270
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 20–24 seconds
+
 **Supporting Visuals (Static):**
 
 - Code on left.
@@ -918,6 +1057,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "Tracking changes over time becomes super readable. Savings starts at zero. Plus-equals five-hundred on payday. Minus-equals eighty for a concert. Plus-equals fifty for birthday money. Minus-equals two-hundred for rent. Final balance: two-seventy. It reads like a story of real life. And the code is clean doing it."
+
+**Audio Duration:** 22 seconds
 
 ***
 
@@ -939,6 +1080,8 @@ SPEED_LIMIT = 65
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Two equal columns.
@@ -948,6 +1091,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "CONSTANTS are variables that shouldn't change during your program. Max health, gravity, tax rates, speed limits. Python doesn't enforce this—it's just a convention. If you write a variable in ALL CAPS with underscores, everyone knows: don't change this. It's a professional signal."
+
+**Audio Duration:** 20 seconds
 
 ***
 
@@ -968,6 +1113,8 @@ shipping = weight * TAX_RATE
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Top ("Bad"): `1.18` circled multiple times (red), label "Magic number".
@@ -976,6 +1123,8 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "Instead of mysterious numbers everywhere, define them once as CONSTANTS. If the tax rate changes, you update one line instead of hunting through your entire program. Your code becomes self-documenting. Other programmers—and future you—will thank you."
+
+**Audio Duration:** 18 seconds
 
 ***
 
@@ -1000,6 +1149,8 @@ score = score - 25
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 14–18 seconds
+
 **Supporting Visuals (Static):**
 
 - Two vertical code blocks side-by-side: "Before" (faded) vs "After" (bright).
@@ -1008,6 +1159,14 @@ PRODUCE OUTPUT: FALSE
 
 **Audio:**
 "You've unlocked professional code style. Use assignment shortcuts to reduce repetition. Use CONSTANTS for values that don't change. Your code is now cleaner, more readable, and maintainable. You've leveled up."
+
+**Audio Duration:** 14 seconds
+
+***
+
+### Video A Summary
+
+| **TOTAL** | | **~150 seconds** |
 
 ***
 
@@ -1027,6 +1186,8 @@ Helpful Python Functions
 ⭐ SIDE QUEST
 ```
 
+**Slide Duration:** 10–12 seconds
+
 **Supporting Visuals (Static):**
 
 - Central toolbox icon with labels `type`, `abs`, `min`, `max`, `pow` on tools.
@@ -1035,6 +1196,8 @@ Helpful Python Functions
 
 **Audio:**
 "Python has built-in functions that make working with numbers easier. Think of them as power tools in your programming toolbox. Let's look at five you'll actually use."
+
+**Audio Duration:** 10 seconds
 
 ***
 
@@ -1055,6 +1218,8 @@ print(type(name))  # <class 'str'>
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 16–20 seconds
+
 **Supporting Visuals (Static):**
 
 - Three small boxes:
@@ -1066,6 +1231,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "`type()` is your detective function. Not sure what type a variable is? Ask it. Integer, float, string—it'll tell you. Super useful when division sneaks a float into your code and you're suddenly seeing decimals."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -1087,6 +1254,8 @@ print(difference)  # 4 degrees off
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 18–22 seconds
+
 **Supporting Visuals (Static):**
 
 - Top: Number line with –15 and +15 equally distant from 0, label "15".
@@ -1095,6 +1264,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "`abs()` gives you absolute value—distance without caring about direction. Negative fifteen and positive fifteen are both fifteen away from zero. Useful for finding differences, distances, and gaps."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -1122,6 +1293,8 @@ print(actual_damage)  # 50
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 24–28 seconds
+
 **Supporting Visuals (Static):**
 
 - Top: Bar chart with bars 5, 2, 9, 1. Arrows to smallest (1) and largest (9).
@@ -1132,6 +1305,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "`min()` finds the smallest value, `max()` finds the largest. Great for capping values, finding best scores, or picking extremes from a list. If damage is one-fifty but MAX_DAMAGE is one hundred, `min(damage, MAX_DAMAGE)` gives you one hundred. If damage is fifty, `min(damage, MAX_DAMAGE)` gives fifty—because fifty is smaller than one hundred. `min()` returns the smallest, period."
+
+**Audio Duration:** 24 seconds
 
 ***
 
@@ -1149,6 +1324,8 @@ print(pow(2, 3))   # 8
 
 PRODUCE OUTPUT: TRUE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Split: left "2 ** 3 = 8", right "pow(2, 3) = 8".
@@ -1157,6 +1334,8 @@ PRODUCE OUTPUT: TRUE
 
 **Audio:**
 "`pow()` is an alternative to double-star for exponents. Two to the third power? You can write `2 ** 3` or `pow(2, 3)`. They're identical. Most Python programmers use double-star because it's shorter, but you'll see `pow()` sometimes."
+
+**Audio Duration:** 14 seconds
 
 ***
 
@@ -1174,6 +1353,8 @@ pow(x,y)    # x to the power of y
 
 PRODUCE OUTPUT: FALSE
 
+**Slide Duration:** 12–15 seconds
+
 **Supporting Visuals (Static):**
 
 - Five icons in a row (each in its own badge/box), labeled:
@@ -1184,32 +1365,40 @@ PRODUCE OUTPUT: FALSE
 **Audio:**
 "These five functions are your number toolkit. type() identifies what you have. abs() finds distances. min() and max() find extremes. pow() calculates powers. You'll see these often, and knowing them will save you time."
 
+**Audio Duration:** 12 seconds
+
 ***
 
-_End of document._
-<span style="display:none">[^1][^10][^11][^2][^3][^4][^5][^6][^7][^8][^9]</span>
+### Video B Summary
+
+| **TOTAL** | | **~120 seconds** |
+
+***
+
+## Arc 3 Complete Summary
+
+### Required Path (Main Quest) 🔵
+
+| **REQUIRED TOTAL** | | **~480–520 seconds (8–8.7 min)** |
+
+### Optional Path (Side Quests) ⭐
+
+| Video | Title | Duration | Slides |
+|-------|-------|----------|--------|
+| A | Writing Like a Pro | 150s | 8 |
+| B | Helpful Python Functions | 120s | 6 |
+| **OPTIONAL TOTAL** | | **~270 seconds (4.5 min)** | **14 slides** |
+
+### Arc 3 Grand Total
+
+| Category | Duration | Slides |
+|----------|----------|--------|
+| **Required Videos** | ~480–520 seconds (8–8.7 min) | 27 |
+| **Optional Videos** | ~270 seconds (4.5 min) | 14 |
+| **COMPLETE ARC 3** | **~750–790 seconds (12.5–13.2 min)** | **41 slides** |
+
+***
+
+_End of Arc 3 static visual specification with comprehensive timing information._
 
 <div align="center">⁂</div>
-
-[^1]: __Arc 2_ Memory \& Storage - REVISED (Casual \& Humo.docx
-
-[^2]: Course Plan.docx
-
-[^3]: I-need-to-plan-videos-for-Chapter-X-of-the-pytho.pdf
-
-[^4]: Course-Plan.docx
-
-[^5]: Arc-1_-Basic-Commands-REVISED-Enhanced-Humor.docx
-
-[^6]: Arc-1_-Basic-Commands-COMPLETE-REVISED-VERSION.docx
-
-[^7]: Arc2-Final-REVISED-v3.1.docx
-
-[^8]: give-me-full-script-as-per-your-suggestions.docx
-
-[^9]: Arc2-V5.1.md
-
-[^10]: Arc-3_-Operations-Calculations-COMPLETE-SCRIPT.md
-
-[^11]: Arc3-FullScript-v5.0.md
-

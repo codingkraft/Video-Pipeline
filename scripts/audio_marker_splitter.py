@@ -11,6 +11,11 @@ Prerequisites:
 - FFmpeg installed and in PATH
 """
 
+import warnings
+# Suppress Whisper CUDA warnings (harmless - falls back to CPU)
+warnings.filterwarnings("ignore", message=".*Failed to launch Triton kernels.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="whisper.timing")
+
 import whisper
 import subprocess
 import os

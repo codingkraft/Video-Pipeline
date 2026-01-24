@@ -180,7 +180,13 @@ export class AudioGenerator {
 
             // Extract video number from narration file path if it's an individual video file
             const narrationFileName = path.basename(narrationPath);
-            const videoNumMatch = narrationFileName.match(/video(\d+)_narration_individual/);
+            let videoNumMatch = narrationFileName.match(/video(\d+)_narration_individual/);
+
+            // Also check for Perplexity output format: perplexity_audio_response_v{N}.txt
+            if (!videoNumMatch) {
+                videoNumMatch = narrationFileName.match(/perplexity_audio_response_v(\d+)/);
+            }
+
             const videoPrefix = videoNumMatch ? `v${videoNumMatch[1]}_` : '';
             if (videoPrefix) {
                 steps.push(`📹 Processing individual video ${videoNumMatch![1]} narration`);

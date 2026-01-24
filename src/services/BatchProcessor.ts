@@ -710,6 +710,10 @@ export class BatchProcessor {
                     await this.sleep(2000);
                 }
 
+                // Mark overall perplexity_narration step as complete (for UI progress tracking)
+                ProgressTracker.markStepComplete(folderPath, 'perplexity_narration');
+                this.log(`${folderName}: All Perplexity narrations complete`);
+
                 // ========================
                 // PHASE 2: All TTS audio generation
                 // ========================

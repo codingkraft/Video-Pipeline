@@ -178,7 +178,7 @@ export class MarkdownScriptParser {
         const supportingVisual = supportingVisualMatch ? supportingVisualMatch[1].trim() : undefined;
 
         // Extract duration
-        const durationMatch = content.match(/\*\*\[(\d+)\s*seconds?\]\*\*/);
+        const durationMatch = content.match(/\*\*\s+(\d+)\s*seconds/);
         const duration = durationMatch ? parseInt(durationMatch[1]) : undefined;
 
         // Extract code blocks with their PRODUCE OUTPUT flags
