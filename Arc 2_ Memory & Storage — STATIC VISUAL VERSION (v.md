@@ -2,14 +2,14 @@
 
 # Arc 2: Memory \& Storage — STATIC VISUAL VERSION (v2.0)[1]
 
-_All visuals below are specified for **single static images** per slide, with simple, uncluttered compositions suitable for NotebookLM-style generation. No video or slide numbers appear inside the visuals themselves._[^1]
+_All visuals below are specified for **single static images** per slide, with simple, uncluttered compositions suitable for NotebookLM-style generation. No video or slide numbers appear inside the visuals themselves._
 
 ***
 
 ## Video 6: Storing Data in Memory
 
 **Duration:** ~150–160 seconds
-**Concept:** Variables are named storage containers[^1]
+**Concept:** Variables are named storage containers
 
 ***
 
@@ -23,12 +23,12 @@ Video 6: Storing Data in Memory
 
 **Supporting Visuals (Static):**
 
-- Central icon of a simple computer chip or brain with small labeled drawers: "score", "username", "level".[^1]
+- Central icon of a simple computer chip or brain with small labeled drawers: "score", "username", "level".
 - Subtitle under title: "Python's little memory system".
 - Clean dark or gradient background.
 
 **Audio:**
-"You're building a game and need to remember the player's username, score, and level. Print them once? They're gone. You need to store data so you can use it throughout your code. That's what variables do—Python's little memory system."[^1]
+"You're building a game and need to remember the player's username, score, and level. Print them once? They're gone. You need to store data so you can use it throughout your code. That's what variables do—Python's little memory system."
 
 ***
 
@@ -49,12 +49,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Code editor pane showing exactly this snippet.[^1]
+- Code editor pane showing exactly this snippet.
 - Multiple occurrences of `"Shadow_Blade"` highlighted to show repetition.
 - Small caption: "Change name? Hunt through every line."
 
 **Audio:**
-"Imagine you hardcode your character's name everywhere in your game: welcome messages, level-up notifications, boss defeats—and imagine 50 more lines like this. This works… until you change your mind. And you will. Because naming a character is a sacred ritual: you pick something cool, then immediately regret it. Without variables, you have to hunt down every single mention and change it manually. Miss even one line and your game becomes inconsistent."[^1]
+"Imagine you hardcode your character's name everywhere in your game: welcome messages, level-up notifications, boss defeats—and imagine 50 more lines like this. This works… until you change your mind. And you will. Because naming a character is a sacred ritual: you pick something cool, then immediately regret it. Without variables, you have to hunt down every single mention and change it manually. Miss even one line and your game becomes inconsistent."
 
 ***
 
@@ -74,12 +74,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Editor view with `"Shadow_Blade leveled up!"` highlighted and a small "OOPS" label.[^1]
+- Editor view with `"Shadow_Blade leveled up!"` highlighted and a small "OOPS" label.
 - Speech bubble near code: "Identity crisis…"
 - No extra text beyond short labels.
 
 **Audio:**
-"This is the classic bug: you update most lines, miss one, and now your game has identity issues. It's not broken in a dramatic way—it's broken in an embarrassing way."[^1]
+"This is the classic bug: you update most lines, miss one, and now your game has identity issues. It's not broken in a dramatic way—it's broken in an embarrassing way."
 
 ***
 
@@ -104,12 +104,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Top half: "Before" snippet, `"Shadow_Blade"` occurrences highlighted.[^1]
+- Top half: "Before" snippet, `"Shadow_Blade"` occurrences highlighted.
 - Bottom half: "After" snippet with `character_name` assignment at top highlighted and reused below.
 - Arrow or label: "One change → updates everywhere".
 
 **Audio:**
-"With variables, you store the name once, then reuse it everywhere. Now changing the character name is one edit, not a scavenger hunt. Change one line at the top, and the whole game updates. That's the real power of variables: update in one place, affect everything."[^1]
+"With variables, you store the name once, then reuse it everywhere. Now changing the character name is one edit, not a scavenger hunt. Change one line at the top, and the whole game updates. That's the real power of variables: update in one place, affect everything."
 
 ***
 
@@ -126,11 +126,11 @@ Fav snack: ?
 
 **Supporting Visuals (Static):**
 
-- Smartphone contacts screen showing one contact called "Best Friend" with a phone number, birthday, and favorite snack field.[^1]
+- Smartphone contacts screen showing one contact called "Best Friend" with a phone number, birthday, and favorite snack field.
 - Small arrow to "Edit contact once → all future calls use new number".
 
 **Audio:**
-"Variables are like saving your best friend's contact. You don't memorize their phone number—because you'd get it wrong, call the wrong person, and have an awkward conversation. You save it once as 'Best Friend' and use it forever. When they change their number, you update it once and every call uses the new number. Same idea: store important information once, reference it everywhere."[^1]
+"Variables are like saving your best friend's contact. You don't memorize their phone number—because you'd get it wrong, call the wrong person, and have an awkward conversation. You save it once as 'Best Friend' and use it forever. When they change their number, you update it once and every call uses the new number. Same idea: store important information once, reference it everywhere."
 
 ***
 
@@ -146,12 +146,12 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Code line centered in a code editor mockup.[^1]
+- Code line centered in a code editor mockup.
 - Above or below: arrows labeling `favorite_snack` as "variable name" and `"Kale Chips"` as "value".
 - Small caption: "This is assignment."
 
 **Audio:**
-"Creating a variable is simple. Pick a name—like favorite_snack—use the equals sign, then provide the value. This is called assignment. You're telling Python: 'Whenever I say favorite_snack, I mean Kale Chips.' We're definitely lying to ourselves, but Python trusts us."[^1]
+"Creating a variable is simple. Pick a name—like favorite_snack—use the equals sign, then provide the value. This is called assignment. You're telling Python: 'Whenever I say favorite_snack, I mean Kale Chips.' We're definitely lying to ourselves, but Python trusts us."
 
 ***
 
@@ -174,11 +174,11 @@ PRODUCE OUTPUT: FALSE
     - Phone icon labeled "String".
     - Laptop icon labeled "Integer".
     - Water bottle "0.5 L" labeled "Float".
-    - Moldy sandwich labeled "Boolean: True for 'contains mystery'".[^1]
+    - Moldy sandwich labeled "Boolean: True for 'contains mystery'".
 - Arrows from pockets to the corresponding code variables.
 
 **Audio:**
-"Variables can store different kinds of data, like pockets in a backpack. Phone in one pocket, laptop in another, water bottle on the side, and that mystery sandwich from last week in the hidden pocket—we're not opening that. Each pocket just holds what you put in. Variables do the same thing."[^1]
+"Variables can store different kinds of data, like pockets in a backpack. Phone in one pocket, laptop in another, water bottle on the side, and that mystery sandwich from last week in the hidden pocket—we're not opening that. Each pocket just holds what you put in. Variables do the same thing."
 
 ***
 
@@ -194,11 +194,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Big equals sign `=` between "level" and "5" with arrows showing: "Look right first (5) → store into left (level)".[^1]
+- Big equals sign `=` between "level" and "5" with arrows showing: "Look right first (5) → store into left (level)".
 - Caption: "Instruction, not a math fact."
 
 **Audio:**
-"Important: the equals sign isn't saying 'level IS 5' like a math fact. It's an instruction. Here's what Python does: First, it looks at the right side and grabs the value 5. Then it stores that 5 into the variable called level. Right side first, then store in the left side. That's the pattern every time."[^1]
+"Important: the equals sign isn't saying 'level IS 5' like a math fact. It's an instruction. Here's what Python does: First, it looks at the right side and grabs the value 5. Then it stores that 5 into the variable called level. Right side first, then store in the left side. That's the pattern every time."
 
 ***
 
@@ -221,12 +221,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Left margin tag "One-off" next to first print.[^1]
+- Left margin tag "One-off" next to first print.
 - Right side: three identical terminal lines `"Visit my channel!"` stacked, arrows back to `channel_message`.
 - Caption: "Snap vs saved to camera roll."
 
 **Audio:**
-"Printing a value directly is like a Snapchat message. It appears once, then vanishes. Variables are like saving it to your camera roll—you store it once, then reuse it anywhere. We stored the message in channel_message, and now we can print it three times without retyping."[^1]
+"Printing a value directly is like a Snapchat message. It appears once, then vanishes. Variables are like saving it to your camera roll—you store it once, then reuse it anywhere. We stored the message in channel_message, and now we can print it three times without retyping."
 
 ***
 
@@ -244,18 +244,18 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Two-column annotation: left box "Name (label)", right box "Value (data)".[^1]
+- Two-column annotation: left box "Name (label)", right box "Value (data)".
 - Simple container icon with the label on top and value inside.
 
 **Audio:**
-"Variables are named storage containers. Store a value once, then reuse it by name anywhere in your program. Update it in one place, and everything that uses it updates too."[^1]
+"Variables are named storage containers. Store a value once, then reuse it by name anywhere in your program. Update it in one place, and everything that uses it updates too."
 
 ***
 
 ## Video 7: Changing Stored Values
 
 **Duration:** ~135 seconds
-**Concept:** Variables can be updated (overwritten)[^1]
+**Concept:** Variables can be updated (overwritten)
 
 ***
 
@@ -269,11 +269,11 @@ Video 7: Changing Stored Values
 
 **Supporting Visuals (Static):**
 
-- Title centered.[^1]
+- Title centered.
 - Icon of a whiteboard being erased and rewritten.
 
 **Audio:**
-"Real data changes constantly. Your score changes, your battery changes, your mood changes after 'one more video.' Variables aren't permanent—you can update them whenever you want."[^1]
+"Real data changes constantly. Your score changes, your battery changes, your mood changes after 'one more video.' Variables aren't permanent—you can update them whenever you want."
 
 ***
 
@@ -292,11 +292,11 @@ PRODUCE OUTPUT: FALSE
 
 - Two-step panel:
     - Step 1: score box showing "100".
-    - Step 2: same box overwritten with "200", "100" faded out.[^1]
+    - Step 2: same box overwritten with "200", "100" faded out.
 - Caption: "New value replaces old value."
 
 **Audio:**
-"Key rule: when you assign a new value to a variable, the old value is replaced. Not saved. Not archived. Gone. Variables don't keep memories—ironic, I know. That's actually why they're called variables—because the value inside can vary. It's not locked forever. The old value gets deleted like you never existed. Dramatic, but true."[^1]
+"Key rule: when you assign a new value to a variable, the old value is replaced. Not saved. Not archived. Gone. Variables don't keep memories—ironic, I know. That's actually why they're called variables—because the value inside can vary. It's not locked forever. The old value gets deleted like you never existed. Dramatic, but true."
 
 ***
 
@@ -311,11 +311,11 @@ TODO: Watch Cat Videos
 
 **Supporting Visuals (Static):**
 
-- Whiteboard illustration: "Study Python" written and crossed out, "Watch Cat Videos" written below in fresh ink.[^1]
+- Whiteboard illustration: "Study Python" written and crossed out, "Watch Cat Videos" written below in fresh ink.
 - Eraser in hand to emphasize overwrite.
 
 **Audio:**
-"Think of a variable like a whiteboard. You write 'Study Python' on it with determination. Then reality hits. You erase it and write 'Watch Cat Videos' because priorities shift. The old text disappears, new text takes its place. Variables work exactly like that: assign a new value, the old one vanishes."[^1]
+"Think of a variable like a whiteboard. You write 'Study Python' on it with determination. Then reality hits. You erase it and write 'Watch Cat Videos' because priorities shift. The old text disappears, new text takes its place. Variables work exactly like that: assign a new value, the old one vanishes."
 
 ***
 
@@ -338,12 +338,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Left: code as above.[^1]
+- Left: code as above.
 - Right: terminal output `1`, `5`, `23` stacked.
 - Underneath: a simple browser window icon that grows busier (1 tab → 5 tabs → 23 tiny tabs).
 
 **Audio:**
-"Let's track something we all understand: YouTube tabs. Start with 1 tab open—you're being responsible. Print shows 1. Then 'just one more video' happens. We assign youtube_tabs = 5. That overwrites the 1—it's gone. Print shows 5. An hour later? We assign youtube_tabs = 23 and your browser is crying for mercy. The 5 gets replaced. Print shows 23. Same variable, but each new assignment completely overwrites what was there before. Python doesn't judge your tab addiction."[^1]
+"Let's track something we all understand: YouTube tabs. Start with 1 tab open—you're being responsible. Print shows 1. Then 'just one more video' happens. We assign youtube_tabs = 5. That overwrites the 1—it's gone. Print shows 5. An hour later? We assign youtube_tabs = 23 and your browser is crying for mercy. The 5 gets replaced. Print shows 23. Same variable, but each new assignment completely overwrites what was there before. Python doesn't judge your tab addiction."
 
 ***
 
@@ -363,11 +363,11 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Code on left, terminal output (`100` then `150`) on right.[^1]
+- Code on left, terminal output (`100` then `150`) on right.
 - Arrow from `followers = followers + 50` to a small breakdown: "Right side: 100 + 50 → 150; Left side: store 150".
 
 **Audio:**
-"Here's where it gets powerful: you can use a variable's current value to calculate its new value. Followers starts at 100. Then we say: followers equals followers plus 50. Python reads the RIGHT side first—looks up followers, sees 100, adds 50, gets 150. Then it stores that 150 back into followers. The old 100? Replaced. Now when we print, we see 150. It's the same variable, just updated with math."[^1]
+"Here's where it gets powerful: you can use a variable's current value to calculate its new value. Followers starts at 100. Then we say: followers equals followers plus 50. Python reads the RIGHT side first—looks up followers, sees 100, adds 50, gets 150. Then it stores that 150 back into followers. The old 100? Replaced. Now when we print, we see 150. It's the same variable, just updated with math."
 
 ***
 
@@ -390,12 +390,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Code snippet with comments as above.[^1]
+- Code snippet with comments as above.
 - Right side: XP bar graphic going from 0 → 10 → 20 with tick marks.
 - Output `10` and `20` shown under the bar.
 
 **Audio:**
-"This pattern is everywhere in games. You start with 0 XP. You defeat an enemy. We do: xp equals xp plus 10. Python evaluates the right side first—0 plus 10 equals 10—then shoves that back into xp. Print shows 10. Defeat another enemy, same code runs again. Python reads xp—now 10—adds 10, gets 20, stores it back. The 10 gets overwritten. We're not getting a new XP bar each time; the old value just keeps getting replaced."[^1]
+"This pattern is everywhere in games. You start with 0 XP. You defeat an enemy. We do: xp equals xp plus 10. Python evaluates the right side first—0 plus 10 equals 10—then shoves that back into xp. Print shows 10. Defeat another enemy, same code runs again. Python reads xp—now 10—adds 10, gets 20, stores it back. The 10 gets overwritten. We're not getting a new XP bar each time; the old value just keeps getting replaced."
 
 ***
 
@@ -409,11 +409,11 @@ Battery: 100% → 50% → 20% → 1%
 
 **Supporting Visuals (Static):**
 
-- Four battery icons in a row with levels 100%, 50%, 20%, 1%.[^1]
+- Four battery icons in a row with levels 100%, 50%, 20%, 1%.
 - Small caption: "Same icon, changing value."
 
 **Audio:**
-"Your phone battery is basically a variable. Same battery icon, different value inside—and somehow it always drops faster when you need it most."[^1]
+"Your phone battery is basically a variable. Same battery icon, different value inside—and somehow it always drops faster when you need it most."
 
 ***
 
@@ -431,18 +431,18 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Simple timeline: "5 → 10 → 11" above a variable box labeled `x`.[^1]
+- Simple timeline: "5 → 10 → 11" above a variable box labeled `x`.
 - Caption: "New assignments overwrite; math builds on current value."
 
 **Audio:**
-"Variables update constantly. New values replace old ones. And you can use the current value to compute the next value. That's how programs track a changing world."[^1]
+"Variables update constantly. New values replace old ones. And you can use the current value to compute the next value. That's how programs track a changing world."
 
 ***
 
 ## Video 8: Naming Rules
 
 **Duration:** ~135 seconds
-**Concept:** Variable names follow rules (and good style saves you later)[^1]
+**Concept:** Variable names follow rules (and good style saves you later)
 
 ***
 
@@ -456,11 +456,11 @@ Video 8: Naming Rules
 
 **Supporting Visuals (Static):**
 
-- Title centered.[^1]
+- Title centered.
 - Python as a small "name tag" icon with `player_score` written clearly.
 
 **Audio:**
-"You want variables for score, username, level, and everything else. But Python is picky about names. Use the wrong format and your code crashes instantly. Let's learn the rules so Python doesn't have a meltdown."[^1]
+"You want variables for score, username, level, and everything else. But Python is picky about names. Use the wrong format and your code crashes instantly. Let's learn the rules so Python doesn't have a meltdown."
 
 ***
 
@@ -474,11 +474,11 @@ Python = Strict Bouncer
 
 **Supporting Visuals (Static):**
 
-- Cartoon Python snake dressed as a bouncer holding a clipboard labeled "Valid names only".[^1]
+- Cartoon Python snake dressed as a bouncer holding a clipboard labeled "Valid names only".
 - A variable name with sandals and a hyphen (`my-score`) being turned away at a rope barrier.
 
 **Audio:**
-"Python is like a strict nightclub bouncer. It has a guest list. Your variable name shows up wearing sandals and a hyphen? Not getting in."[^1]
+"Python is like a strict nightclub bouncer. It has a guest list. Your variable name shows up wearing sandals and a hyphen? Not getting in."
 
 ***
 
@@ -501,12 +501,12 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Code panel with good lines highlighted green, bad lines red.[^1]
+- Code panel with good lines highlighted green, bad lines red.
 - Small math bubble showing `my - score` above `my-score`.
 - Label: "Only letters, numbers, underscores."
 
 **Audio:**
-"Rule one: only letters, numbers, and underscores. A hyphen looks like subtraction, so Python thinks you're doing math. A space looks like two separate names. Underscores are the safe connector."[^1]
+"Rule one: only letters, numbers, and underscores. A hyphen looks like subtraction, so Python thinks you're doing math. A space looks like two separate names. Underscores are the safe connector."
 
 ***
 
@@ -523,11 +523,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Code snippet with `1st_place` underlined red and `place_1` green.[^1]
+- Code snippet with `1st_place` underlined red and `place_1` green.
 - Tiny caption: "First character must be letter or underscore."
 
 **Audio:**
-"Rule two: don't start with a number. Python sees a leading number and assumes you're doing math, not naming something."[^1]
+"Rule two: don't start with a number. Python sees a leading number and assumes you're doing math, not naming something."
 
 ***
 
@@ -545,11 +545,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Three labeled boxes: `score`, `Score`, `SCORE`, each with its different value.[^1]
+- Three labeled boxes: `score`, `Score`, `SCORE`, each with its different value.
 - Underneath, a recommended-style example: `player_score` labeled "Python style: lowercase_with_underscores".
 
 **Audio:**
-"Rule three: Python is case-sensitive—these are three different variables. It's like three people with the same name who get mad if you call them the wrong version. Python convention is to use lowercase_with_underscores, so names like player_score are the usual style."[^1]
+"Rule three: Python is case-sensitive—these are three different variables. It's like three people with the same name who get mad if you call them the wrong version. Python convention is to use lowercase_with_underscores, so names like player_score are the usual style."
 
 ***
 
@@ -570,11 +570,11 @@ PRODUCE OUTPUT: FALSE
 
 - Two mini panels:
     - Panel A ("Works"): `print("Hello")` with a check.
-    - Panel B ("Breaks"): `print = "oops"` followed by `print("Hello")` with an error icon.[^1]
+    - Panel B ("Breaks"): `print = "oops"` followed by `print("Hello")` with an error icon.
 - Caption: "Some words are already taken by Python."
 
 **Audio:**
-"Rule four: some words are already taken—print, if, for, while. Python called dibs on these. These are words that Python uses, so you shouldn’t use them. You have already learned about the print command. The others you will learn soon."[^1]
+"Rule four: some words are already taken—print, if, for, while. Python called dibs on these. These are words that Python uses, so you shouldn’t use them. You have already learned about the print command. The others you will learn soon."
 
 ***
 
@@ -594,12 +594,12 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Left column titled "Clear": `player_score`, `lives_remaining`.[^1]
+- Left column titled "Clear": `player_score`, `lives_remaining`.
 - Right column titled "Painful": `x`, `n`.
 - Future-you character holding head in hands next to the right column.
 
 **Audio:**
-"Beyond the rules: use descriptive names. player_score is clear. But 'x'? Is that a coordinate? A score? The number of times you’ve rage-quit today? Future you will open this code and whisper: 'Who wrote this?' Spoiler: it was you."[^1]
+"Beyond the rules: use descriptive names. player_score is clear. But 'x'? Is that a coordinate? A score? The number of times you’ve rage-quit today? Future you will open this code and whisper: 'Who wrote this?' Spoiler: it was you."
 
 ***
 
@@ -615,11 +615,11 @@ math_assignment_jan_2024.pdf
 
 **Supporting Visuals (Static):**
 
-- Two file icons side by side: one with the chaotic long name, one with the clean structured name.[^1]
+- Two file icons side by side: one with the chaotic long name, one with the clean structured name.
 - Caption: "Good names save time later."
 
 **Audio:**
-"It’s like naming computer files. Ever seen a folder full of files named ‘homework_final_FINAL_v3_REAL_actually_final.pdf’? Chaos. Or clear names like ‘math_assignment_jan_2024.pdf’? You find it instantly. Good variable names are self-explanatory—you know what’s inside without guessing."[^1]
+"It’s like naming computer files. Ever seen a folder full of files named ‘homework_final_FINAL_v3_REAL_actually_final.pdf’? Chaos. Or clear names like ‘math_assignment_jan_2024.pdf’? You find it instantly. Good variable names are self-explanatory—you know what’s inside without guessing."
 
 ***
 
@@ -637,18 +637,18 @@ Use clear, readable names
 
 **Supporting Visuals (Static):**
 
-- Simple checklist with these five bullets and checkmarks.[^1]
+- Simple checklist with these five bullets and checkmarks.
 - Small example at bottom: `player_score` with a green tick.
 
 **Audio:**
-"Letters, numbers, underscores. Start with a letter or underscore. Case-sensitive. Avoid reserved words. And choose names that make your code readable."[^1]
+"Letters, numbers, underscores. Start with a letter or underscore. Case-sensitive. Avoid reserved words. And choose names that make your code readable."
 
 ***
 
 ## Video 9.1: Understanding Strings (Why “String”?)
 
 **Duration:** ~125 seconds
-**Concept:** Strings are text in quotes[^1]
+**Concept:** Strings are text in quotes
 
 ***
 
@@ -662,11 +662,11 @@ Video 9.1: Understanding Strings
 
 **Supporting Visuals (Static):**
 
-- Title centered.[^1]
+- Title centered.
 - Icon of text `"HELLO"` hanging like beads on a string.
 
 **Audio:**
-"In Python, text data is called a String. But why? Let's break down what strings are, why they have that name, and why you'll use them constantly."[^1]
+"In Python, text data is called a String. But why? Let's break down what strings are, why they have that name, and why you'll use them constantly."
 
 ***
 
@@ -684,11 +684,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Code snippet with comments visible but slightly faded to keep focus on quoted text.[^1]
+- Code snippet with comments visible but slightly faded to keep focus on quoted text.
 - Small icons next to each: user avatar, fire/this‑is‑fine meme hint, potion bottle.
 
 **Audio:**
-"Strings are text wrapped in quotes. Usernames, messages, item names—anything made of characters is a string. Python doesn't judge what you type. It just stores it."[^1]
+"Strings are text wrapped in quotes. Usernames, messages, item names—anything made of characters is a string. Python doesn't judge what you type. It just stores it."
 
 ***
 
@@ -704,11 +704,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Central visual: beads labeled H‑E‑L‑L‑O on a single necklace string.[^1]
+- Central visual: beads labeled H‑E‑L‑L‑O on a single necklace string.
 - Arrow from beads to the word "String of characters".
 
 **Audio:**
-"It's called a string because it's a string of characters—like beads on a necklace. HELLO is five characters in order. Somebody way back thought that's how it looked, and we've been living with it ever since. Kind of like how we call it a pineapple even though it's neither a pine nor an apple."[^1]
+"It's called a string because it's a string of characters—like beads on a necklace. HELLO is five characters in order. Somebody way back thought that's how it looked, and we've been living with it ever since. Kind of like how we call it a pineapple even though it's neither a pine nor an apple."
 
 ***
 
@@ -725,12 +725,12 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Code snippet shown.[^1]
+- Code snippet shown.
 - Around `"` characters, a small ice/freeze icon indicating "frozen text".
 - Caption: "Quotes stop Python from 'thinking'—just store exactly."
 
 **Audio:**
-"Quotes tell Python: 'Take a time-out—don't think, just remember exactly what you see.' The moment Python sees an opening quote, it stops trying to understand or execute anything. It just collects every character—letters, spaces, symbols, whatever—until it sees the closing quote. Then it stores all of that as frozen text. No interpretation. No commands. Just pure text, saved exactly as written."[^1]
+"Quotes tell Python: 'Take a time-out—don't think, just remember exactly what you see.' The moment Python sees an opening quote, it stops trying to understand or execute anything. It just collects every character—letters, spaces, symbols, whatever—until it sees the closing quote. Then it stores all of that as frozen text. No interpretation. No commands. Just pure text, saved exactly as written."
 
 ***
 
@@ -747,12 +747,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Code snippet with `"10 + 5"` clearly inside quotes.[^1]
+- Code snippet with `"10 + 5"` clearly inside quotes.
 - Terminal output showing literal `10 + 5` (not 15).
 - Small note: "Text, not math."
 
 **Audio:**
-"Here's the weird part: even if you put math inside quotes, Python won't calculate it. It just stores the characters '1', '0', ' ', '+', ' ', '5'. You get the text '10 + 5', not the answer 15. Quotes freeze everything into text."[^1]
+"Here's the weird part: even if you put math inside quotes, Python won't calculate it. It just stores the characters '1', '0', ' ', '+', ' ', '5'. You get the text '10 + 5', not the answer 15. Quotes freeze everything into text."
 
 ***
 
@@ -769,11 +769,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Second line highlighted red with a small "NameError" bubble.[^1]
+- Second line highlighted red with a small "NameError" bubble.
 - Caption: "Without quotes, Python thinks Alex is a variable name."
 
 **Audio:**
-"Without quotes, Python assumes you're referring to a variable named Alex. If Alex doesn't exist, Python complains. Quotes make it literal text."[^1]
+"Without quotes, Python assumes you're referring to a variable named Alex. If Alex doesn't exist, Python complains. Quotes make it literal text."
 
 ***
 
@@ -790,18 +790,18 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Code-style box with comments exactly as above.[^1]
+- Code-style box with comments exactly as above.
 - Small highlight on the quotes as the key difference.
 
 **Audio:**
-"Strings are text in quotes. Quotes freeze text so Python stores it exactly."[^1]
+"Strings are text in quotes. Quotes freeze text so Python stores it exactly."
 
 ***
 
 ## Video 9.2: Understanding Numbers (Integers \& Floats)
 
 **Duration:** ~115 seconds
-**Concept:** Integers vs floats, and why mixing types breaks things[^1]
+**Concept:** Integers vs floats, and why mixing types breaks things
 
 ***
 
@@ -815,11 +815,11 @@ Video 9.2: Understanding Numbers
 
 **Supporting Visuals (Static):**
 
-- Title centered.[^1]
+- Title centered.
 - Two big number tokens: `42` labeled "int", `3.14` labeled "float".
 
 **Audio:**
-"Now let's talk about actual numbers. Python has integers for whole numbers and floats for decimals. Mixing numbers with strings is where the comedy—and the errors—begin."[^1]
+"Now let's talk about actual numbers. Python has integers for whole numbers and floats for decimals. Mixing numbers with strings is where the comedy—and the errors—begin."
 
 ***
 
@@ -838,11 +838,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Game HUD elements: hearts with "3", big score "1000", level badge "42", player count "100".[^1]
+- Game HUD elements: hearts with "3", big score "1000", level badge "42", player count "100".
 - Caption: "Counting things? Use integers."
 
 **Audio:**
-"Integers are whole numbers. Great for counting: lives, scores, levels, number of players. You can't have 2.5 lives. That's not how games—or life—works."[^1]
+"Integers are whole numbers. Great for counting: lives, scores, levels, number of players. You can't have 2.5 lives. That's not how games—or life—works."
 
 ***
 
@@ -862,10 +862,10 @@ PRODUCE OUTPUT: FALSE
 
 - Price tag "₹9.99" or "9.99".
 - Health bar at 87.5%, numeric label "87.5".
-- Progress ring or percentage bar labeled "75%".[^1]
+- Progress ring or percentage bar labeled "75%".
 
 **Audio:**
-"Floats are decimals. Great for prices, percentages, and anything that needs precision. That dot is the clue: decimal point equals float."[^1]
+"Floats are decimals. Great for prices, percentages, and anything that needs precision. That dot is the clue: decimal point equals float."
 
 ***
 
@@ -886,11 +886,11 @@ PRODUCE OUTPUT: TRUE
 
 - Left: `age = 25` boxed with label "number".
 - Middle: `age = "25"` boxed with label "string".
-- Bottom: terminal showing `30`.[^1]
+- Bottom: terminal showing `30`.
 - Caption: "Quotes turn numbers into text."
 
 **Audio:**
-"Critical difference: numbers have no quotes. Put quotes around a number and you've turned it into text. Without quotes, 25 plus 5 gives you 30. With quotes, '25' is frozen text—you can't do math with it. Quotes change everything."[^1]
+"Critical difference: numbers have no quotes. Put quotes around a number and you've turned it into text. Without quotes, 25 plus 5 gives you 30. With quotes, '25' is frozen text—you can't do math with it. Quotes change everything."
 
 ***
 
@@ -909,11 +909,11 @@ PRODUCE OUTPUT: TRUE
 
 - Small blender illustration:
     - Fruit labeled "numbers" blending smoothly.
-    - Rock labeled `"hello"` jamming the blender.[^1]
+    - Rock labeled `"hello"` jamming the blender.
 - Terminal output: `5.0` then a `TypeError` line.
 
 **Audio:**
-"Think of math like a blender. Numbers are fruit—blend smoothly. Strings are rocks—blend that and something breaks. Python doesn't know what 'divide text' means, so it throws a TypeError and stops instead of guessing."[^1]
+"Think of math like a blender. Numbers are fruit—blend smoothly. Strings are rocks—blend that and something breaks. Python doesn't know what 'divide text' means, so it throws a TypeError and stops instead of guessing."
 
 ***
 
@@ -931,11 +931,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Three icons: heart (lives), star rating (4.5 stars), user avatar ("Neo").[^1]
+- Three icons: heart (lives), star rating (4.5 stars), user avatar ("Neo").
 - Each icon linked to its code line and type label.
 
 **Audio:**
-"Simple rule: text in quotes equals string. Whole numbers equal int. Decimals equal float. Match the type to the job and your code behaves."[^1]
+"Simple rule: text in quotes equals string. Whole numbers equal int. Decimals equal float. Match the type to the job and your code behaves."
 
 ***
 
@@ -953,18 +953,18 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Three boxes side by side labeled "int", "float", "string".[^1]
+- Three boxes side by side labeled "int", "float", "string".
 - Caption: "Same digits, different types."
 
 **Audio:**
-"Two number types: integers and floats. Don't put quotes around numbers unless you want text."[^1]
+"Two number types: integers and floats. Don't put quotes around numbers unless you want text."
 
 ***
 
 ## Video 10: Working with Multiple Variables
 
 **Duration:** ~130 seconds
-**Concept:** Real programs use many variables together (including True/False)[^1]
+**Concept:** Real programs use many variables together (including True/False)
 
 ***
 
@@ -978,11 +978,11 @@ Video 10: Working with Multiple Variables
 
 **Supporting Visuals (Static):**
 
-- Title centered.[^1]
+- Title centered.
 - Character profile card silhouette with several labeled fields (name, level, HP, etc.).
 
 **Audio:**
-"One variable is lonely. Real programs juggle lots of variables at once: username, score, level, settings, inventory—everything. Let's build a character profile to see how variables work together."[^1]
+"One variable is lonely. Real programs juggle lots of variables at once: username, score, level, settings, inventory—everything. Let's build a character profile to see how variables work together."
 
 ***
 
@@ -1003,11 +1003,11 @@ PRODUCE OUTPUT: FALSE
 **Supporting Visuals (Static):**
 
 - Simple character sheet layout:
-    - Name, Level, Speed, Weapon, "Runs from combat?" fields filled with the variable values.[^1]
+    - Name, Level, Speed, Weapon, "Runs from combat?" fields filled with the variable values.
 - Icons: hooded figure, level badge, speed shoe, rusty spoon, running man.
 
 **Audio:**
-"Meet our hero. Great name… questionable stats. Notice we're using different types: text for names, numbers for stats, and True/False for behavior. That True/False type is called a Boolean—basically an on/off switch."[^1]
+"Meet our hero. Great name… questionable stats. Notice we're using different types: text for names, numbers for stats, and True/False for behavior. That True/False type is called a Boolean—basically an on/off switch."
 
 ***
 
@@ -1021,11 +1021,11 @@ Each variable = its own pocket
 
 **Supporting Visuals (Static):**
 
-- Backpack with clearly separated labeled pockets: `hero_name`, `hero_level`, `hero_speed`, `hero_weapon`, `runs_from_combat`.[^1]
+- Backpack with clearly separated labeled pockets: `hero_name`, `hero_level`, `hero_speed`, `hero_weapon`, `runs_from_combat`.
 - Caption: "Changing one pocket doesn’t change the others."
 
 **Audio:**
-"Think of each variable like its own pocket. Weapon pocket, speed pocket, name pocket. Changing one pocket doesn't magically change the others."[^1]
+"Think of each variable like its own pocket. Weapon pocket, speed pocket, name pocket. Changing one pocket doesn't magically change the others."
 
 ***
 
@@ -1045,11 +1045,11 @@ PRODUCE OUTPUT: TRUE
 **Supporting Visuals (Static):**
 
 - Code on left, terminal output on right:
-`Hero: Swift_Shadow_Assassin` etc.[^1]
+`Hero: Swift_Shadow_Assassin` etc.
 - Small note: "Commas add spaces between pieces automatically."
 
 **Audio:**
-"Use commas in print() to show labels and values together. print() handles spacing for you. Clean, readable output."[^1]
+"Use commas in print() to show labels and values together. print() handles spacing for you. Clean, readable output."
 
 ***
 
@@ -1067,12 +1067,12 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Code snippet as above.[^1]
+- Code snippet as above.
 - Terminal output: `Swift_Shadow_Assassin The Legendary`.
 - Visual: three text blocks ("Swift_Shadow_Assassin", `" "`, "The Legendary") being glued together into one banner.
 
 **Audio:**
-"You can glue strings together with plus. Some people call this concatenation, but think of it as superglue for text. Here's how it works: Python takes hero_name—that's 'Swift_Shadow_Assassin'—adds a space, then adds 'The Legendary'. They stick together into one long string. Now our cowardly hero has a properly formatted title."[^1]
+"You can glue strings together with plus. Some people call this concatenation, but think of it as superglue for text. Here's how it works: Python takes hero_name—that's 'Swift_Shadow_Assassin'—adds a space, then adds 'The Legendary'. They stick together into one long string. Now our cowardly hero has a properly formatted title."
 
 ***
 
@@ -1092,14 +1092,14 @@ PRODUCE OUTPUT: TRUE
 
 **Supporting Visuals (Static):**
 
-- Code block.[^1]
+- Code block.
 - Two separate speed gauges:
     - Hero speed gauge changing from 0.1 to 0.05.
     - Enemy speed gauge locked at 50.0.
 - Arrow/label: "Updating hero_speed does not touch enemy_speed."
 
 **Audio:**
-"Changing hero_speed doesn't change enemy_speed. Variables don't affect each other unless you explicitly connect them. They're separate containers."[^1]
+"Changing hero_speed doesn't change enemy_speed. Variables don't affect each other unless you explicitly connect them. They're separate containers."
 
 ***
 
@@ -1119,11 +1119,11 @@ PRODUCE OUTPUT: FALSE
 
 **Supporting Visuals (Static):**
 
-- Two columns: "Player" vs "Enemy" with HP and XP under each.[^1]
+- Two columns: "Player" vs "Enemy" with HP and XP under each.
 - Clear grouping lines showing the prefixes `player_` and `enemy_`.
 
 **Audio:**
-"Organization matters. Prefixes like player_ and enemy_ keep your variables from turning into a confusing soup. The player has 50 HP, the enemy has 500. Accidentally swapping those would make for a very short, very one-sided game."[^1]
+"Organization matters. Prefixes like player_ and enemy_ keep your variables from turning into a confusing soup. The player has 50 HP, the enemy has 500. Accidentally swapping those would make for a very short, very one-sided game."
 
 ***
 
@@ -1139,11 +1139,11 @@ One coherent system
 
 **Supporting Visuals (Static):**
 
-- Full character sheet recap with all fields: name, level, speed, weapon, behavior flags, HP/XP.[^1]
+- Full character sheet recap with all fields: name, level, speed, weapon, behavior flags, HP/XP.
 - Caption: "Real programs juggle lots of variables together."
 
 **Audio:**
-"Real programs coordinate many variables of different types. Name them clearly, keep them organized, and use them together to describe bigger systems."[^1]
+"Real programs coordinate many variables of different types. Name them clearly, keep them organized, and use them together to describe bigger systems."
 
 ***
 
@@ -1152,7 +1152,7 @@ _End of Arc 2 static visual specification._
 
 <div align="center">⁂</div>
 
-[^1]: Arc2-V5.4-FINAL-1.md
+: Arc2-V5.4-FINAL-1.md
 
 [^2]: __Arc 2_ Memory \& Storage - REVISED (Casual \& Humo.docx
 
