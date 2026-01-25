@@ -376,42 +376,27 @@ export class VideoFolderCreator {
         if (!durationText || durationText === '0 seconds' || durationText.startsWith('0 ')) {
             durationText = `${totalSeconds} seconds`;
         }
-        lines.push(`Create a Video Overview (~${durationText}) using the DOCX as the single source.`);
-        lines.push(`CRITICAL CONTENT RULE:`);
-        lines.push(`The narration file (${narrationFilename}) is the SOLE source of all audio content.`);
-        lines.push(`Read ONLY the exact text in the narration file—verbatim, word-for-word.`);
-        lines.push(`Do NOT deviate, ad-lib, or add commentary.`);
+        lines.push(`Create a Video Overview (~${durationText}) using the DOCX as the source.`);
+        lines.push(``);
+        lines.push(`CRITICAL INSTRUCTION FOR DOCX INTERPRETATION:`);
+        lines.push(`1. IGNORE HEADERS: Do NOT generate slides that display the text "[SLIDE X]" or "Video 0". Treat all bracketed text [ ] as invisible instructions.`);
+        lines.push(`2. USE SUPPORTING VISUALS: When the DOCX has a section labeled "Supporting Visuals" (e.g., "Split screen: Person at desk vs Code running"), you must GENERATE that exact image. Do NOT just write the text of the description on screen.`);
+        lines.push(`3. NO CHAPTER CARDS: The video must flow continuously. Do not insert "Chapter 1" or "Part 1" title cards between segments.`);
+
+        lines.push(``);
+        lines.push(`AUDIO RULE:`);
+        lines.push(`- Source: Use 'video0,1,2_narration.txt' exclusively.`);
+        lines.push(`- Read VERBATIM. Do not ad-lib. Do not read visual descriptions.`);
+
         lines.push(``);
         lines.push(`ABSOLUTE RULES:`);
-        lines.push(``);
-        lines.push(`1. Read ONLY the exact text in the narration file—verbatim, word-for-word.`);
-        lines.push(``);
-        lines.push(`2. Do NOT add intro/outro, transitions, filler words ("So," "Okay," "Well"), definitions, or summaries.`);
-        lines.push(``);
-        lines.push(`3. ALWAYS complete full narration for every segment—even if images are missing.`);
-        lines.push(``);
-        lines.push(`4. Narration and visuals must align perfectly.`);
-        lines.push(``);
-        lines.push(`5. Do not draw boxes over the code. If you want to point to something in code use an arrow`);
-        lines.push(``);
-        lines.push(`6. Do not draw anything on code that might cover the text or make it hard to read. drawing arrows is fine`);
+        lines.push(`1. FULL IMMERSION: The entire slide is the screen. Do not place a "computer monitor" on a desk. The viewer IS the computer.`);
+        lines.push(`2. DARK MODE ENFORCEMENT: The background of every single slide must be black pixels (#000000) or a dark grid.`);
+
         lines.push(``);
 
         lines.push(`SLIDE TIMING (EXACT):`);
         lines.push(`${timingParts.join(', ')}. Total: ~${totalSeconds} seconds.`);
-
-        lines.push(``);
-        lines.push(`VISUAL MANDATE:`);
-        lines.push(`- GENERATE EVERY SINGLE SLIDE`);
-        lines.push(`- EVERY SLIDE MUST HAVE A VISUAL (no text-only slides)`);
-        lines.push(`- Code must be readable`);
-        lines.push(`- All slides must have dark backgrounds`);
-        lines.push(`- Do not skip or merge slides`);
-        lines.push(`- Use visual metaphors to explain Python concepts—for example, use a literal 'box' to represent a variable or a 'loop' graphic for iteration.`);
-
-        lines.push(``);
-        lines.push(`THEME:`);
-        lines.push(`Apply hacker/cybersecurity aesthetic throughout. Use the NotebookLM Style Settings for visual design.`);
         lines.push(``);
 
         // Visual assets section - only slides with images
@@ -422,7 +407,7 @@ export class VideoFolderCreator {
                 lines.push(`Slide ${slide.number}: ${images.join(', ')}`);
             }
         }
-        lines.push(``);
+        lines.push(`- Do not obscure the code text with other graphics.`);
 
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         console.log(`[VideoFolderCreator] Generated: ${filePath}`);
@@ -490,6 +475,7 @@ export class VideoFolderCreator {
 
         // ===== SLIDES =====
         let currentOriginalVideo = ''; // Track video changes
+        let isFirstVideoHeader = true; // Track if we've added the first video header
 
         for (const slide of video.slides) {
             const slideScreenshots = screenshotsBySlide.get(slide.number) || [];
@@ -499,19 +485,22 @@ export class VideoFolderCreator {
             if (slide.originalVideoNumber && slide.originalVideoNumber !== currentOriginalVideo) {
                 currentOriginalVideo = slide.originalVideoNumber;
 
-                // Add explicit Video Header (Visual Demarcation)
-                children.push(new Paragraph({
-                    text: `Video: ${currentOriginalVideo}`,
-                    heading: HeadingLevel.HEADING_1,
-                    spacing: { before: 400, after: 200 }
-                    // Border removed to avoid TS issues with specific docx version
-                }));
+                // Add explicit Video Header (Visual Demarcation) - ONLY for the first video in the batch
+                if (isFirstVideoHeader) {
+                    children.push(new Paragraph({
+                        text: `[[Video: ${currentOriginalVideo}]]`, // Wrapped in [[]]
+                        heading: HeadingLevel.HEADING_1,
+                        spacing: { before: 400, after: 200 }
+                    }));
+                    isFirstVideoHeader = false;
+                }
+                // Subsequent video headers are skipped as per requirement
             }
 
             // Slide Header with duration
             const slideHeader = slide.duration
-                ? `[SLIDE ${slide.number}: ${slide.title}] **[${slide.duration} seconds]**`
-                : `[SLIDE ${slide.number}: ${slide.title}]`;
+                ? `[[SLIDE ${slide.number}: ${slide.title}]] **[${slide.duration} seconds]**`
+                : `[[SLIDE ${slide.number}: ${slide.title}]]`;
 
             children.push(new Paragraph({
                 text: slideHeader,

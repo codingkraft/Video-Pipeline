@@ -1,0 +1,9 @@
+--- START VERIFICATION ---
+HEADER ADDED: [[Video: 5]]
+SLIDE ADDED: [[SLIDE 1: Intro]] **[10 seconds]**
+SLIDE ADDED: [[SLIDE 2: Concept]] **[20 seconds]**
+HEADER SKIPPED for Video: 6
+SLIDE ADDED: [[SLIDE 3: Start Video 6]] **[15 seconds]**
+HEADER SKIPPED for Video: 7
+SLIDE ADDED: [[SLIDE 4: Start Video 7]] **[15 seconds]**
+--- END VERIFICATION ---
